@@ -120,12 +120,23 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.play()
 
-        // Start automatic QR detection when video starts playing
+        // Set up event listeners for video
         videoRef.current.onloadedmetadata = () => {
-          startAutoScan()
+          console.log('📹 Video metadata loaded, dimensions:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight)
         }
+
+        videoRef.current.oncanplay = () => {
+          console.log('📹 Video can play, starting auto-scan...')
+          // Start auto-scan when video is ready to play
+          setTimeout(() => {
+            startAutoScan()
+          }, 500) // Small delay to ensure video is fully ready
+        }
+
+        // Start playing the video
+        await videoRef.current.play()
+        console.log('📹 Video started playing')
       }
     } catch (err) {
       console.error('Camera access error:', err)
@@ -152,9 +163,14 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
 
     scanIntervalRef.current = setInterval(() => {
       if (!processing && scanning && videoRef.current && videoRef.current.readyState === 4) {
-        performAutoScan()
+        // Check if video has valid dimensions
+        if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+          performAutoScan()
+        } else {
+          console.log('⏳ Video not ready yet, dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight)
+        }
       }
-    }, 500) // Scan every 500ms
+    }, 200) // Scan every 200ms for faster detection
   }
 
   // Stop automatic scanning
@@ -174,7 +190,16 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
-    if (!context) return
+    if (!context) {
+      console.log('❌ Canvas context not available')
+      return
+    }
+
+    // Check video dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.log('⏳ Video dimensions not ready:', video.videoWidth, 'x', video.videoHeight)
+      return
+    }
 
     try {
       // Set canvas size to match video
@@ -187,24 +212,56 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
       // Get image data for QR scanning
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
 
-      // Try to scan QR code using jsQR library
-      const jsQR = (await import('jsqr')).default
-      const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'attemptBoth'
-      })
+      // Validate image data
+      if (!imageData || imageData.data.length === 0) {
+        console.log('❌ No image data captured')
+        return
+      }
+
+      // Try to scan QR code using jsQR library with multiple attempts
+      let jsQR
+      try {
+        jsQR = (await import('jsqr')).default
+      } catch (importError) {
+        console.error('Failed to import jsQR:', importError)
+        setError('QR scanning library not available. Please refresh the page.')
+        return
+      }
+
+      // Try different scanning options for better detection
+      const scanOptions = [
+        { inversionAttempts: 'attemptBoth' },
+        { inversionAttempts: 'onlyInvert' },
+        { inversionAttempts: 'dontInvert' }
+      ]
+
+      let qrCode = null
+      for (const options of scanOptions) {
+        try {
+          qrCode = jsQR(imageData.data, imageData.width, imageData.height, options)
+          if (qrCode && qrCode.data) break
+        } catch (scanError) {
+          console.log('QR scan attempt failed with options:', options, scanError)
+        }
+      }
 
       if (qrCode && qrCode.data) {
-        console.log('🎯 QR Code automatically detected!')
+        console.log('🎯 QR Code automatically detected!', qrCode.data.substring(0, 50) + '...')
 
         // Stop auto-scanning to prevent multiple detections
         stopAutoScan()
 
         // Process the detected QR code
         await processDetectedQR(qrCode.data)
+      } else {
+        // Log every 20th attempt to avoid spam
+        if (Math.random() < 0.05) {
+          console.log('🔍 Auto-scan attempt - no QR code found (canvas:', canvas.width, 'x', canvas.height, ')')
+        }
       }
     } catch (error) {
-      // Silent fail for auto-scan - don't show errors for failed attempts
-      console.log('Auto-scan attempt failed:', error)
+      // Log errors but don't show to user for auto-scan
+      console.error('Auto-scan error:', error)
     }
   }
 
@@ -518,28 +575,44 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
               ) : (
                 <div className="space-y-3">
                   {/* Auto-scan status */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-center space-x-2">
-                      {autoScanActive ? (
-                        <>
-                          <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                          <span className="text-sm text-blue-700 font-medium">
-                            🔍 Automatically scanning for QR codes...
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
-                          <span className="text-sm text-gray-600">
-                            Auto-scan paused
-                          </span>
-                        </>
+                  <div className={`border rounded-lg p-3 ${
+                    autoScanActive
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {autoScanActive ? (
+                          <>
+                            <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-sm text-green-700 font-medium">
+                              🔍 Auto-scanning active (every 200ms)
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
+                            <span className="text-sm text-gray-600">
+                              Auto-scan paused
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {autoScanActive && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={stopAutoScan}
+                          className="text-xs"
+                        >
+                          Pause
+                        </Button>
                       )}
                     </div>
                   </div>
 
                   {/* Control buttons */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                     <Button
                       variant="outline"
                       onClick={() => fileInputRef.current?.click()}
@@ -548,6 +621,21 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
                       <Upload className="h-4 w-4 mr-2" />
                       <span className="hidden sm:inline">Upload Image</span>
                       <span className="sm:hidden">Upload</span>
+                    </Button>
+
+                    {/* Manual test scan button for debugging */}
+                    <Button
+                      onClick={performAutoScan}
+                      disabled={processing}
+                      className="bg-blue-500 hover:bg-blue-600 w-full text-sm sm:text-base py-2 sm:py-3"
+                    >
+                      {processing ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Scan className="h-4 w-4 mr-2" />
+                      )}
+                      <span className="hidden sm:inline text-white">Test Scan</span>
+                      <span className="sm:hidden text-white">Test</span>
                     </Button>
 
                     <Button
