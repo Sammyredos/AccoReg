@@ -1060,7 +1060,7 @@ function AttendancePageContent() {
                             showVerifyButton={!registration.isVerified}
                             showUnverifyButton={registration.isVerified}
                             showQRButton={registration.hasQRCode && !registration.isVerified}
-                            showQRViewButton={!!registration.qrCode}
+                            showQRViewButton={!!registration.qrCode && !registration.isVerified}
                           />
                         </div>
                       ))}

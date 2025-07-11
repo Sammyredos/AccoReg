@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
     const [
       totalRegistrations,
       verifiedRegistrations,
-      unverifiedRegistrations,
       totalRooms,
       activeRooms,
       totalCapacity,
@@ -41,9 +40,6 @@ export async function GET(request: NextRequest) {
       prisma.registration.count(),
       prisma.registration.count({
         where: { isVerified: true }
-      }),
-      prisma.registration.count({
-        where: { isVerified: false }
       }),
       
       // Room stats
@@ -65,6 +61,9 @@ export async function GET(request: NextRequest) {
         }
       })
     ])
+
+    // Calculate unverified registrations consistently with other APIs
+    const unverifiedRegistrations = totalRegistrations - verifiedRegistrations
 
     const totalCapacityValue = totalCapacity._sum.capacity || 0
     const occupiedSpacesValue = occupiedSpaces._count || 0
