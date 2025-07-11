@@ -1,0 +1,195 @@
+/* Settings Page Responsive Styles */
+
+/* Hide scrollbar for horizontal scroll on tab navigation */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Smooth scrolling for tab navigation */
+.tab-scroll-container {
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+}
+
+.tab-scroll-container > * {
+  scroll-snap-align: start;
+}
+
+/* Enhanced focus states for accessibility */
+.tab-button:focus {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Mobile-first responsive animations */
+@media (max-width: 640px) {
+  .tab-button {
+    transform: scale(1);
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .tab-button:active {
+    transform: scale(0.95);
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .tab-button {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .tab-button:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1025px) {
+  .tab-button {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .tab-button:hover {
+    transform: translateY(-3px) scale(1.02);
+  }
+}
+
+/* Grid layout animations for large screens */
+@media (min-width: 1280px) {
+  .tab-grid-item {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .tab-grid-item:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+}
+
+/* Enhanced gradient animations */
+.gradient-tab {
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Responsive text scaling */
+.responsive-text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-text-xs {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .responsive-text-xs {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+}
+
+/* Tab content fade-in animation */
+.tab-content-enter {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: tabContentFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes tabContentFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile dropdown enhancements */
+.mobile-dropdown {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* Loading states */
+.tab-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.tab-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #f3f4f6;
+  border-top: 2px solid #4f46e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .tab-button {
+    border: 2px solid currentColor;
+  }
+  
+  .tab-button.active {
+    background: #000;
+    color: #fff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .tab-button,
+  .tab-grid-item,
+  .gradient-tab {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .tab-navigation {
+    display: none;
+  }
+  
+  .tab-content {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+}

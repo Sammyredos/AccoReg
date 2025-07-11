@@ -1,0 +1,140 @@
+services:
+  - type: web
+    name: Mopgomyouth
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: |
+      echo "🚀 Starting Mopgomyouth production build process..." &&
+      echo "📦 Installing dependencies with production optimizations..." &&
+      npm ci --production=false &&
+      echo "🔧 Installing build dependencies..." &&
+      npm install --save-dev @types/node typescript tsx &&
+      echo "✅ Dependencies installed successfully" &&
+      echo "🧹 Cleaning previous build artifacts..." &&
+      rm -rf .next || true &&
+      echo "🔧 Generating optimized Prisma client..." &&
+      npx prisma generate &&
+      echo "✅ Prisma client generated" &&
+      echo "🗄️ Deploying database migrations..." &&
+      npx prisma migrate deploy &&
+      echo "✅ Database migrations deployed" &&
+      echo "👑 Setting up Super Admin account..." &&
+      (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
+      echo "⚙️ Seeding system settings..." &&
+      (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
+      echo "🏗️ Building Next.js application with production optimizations..." &&
+      NODE_ENV=production npm run build &&
+      echo "🧹 Cleaning up development dependencies..." &&
+      npm prune --production &&
+      echo "🎉 Mopgomyouth production build completed successfully!" &&
+      echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
+      echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!" &&
+      echo "📊 Build size analysis:" &&
+      du -sh .next || true
+    startCommand: NODE_ENV=production npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Core Application Settings
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: youth-registration-database
+          property: connectionString
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        value: https://mopgomyouth.onrender.com
+      - key: SUPER_ADMIN_PASSWORD
+        value: SuperAdmin123!
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # Performance & Caching
+      - key: REDIS_URL
+        value: ""
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: LOG_LEVEL
+        value: "warn"
+      - key: HEALTH_CHECK_ENABLED
+        value: "true"
+
+      # Build Optimizations
+      - key: SKIP_TYPE_CHECK
+        value: "false"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: ANALYZE
+        value: "false"
+
+      # GDPR & Compliance
+      - key: GDPR_ENABLED
+        value: "true"
+      - key: DATA_RETENTION_DAYS
+        value: "2555"
+      - key: CONSENT_VERSION
+        value: "1.0"
+      # Email Configuration
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: samuel.obadina93@gmail.com
+      - key: SMTP_PASS
+        value: gdjr ryiz gjwx yekm
+      - key: SMTP_SECURE
+        value: "false"
+      - key: EMAIL_FROM_NAME
+        value: MopgomYouth
+      - key: EMAIL_REPLY_TO
+        value: noreply@mopgomyouth.com
+      - key: ADMIN_EMAILS
+        value: admin@youthreg.com,samuel.obadina93@gmail.com
+      - key: EMAIL_NOTIFICATIONS_ENABLED
+        value: "true"
+      - key: SEND_REGISTRATION_EMAILS
+        value: "true"
+      - key: SEND_ADMIN_NOTIFICATIONS
+        value: "true"
+
+      # Security & Headers
+      - key: SECURITY_HEADERS_ENABLED
+        value: "true"
+      - key: CSP_ENABLED
+        value: "true"
+      - key: HSTS_ENABLED
+        value: "true"
+      - key: BACKUP_ENCRYPTION
+        value: "true"
+      - key: BACKUP_ENCRYPTION_KEY
+        generateValue: true
+
+      # Production Performance
+      - key: MAX_REQUEST_SIZE
+        value: "10mb"
+      - key: BODY_PARSER_LIMIT
+        value: "10mb"
+      - key: CONNECTION_POOL_SIZE
+        value: "10"
+      - key: QUERY_TIMEOUT
+        value: "30000"
+
+      # Monitoring & Analytics
+      - key: ENABLE_ANALYTICS
+        value: "true"
+      - key: ENABLE_PERFORMANCE_MONITORING
+        value: "true"
+      - key: ERROR_REPORTING_ENABLED
+        value: "true"
+
+databases:
+  - name: youth-registration-database
+    plan: free
+    databaseName: youth_registration
+    user: youth_user
+    region: oregon
