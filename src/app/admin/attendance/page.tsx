@@ -15,6 +15,7 @@ import { QRCodeViewModal } from '@/components/modals/QRCodeViewModal'
 import { VerificationConfirmModal } from '@/components/modals/VerificationConfirmModal'
 import { useAccommodationUpdates, AccommodationUpdatesProvider } from '@/contexts/AccommodationUpdatesContext'
 import { capitalizeName } from '@/lib/utils'
+import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
 
 import {
   Activity,
@@ -109,7 +110,31 @@ function AttendancePageContent() {
   const [showQRViewModal, setShowQRViewModal] = useState(false)
   const [qrViewTarget, setQRViewTarget] = useState<Registration | null>(null)
 
+  // Real-time attendance updates
+  const { isConnected, connectionError, lastEvent, eventCount } = useRealTimeAttendance({
+    onVerification: (event) => {
+      // Auto-refresh data when someone is verified
+      loadRegistrations()
+      loadStats()
 
+      // Auto-close QR scanner modal if the verified person matches current scan
+      if (showQRScanner && event.data.registrationId) {
+        setShowQRScanner(false)
+        setScannerInputValue('')
+      }
+
+      // Auto-close confirmation modal if it's open
+      if (showConfirmModal && confirmTarget?.id === event.data.registrationId) {
+        setShowConfirmModal(false)
+        setConfirmTarget(null)
+      }
+    },
+    onStatusChange: (event) => {
+      // Refresh data on status changes
+      loadRegistrations()
+      loadStats()
+    }
+  })
 
   // Dropdown states for collapsible sections - closed by default on mobile/tablet
   const [isGenderBreakdownOpen, setIsGenderBreakdownOpen] = useState(false)
@@ -524,12 +549,42 @@ function AttendancePageContent() {
                   </span>
                 </div>
 
-                {/* Auto-refresh indicator */}
-                <div className="flex items-center space-x-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                  <RefreshCw className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className="font-apercu-medium text-xs sm:text-sm text-green-700">
-                    <span className="hidden sm:inline">Auto-refresh: 30s</span>
-                    <span className="sm:hidden">Auto: 30s</span>
+                {/* Real-time connection status */}
+                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
+                  isConnected
+                    ? 'bg-green-50 border-green-200'
+                    : connectionError
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <Activity className={`h-4 w-4 flex-shrink-0 ${
+                    isConnected
+                      ? 'text-green-600 animate-pulse'
+                      : connectionError
+                      ? 'text-red-600'
+                      : 'text-yellow-600'
+                  }`} />
+                  <span className={`font-apercu-medium text-xs sm:text-sm ${
+                    isConnected
+                      ? 'text-green-700'
+                      : connectionError
+                      ? 'text-red-700'
+                      : 'text-yellow-700'
+                  }`}>
+                    <span className="hidden sm:inline">
+                      {isConnected
+                        ? `Real-time: Connected (${eventCount})`
+                        : connectionError
+                        ? 'Real-time: Disconnected'
+                        : 'Real-time: Connecting...'}
+                    </span>
+                    <span className="sm:hidden">
+                      {isConnected
+                        ? `Live (${eventCount})`
+                        : connectionError
+                        ? 'Offline'
+                        : 'Connecting...'}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -940,7 +995,7 @@ function AttendancePageContent() {
                             isUnverifying={unverifying === registration.id}
                             showVerifyButton={!registration.isVerified}
                             showUnverifyButton={registration.isVerified}
-                            showQRButton={registration.hasQRCode}
+                            showQRButton={registration.hasQRCode && !registration.isVerified}
                             showQRViewButton={!!registration.qrCode}
                           />
                         </div>

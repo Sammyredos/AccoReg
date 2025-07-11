@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { verifyQRCode } from '@/lib/qr-code'
 import { Logger } from '@/lib/logger'
+import { broadcastAttendanceEvent } from '../events/route'
 
 const logger = new Logger('AttendanceVerification')
 
@@ -99,6 +100,20 @@ export async function POST(request: NextRequest) {
       fullName: registration.fullName,
       method,
       verifiedBy: currentUser.email
+    })
+
+    // Broadcast real-time event
+    broadcastAttendanceEvent({
+      type: 'verification',
+      data: {
+        registrationId: registration.id,
+        fullName: registration.fullName,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        scannerName: currentUser.fullName || currentUser.email,
+        platoonName: registration.platoonAllocation?.platoon?.name,
+        roomName: registration.roomAllocation?.room?.name
+      }
     })
 
     return NextResponse.json({

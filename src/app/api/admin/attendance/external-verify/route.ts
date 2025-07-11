@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyQRCode } from '@/lib/qr-code'
 import { Logger } from '@/lib/logger'
+import { broadcastAttendanceEvent } from '../events/route'
 
 const logger = new Logger('ExternalScanner')
 
@@ -88,6 +89,20 @@ export async function POST(request: NextRequest) {
       participantName: updatedRegistration.fullName,
       scannerDevice,
       operatorId
+    })
+
+    // Broadcast real-time event
+    broadcastAttendanceEvent({
+      type: 'verification',
+      data: {
+        registrationId: registrationData.id,
+        fullName: updatedRegistration.fullName,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        scannerName: `External Scanner (${scannerDevice || 'Unknown'})`,
+        platoonName: undefined, // External scanner doesn't have platoon info
+        roomName: undefined
+      }
     })
 
     return NextResponse.json({

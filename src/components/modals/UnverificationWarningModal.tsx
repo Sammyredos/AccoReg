@@ -42,9 +42,9 @@ interface Registration {
 
 interface UnverificationWarningModalProps {
   isOpen: boolean
-  onClose: () => void
-  onConfirm: (forceUnverify?: boolean) => void
-  onGoToAccommodations: () => void
+  onCloseAction: () => void
+  onConfirmAction: (forceUnverify?: boolean) => void
+  onGoToAccommodationsAction: () => void
   loading: boolean
   hasRoomAllocation: boolean
   roomAllocation?: RoomAllocation
@@ -54,9 +54,9 @@ interface UnverificationWarningModalProps {
 
 export function UnverificationWarningModal({
   isOpen,
-  onClose,
-  onConfirm,
-  onGoToAccommodations,
+  onCloseAction,
+  onConfirmAction,
+  onGoToAccommodationsAction,
   loading,
   hasRoomAllocation,
   roomAllocation,
@@ -103,7 +103,7 @@ export function UnverificationWarningModal({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onCloseAction}>
       <DialogContent className="sm:max-w-[480px] md:max-w-[520px] lg:max-w-[560px] p-0 overflow-hidden mx-4 sm:mx-0">
         {/* Header */}
         <div className="bg-gradient-to-br from-red-50 to-orange-50 p-4 sm:p-6 border-b border-red-100">
@@ -133,7 +133,7 @@ export function UnverificationWarningModal({
                     Remove them from the room first.
                   </p>
                   <Button
-                    onClick={onGoToAccommodations}
+                    onClick={onGoToAccommodationsAction}
                     size="sm"
                     className="mt-3 bg-red-600 hover:bg-red-700 font-apercu-medium"
                   >
@@ -174,7 +174,7 @@ export function UnverificationWarningModal({
           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">
             <Button
               variant="outline"
-              onClick={onClose}
+              onClick={onCloseAction}
               disabled={loading}
               className="flex-1 font-apercu-medium"
             >
@@ -183,7 +183,7 @@ export function UnverificationWarningModal({
 
             {!hasRoomAllocation && (
               <Button
-                onClick={() => onConfirm(false)}
+                onClick={() => onConfirmAction(false)}
                 disabled={loading}
                 className="flex-1 bg-red-600 hover:bg-red-700 font-apercu-medium"
               >

@@ -4,6 +4,9 @@ services:
     env: node
     plan: free
     region: oregon
+    # Optimized for real-time features
+    autoDeploy: true
+    previewsEnabled: false
     buildCommand: |
       echo "🚀 Starting Mopgomyouth production build process..." &&
       echo "📦 Installing dependencies with production optimizations..." &&
@@ -31,7 +34,10 @@ services:
       echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
       echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!" &&
       echo "📊 Build size analysis:" &&
-      du -sh .next || true
+      du -sh .next || true &&
+      echo "🔄 Real-time features enabled: Attendance updates, QR auto-close, live status" &&
+      echo "📱 Mobile-responsive analytics and attendance verification ready" &&
+      echo "🚀 Production deployment optimized for performance and security"
     startCommand: NODE_ENV=production npm start
     healthCheckPath: /api/health
     envVars:
@@ -120,9 +126,13 @@ services:
       - key: BODY_PARSER_LIMIT
         value: "10mb"
       - key: CONNECTION_POOL_SIZE
-        value: "10"
+        value: "15"
       - key: QUERY_TIMEOUT
         value: "30000"
+      - key: SSE_KEEP_ALIVE_TIMEOUT
+        value: "65000"
+      - key: HTTP_TIMEOUT
+        value: "120000"
 
       # Monitoring & Analytics
       - key: ENABLE_ANALYTICS
@@ -130,6 +140,36 @@ services:
       - key: ENABLE_PERFORMANCE_MONITORING
         value: "true"
       - key: ERROR_REPORTING_ENABLED
+        value: "true"
+
+      # Real-Time Features
+      - key: REALTIME_ENABLED
+        value: "true"
+      - key: SSE_HEARTBEAT_INTERVAL
+        value: "30000"
+      - key: SSE_RECONNECT_INTERVAL
+        value: "5000"
+      - key: REALTIME_EVENT_TIMEOUT
+        value: "60000"
+      - key: MAX_SSE_CONNECTIONS
+        value: "100"
+
+      # QR Code & Attendance Features
+      - key: QR_AUTO_CLOSE_ENABLED
+        value: "true"
+      - key: ATTENDANCE_REALTIME_UPDATES
+        value: "true"
+      - key: HIDE_QR_FOR_VERIFIED
+        value: "true"
+      - key: AUTO_REFRESH_ATTENDANCE
+        value: "true"
+
+      # Mobile & Responsive Optimizations
+      - key: MOBILE_OPTIMIZED
+        value: "true"
+      - key: RESPONSIVE_CHARTS
+        value: "true"
+      - key: TOUCH_FRIENDLY_UI
         value: "true"
 
 databases:
