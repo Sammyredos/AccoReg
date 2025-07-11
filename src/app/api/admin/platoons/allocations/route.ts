@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth'
-import { logger } from '@/lib/logger'
+import { Logger } from '@/lib/logger'
+
+const logger = Logger('PlatoonAllocations')
 
 // POST /api/admin/platoons/allocations - Allocate participants to platoons
 export async function POST(request: NextRequest) {

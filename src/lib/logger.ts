@@ -69,24 +69,27 @@ class SimpleLogger {
 }
 
 // Create and export logger instance
-const logger = new SimpleLogger()
+const loggerInstance = new SimpleLogger()
 
 // Set level based on environment
 if (process.env.NODE_ENV === 'development') {
-  logger.setLevel('debug')
+  loggerInstance.setLevel('debug')
 } else {
-  logger.setLevel('info')
+  loggerInstance.setLevel('info')
 }
 
-export default logger
+export default loggerInstance
 
 // Export constructor function for compatibility
 export function Logger(name?: string) {
-  return logger
+  return loggerInstance
 }
 
 // Export class for direct instantiation
 export { SimpleLogger }
 
+// Export the logger instance as named export
+export const logger = loggerInstance
+
 // Export compatibility functions
-export const createLogger = (name?: string) => logger
+export const createLogger = (name?: string) => loggerInstance

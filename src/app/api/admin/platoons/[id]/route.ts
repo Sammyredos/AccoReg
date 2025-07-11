@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth'
-import { logger } from '@/lib/logger'
+import { Logger } from '@/lib/logger'
+
+const logger = Logger('PlatoonAPI')
 
 // GET /api/admin/platoons/[id] - Get a specific platoon
 export async function GET(

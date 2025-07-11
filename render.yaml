@@ -7,9 +7,9 @@ services:
     buildCommand: |
       echo "🚀 Starting Mopgomyouth production build process..." &&
       echo "📦 Installing dependencies with production optimizations..." &&
-      npm ci --production=false &&
+      npm ci --production=false --legacy-peer-deps &&
       echo "🔧 Installing build dependencies..." &&
-      npm install --save-dev @types/node typescript tsx &&
+      npm install --save-dev @types/node typescript tsx --legacy-peer-deps &&
       echo "✅ Dependencies installed successfully" &&
       echo "🧹 Cleaning previous build artifacts..." &&
       rm -rf .next || true &&
