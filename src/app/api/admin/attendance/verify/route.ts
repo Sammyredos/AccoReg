@@ -102,7 +102,10 @@ export async function POST(request: NextRequest) {
       verifiedBy: currentUser.email
     })
 
-    // Broadcast real-time event
+    // Small delay to ensure database transaction is committed before broadcasting
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // Broadcast real-time event to all connected clients
     broadcastAttendanceEvent({
       type: 'verification',
       data: {
@@ -114,6 +117,11 @@ export async function POST(request: NextRequest) {
         platoonName: registration.platoonAllocation?.platoon?.name,
         roomName: registration.roomAllocation?.room?.name
       }
+    })
+
+    logger.info('Real-time event broadcasted for verification', {
+      registrationId: registration.id,
+      fullName: registration.fullName
     })
 
     return NextResponse.json({

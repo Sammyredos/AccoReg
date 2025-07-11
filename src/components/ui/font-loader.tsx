@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { verifyApercuFonts, areApercuFontsLoaded } from '@/lib/font-verification'
+import { getCurrentSystemName, isSystemNameLoaded } from './reactive-system-name'
 
 interface FontLoaderProps {
   children: React.ReactNode
@@ -16,8 +17,58 @@ export function FontLoader({
 }: FontLoaderProps) {
   const [fontsLoaded, setFontsLoaded] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [systemName, setSystemName] = useState<string>('Loading...')
 
   useEffect(() => {
+    // Load system name immediately
+    const loadSystemName = async () => {
+      try {
+        // Try to get cached system name first
+        const cachedName = typeof window !== 'undefined' ? localStorage.getItem('system-name') : null
+        if (cachedName) {
+          setSystemName(cachedName)
+          return
+        }
+
+        // Check if system name is already loaded globally
+        if (isSystemNameLoaded()) {
+          setSystemName(getCurrentSystemName())
+          return
+        }
+
+        // Try to load from API quickly
+        try {
+          const response = await fetch('/api/admin/settings', {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(2000) // 2 second timeout
+          })
+          if (response.ok) {
+            const data = await response.json()
+            const brandingSettings = data.settings?.branding || []
+            const systemNameSetting = brandingSettings.find((s: any) => s.key === 'systemName')
+            const apiSystemName = systemNameSetting?.value || 'MOPGOM Global'
+            setSystemName(apiSystemName)
+
+            // Cache for next time
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('system-name', apiSystemName)
+            }
+            return
+          }
+        } catch (apiError) {
+          console.log('API not available during loading, using fallback')
+        }
+
+        // Fallback to default
+        setSystemName('MOPGOM Global')
+      } catch (error) {
+        console.error('Error loading system name for loading screen:', error)
+        setSystemName('MOPGOM Global')
+      }
+    }
+
+    loadSystemName()
+
     const loadFonts = async () => {
       try {
         console.log('🔤 Starting Apercu Pro font loading...')
@@ -140,16 +191,17 @@ export function FontLoader({
               fontSize: '24px',
               fontWeight: '600',
               margin: '0 0 8px 0',
-              color: '#111827'
+              color: '#111827',
+              lineHeight: '1.2'
             }}>
-              Welcome
+              {systemName}
             </h1>
             <p style={{
               fontSize: '14px',
               margin: 0,
               color: '#6b7280'
             }}>
-              Loading Application...
+              Initializing System...
             </p>
           </div>
 

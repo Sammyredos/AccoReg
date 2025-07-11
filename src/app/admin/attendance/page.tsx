@@ -110,29 +110,48 @@ function AttendancePageContent() {
   const [showQRViewModal, setShowQRViewModal] = useState(false)
   const [qrViewTarget, setQRViewTarget] = useState<Registration | null>(null)
 
-  // Real-time attendance updates
-  const { isConnected, connectionError, lastEvent, eventCount } = useRealTimeAttendance({
+  // Real-time attendance updates with stable state and cross-device sync
+  const { isConnected, connectionError, isConnecting, lastEvent, eventCount } = useRealTimeAttendance({
     onVerification: (event) => {
-      // Auto-refresh data when someone is verified
-      loadRegistrations()
-      loadStats()
+      console.log('🔄 Real-time verification received:', event.data)
 
-      // Auto-close QR scanner modal if the verified person matches current scan
-      if (showQRScanner && event.data.registrationId) {
+      // Force immediate data refresh for cross-device sync
+      setTimeout(() => {
+        loadRegistrations(true) // Force refresh
+        loadStats()
+      }, 100) // Small delay to ensure backend is updated
+
+      // Auto-close QR scanner modal for ANY verification (cross-device sync)
+      if (showQRScanner) {
+        console.log('📱 Auto-closing QR scanner due to verification')
         setShowQRScanner(false)
         setScannerInputValue('')
+
+        // Show success notification
+        if (event.data.fullName) {
+          success(`✅ ${event.data.fullName} verified successfully`)
+        }
       }
 
-      // Auto-close confirmation modal if it's open
+      // Auto-close confirmation modal if it matches the verified user
       if (showConfirmModal && confirmTarget?.id === event.data.registrationId) {
         setShowConfirmModal(false)
         setConfirmTarget(null)
       }
+
+      // Auto-close QR view modal if it's open
+      if (showQRViewModal) {
+        setShowQRViewModal(false)
+        setQrViewTarget(null)
+      }
     },
     onStatusChange: (event) => {
-      // Refresh data on status changes
-      loadRegistrations()
-      loadStats()
+      console.log('📊 Real-time status change received:', event.data)
+      // Force refresh data on any status changes
+      setTimeout(() => {
+        loadRegistrations(true) // Force refresh
+        loadStats()
+      }, 100)
     }
   })
 
@@ -189,9 +208,9 @@ function AttendancePageContent() {
 
   const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false)
 
-  const loadRegistrations = async () => {
-    // Prevent multiple simultaneous requests
-    if (isLoadingRegistrations) return
+  const loadRegistrations = async (forceRefresh = false) => {
+    // Prevent multiple simultaneous requests unless it's a force refresh
+    if (isLoadingRegistrations && !forceRefresh) return
 
     setIsLoadingRegistrations(true)
     try {
@@ -461,6 +480,20 @@ function AttendancePageContent() {
     setCurrentPage(1)
   }, [searchTerm])
 
+  // Fallback periodic refresh to ensure cross-device sync (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only refresh if real-time connection is not working properly
+      if (!isConnected) {
+        console.log('🔄 Fallback refresh - real-time connection not active')
+        loadRegistrations(true)
+        loadStats()
+      }
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [isConnected])
+
   // Removed auto-refresh for better performance
 
 
@@ -538,6 +571,27 @@ function AttendancePageContent() {
                 <span className="sm:hidden text-white">Scan QR</span>
               </Button>
 
+              {/* Manual Refresh Button - especially useful when real-time is disconnected */}
+              <Button
+                onClick={() => {
+                  console.log('🔄 Manual refresh triggered')
+                  loadRegistrations(true)
+                  loadStats()
+                  success('Data refreshed successfully')
+                }}
+                variant="outline"
+                className={`w-full sm:w-auto ${
+                  !isConnected
+                    ? 'border-orange-300 text-orange-700 hover:bg-orange-50'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+                title={!isConnected ? 'Real-time disconnected - manual refresh recommended' : 'Manually refresh data'}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
+
               {/* Status Indicators - Responsive */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 {/* External Scanner Status */}
@@ -549,38 +603,48 @@ function AttendancePageContent() {
                   </span>
                 </div>
 
-                {/* Real-time connection status */}
-                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg border ${
+                {/* Real-time connection status - Stable, non-flickering indicator */}
+                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all duration-500 ease-in-out ${
                   isConnected
                     ? 'bg-green-50 border-green-200'
                     : connectionError
                     ? 'bg-red-50 border-red-200'
-                    : 'bg-yellow-50 border-yellow-200'
+                    : 'bg-blue-50 border-blue-200'
                 }`}>
-                  <Activity className={`h-4 w-4 flex-shrink-0 ${
-                    isConnected
-                      ? 'text-green-600 animate-pulse'
-                      : connectionError
-                      ? 'text-red-600'
-                      : 'text-yellow-600'
-                  }`} />
-                  <span className={`font-apercu-medium text-xs sm:text-sm ${
+                  <div className="relative flex items-center">
+                    <Activity className={`h-4 w-4 flex-shrink-0 transition-all duration-500 ease-in-out ${
+                      isConnected
+                        ? 'text-green-600'
+                        : connectionError
+                        ? 'text-red-600'
+                        : 'text-blue-600'
+                    }`} />
+                    {isConnected && (
+                      <div className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-green-400 rounded-full">
+                        <div className="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-75"></div>
+                      </div>
+                    )}
+                    {isConnecting && (
+                      <div className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                    )}
+                  </div>
+                  <span className={`font-apercu-medium text-xs sm:text-sm transition-all duration-500 ease-in-out ${
                     isConnected
                       ? 'text-green-700'
                       : connectionError
                       ? 'text-red-700'
-                      : 'text-yellow-700'
+                      : 'text-blue-700'
                   }`}>
                     <span className="hidden sm:inline">
                       {isConnected
-                        ? `Real-time: Connected (${eventCount})`
+                        ? `Real-time: Connected${eventCount > 0 ? ` (${eventCount})` : ''}`
                         : connectionError
-                        ? 'Real-time: Disconnected'
+                        ? 'Real-time: Offline'
                         : 'Real-time: Connecting...'}
                     </span>
                     <span className="sm:hidden">
                       {isConnected
-                        ? `Live (${eventCount})`
+                        ? `Live${eventCount > 0 ? ` (${eventCount})` : ''}`
                         : connectionError
                         ? 'Offline'
                         : 'Connecting...'}

@@ -27,25 +27,48 @@ export interface AttendanceEvent {
   }
 }
 
-// Broadcast event to all connected clients
+// Broadcast event to all connected clients with enhanced reliability
 export function broadcastAttendanceEvent(event: AttendanceEvent) {
   const eventData = `data: ${JSON.stringify(event)}\n\n`
-  
-  logger.info('Broadcasting attendance event', { 
-    type: event.type, 
+
+  logger.info('Broadcasting attendance event', {
+    type: event.type,
     registrationId: event.data.registrationId,
-    connections: connections.size 
+    fullName: event.data.fullName,
+    connections: connections.size,
+    timestamp: event.data.timestamp
   })
 
-  // Send to all connected clients
+  if (connections.size === 0) {
+    logger.warn('No active SSE connections to broadcast to')
+    return
+  }
+
+  let successCount = 0
+  let failureCount = 0
+
+  // Send to all connected clients with error handling
   connections.forEach(controller => {
     try {
       controller.enqueue(new TextEncoder().encode(eventData))
+      successCount++
     } catch (error) {
       logger.error('Failed to send event to client', error)
       connections.delete(controller)
+      failureCount++
     }
   })
+
+  logger.info('Event broadcast completed', {
+    successCount,
+    failureCount,
+    remainingConnections: connections.size
+  })
+
+  // If we have failures, log them for debugging
+  if (failureCount > 0) {
+    logger.warn(`${failureCount} connections failed during broadcast`)
+  }
 }
 
 export async function GET(request: NextRequest) {

@@ -81,7 +81,7 @@ export default function AdminLogin() {
             />
           </div>
           <h1 className="font-apercu-bold text-3xl text-gray-900 mb-2 animate-fade-in animate-delay-100">
-            Welcome Back
+            Admin Access
           </h1>
           <p className="font-apercu-regular text-gray-600 animate-fade-in animate-delay-200">
             Sign in to your admin dashboard

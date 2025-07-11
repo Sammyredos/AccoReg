@@ -4,10 +4,12 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { 
-  X, 
-  Camera, 
-  Upload, 
+import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
+import { useToast } from '@/contexts/ToastContext'
+import {
+  X,
+  Camera,
+  Upload,
   Scan,
   CheckCircle,
   AlertTriangle,
@@ -25,9 +27,41 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [lastScannedId, setLastScannedId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { info } = useToast()
+
+  // Real-time attendance updates to auto-close modal
+  const { isConnected } = useRealTimeAttendance({
+    onVerification: (event) => {
+      const { registrationId, fullName, scannerName } = event.data
+
+      // Auto-close modal if this verification matches what we might have scanned
+      // or if it's from any scanner (to keep UI in sync)
+      if (isOpen) {
+        console.log('🔄 Real-time verification detected, closing QR scanner')
+
+        // Show info about the verification
+        info(`✅ ${fullName} verified by ${scannerName || 'Scanner'}`)
+
+        // Close the modal after a brief delay to show the success message
+        setTimeout(() => {
+          onClose()
+          setLastScannedId(null)
+          setError(null)
+          setSuccess(null)
+          setProcessing(false)
+        }, 1500)
+      }
+    },
+
+    onStatusChange: (event) => {
+      // Handle any status changes that might affect the scanner
+      console.log('📊 Status change detected:', event.data)
+    }
+  })
   const streamRef = useRef<MediaStream | null>(null)
 
   // Cleanup camera stream when component unmounts or closes
@@ -172,21 +206,22 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl bg-white">
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                <Scan className="h-5 w-5 text-white" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <Card className="w-full max-w-2xl bg-white max-h-[95vh] overflow-y-auto">
+        <div className="p-3 sm:p-6">
+          {/* Header - Mobile Responsive */}
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Scan className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <div>
-                <h2 className="font-apercu-bold text-lg text-gray-900">QR Code Scanner</h2>
-                <p className="font-apercu-regular text-sm text-gray-600">Scan attendee QR codes for verification</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-apercu-bold text-base sm:text-lg text-gray-900 truncate">QR Code Scanner</h2>
+                <p className="font-apercu-regular text-xs sm:text-sm text-gray-600 hidden sm:block">Scan attendee QR codes for verification</p>
+                <p className="font-apercu-regular text-xs text-gray-600 sm:hidden">Scan QR codes</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleClose}>
+            <Button variant="outline" size="sm" onClick={handleClose} className="flex-shrink-0 ml-2">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -208,12 +243,12 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
 
           {/* Scanner Interface */}
           <div className="space-y-4">
-            {/* Camera View */}
+            {/* Camera View - Mobile Responsive */}
             {scanning && (
               <div className="relative">
                 <video
                   ref={videoRef}
-                  className="w-full h-64 bg-gray-900 rounded-lg object-cover"
+                  className="w-full h-48 sm:h-64 bg-gray-900 rounded-lg object-cover"
                   playsInline
                   muted
                 />
@@ -231,56 +266,67 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
               </div>
             )}
 
-            {/* Controls */}
+            {/* Controls - Mobile Responsive */}
             <div className="flex flex-col space-y-3">
               {!scanning ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     onClick={startCamera}
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 w-full text-sm sm:text-base py-2 sm:py-3"
                   >
                     <Camera className="h-4 w-4 mr-2" />
-                    Start Camera
+                    <span className="hidden sm:inline">Start Camera</span>
+                    <span className="sm:hidden">Camera</span>
                   </Button>
-                  
+
                   <Button
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
+                    className="w-full text-sm sm:text-base py-2 sm:py-3"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Upload Image
+                    <span className="hidden sm:inline">Upload Image</span>
+                    <span className="sm:hidden">Upload</span>
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     onClick={captureAndScan}
                     disabled={processing}
-                    className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
+                    className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 w-full text-sm sm:text-base py-2 sm:py-3"
                   >
                     {processing ? (
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <Scan className="h-4 w-4 mr-2" />
                     )}
-                    Scan QR Code
+                    <span className="hidden sm:inline">Scan QR Code</span>
+                    <span className="sm:hidden">Scan</span>
                   </Button>
-                  
-                  <Button variant="outline" onClick={stopCamera}>
-                    Stop Camera
+
+                  <Button
+                    variant="outline"
+                    onClick={stopCamera}
+                    className="w-full text-sm sm:text-base py-2 sm:py-3"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Stop Camera</span>
+                    <span className="sm:hidden">Stop</span>
                   </Button>
                 </div>
               )}
             </div>
 
-            {/* Instructions */}
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            {/* Instructions - Mobile Responsive */}
+            <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-start space-x-2">
-                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                <div>
-                  <p className="font-apercu-bold text-sm text-green-900">QR Scanner Active</p>
-                  <p className="font-apercu-regular text-xs text-green-700 mt-1">
-                    Point your camera at a QR code or upload an image to scan. The system will automatically verify the attendee.
+                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-apercu-bold text-sm text-green-900">QR Scanner Ready</p>
+                  <p className="font-apercu-regular text-xs sm:text-sm text-green-700 mt-1">
+                    <span className="hidden sm:inline">Point your camera at a QR code or upload an image to scan. The system will automatically verify the attendee.</span>
+                    <span className="sm:hidden">Scan QR codes to verify attendees automatically.</span>
                   </p>
                 </div>
               </div>
