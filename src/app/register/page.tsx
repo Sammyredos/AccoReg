@@ -816,7 +816,7 @@ function RegistrationForm() {
                         id="gender"
                         value={formData.gender}
                         onChange={handleChange}
-                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                           getFieldError('gender')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -870,7 +870,7 @@ function RegistrationForm() {
                               setFormData(prev => ({ ...prev, dateOfBirth: newDate }))
                             }
                           }}
-                          className={`block w-full px-3 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                          className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                             getFieldError('dateOfBirth')
                               ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                               : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -899,7 +899,7 @@ function RegistrationForm() {
                               setFormData(prev => ({ ...prev, dateOfBirth: newDate }))
                             }
                           }}
-                          className={`block w-full px-3 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                          className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                             getFieldError('dateOfBirth')
                               ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                               : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -937,7 +937,7 @@ function RegistrationForm() {
                               setFormData(prev => ({ ...prev, dateOfBirth: newDate }))
                             }
                           }}
-                          className={`block w-full px-3 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                          className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                             getFieldError('dateOfBirth')
                               ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                               : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1436,7 +1436,7 @@ function RegistrationForm() {
                         id="emergencyContactRelationship"
                         value={formData.emergencyContactRelationship}
                         onChange={handleChange}
-                        className="block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md"
+                        className="block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md h-9"
                       >
                         <option value="">Select Relationship</option>
                         <option value="Parent">Parent</option>

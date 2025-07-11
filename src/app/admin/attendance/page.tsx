@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -110,10 +110,36 @@ function AttendancePageContent() {
   const [showQRViewModal, setShowQRViewModal] = useState(false)
   const [qrViewTarget, setQRViewTarget] = useState<Registration | null>(null)
 
+  // Refs to track current modal states for real-time events (avoids closure issues)
+  const showQRScannerRef = useRef(showQRScanner)
+  const showConfirmModalRef = useRef(showConfirmModal)
+  const showQRViewModalRef = useRef(showQRViewModal)
+  const confirmTargetRef = useRef(confirmTarget)
+
+  // Update refs when state changes
+  useEffect(() => {
+    showQRScannerRef.current = showQRScanner
+  }, [showQRScanner])
+
+  useEffect(() => {
+    showConfirmModalRef.current = showConfirmModal
+    confirmTargetRef.current = confirmTarget
+  }, [showConfirmModal, confirmTarget])
+
+  useEffect(() => {
+    showQRViewModalRef.current = showQRViewModal
+  }, [showQRViewModal])
+
   // Real-time attendance updates with stable state and cross-device sync
   const { isConnected, connectionError, isConnecting, lastEvent, eventCount } = useRealTimeAttendance({
-    onVerification: (event) => {
+    onVerification: useCallback((event) => {
       console.log('🔄 Real-time verification received:', event.data)
+      console.log('🔍 Current modal states (from refs):', {
+        showQRScanner: showQRScannerRef.current,
+        showConfirmModal: showConfirmModalRef.current,
+        showQRViewModal: showQRViewModalRef.current,
+        confirmTargetId: confirmTargetRef.current?.id
+      })
 
       // Force immediate data refresh for cross-device sync
       setTimeout(() => {
@@ -121,38 +147,62 @@ function AttendancePageContent() {
         loadStats()
       }, 100) // Small delay to ensure backend is updated
 
+      // Show success notification for ALL verifications (cross-device sync)
+      if (event.data.fullName) {
+        success(`✅ ${event.data.fullName} verified successfully`)
+      }
+
       // Auto-close QR scanner modal for ANY verification (cross-device sync)
-      if (showQRScanner) {
-        console.log('📱 Auto-closing QR scanner due to verification')
+      // Using ref to get current state and avoid closure issues
+      if (showQRScannerRef.current) {
+        console.log('📱 Auto-closing QR scanner due to verification (ref-based)')
         setShowQRScanner(false)
         setScannerInputValue('')
-
-        // Show success notification
-        if (event.data.fullName) {
-          success(`✅ ${event.data.fullName} verified successfully`)
-        }
+      } else {
+        console.log('📱 QR scanner not open, no need to close (ref-based)')
       }
 
       // Auto-close confirmation modal if it matches the verified user
-      if (showConfirmModal && confirmTarget?.id === event.data.registrationId) {
+      if (showConfirmModalRef.current && confirmTargetRef.current?.id === event.data.registrationId) {
+        console.log('📋 Auto-closing confirmation modal for matching user (ref-based)')
         setShowConfirmModal(false)
         setConfirmTarget(null)
       }
 
       // Auto-close QR view modal if it's open
-      if (showQRViewModal) {
+      if (showQRViewModalRef.current) {
+        console.log('👁️ Auto-closing QR view modal (ref-based)')
         setShowQRViewModal(false)
         setQrViewTarget(null)
       }
-    },
-    onStatusChange: (event) => {
+
+      // Backup mechanism: Force close QR scanner after a delay if it's still open
+      // This handles cases where the real-time event might not trigger immediately
+      setTimeout(() => {
+        if (showQRScannerRef.current) {
+          console.log('🔄 Backup: Force closing QR scanner after verification delay')
+          setShowQRScanner(false)
+          setScannerInputValue('')
+        }
+      }, 2000) // 2 second delay
+    }, [success]), // Removed state dependencies since we're using refs
+    onStatusChange: useCallback((event) => {
       console.log('📊 Real-time status change received:', event.data)
       // Force refresh data on any status changes
       setTimeout(() => {
         loadRegistrations(true) // Force refresh
         loadStats()
       }, 100)
-    }
+    }, []),
+    onError: useCallback((event) => {
+      console.log('🚨 Real-time error received:', event.data)
+      // Show error notification for ALL error events (cross-device sync)
+      if (event.data.error) {
+        error(`❌ ${event.data.error}`)
+      } else if (event.data.message) {
+        error(`❌ ${event.data.message}`)
+      }
+    }, [error])
   })
 
   // Dropdown states for collapsible sections - closed by default on mobile/tablet
@@ -396,16 +446,37 @@ function AttendancePageContent() {
 
   // Handle external scanner input
   const handleScannerInput = async (scannedData: string) => {
-    if (scannedData.trim().length < 10) return // Minimum QR data length
+    const trimmedData = scannedData.trim()
+    if (trimmedData.length < 10) return // Minimum QR data length
 
     try {
+      console.log('🔍 Processing scanned data:', trimmedData.substring(0, 100) + '...')
+
       // Check if it looks like JSON QR data
-      if (scannedData.startsWith('{') && scannedData.endsWith('}')) {
-        await handleQRScan(scannedData)
-        setScannerInputValue('') // Clear input
-        success('QR code scanned successfully!')
+      if (trimmedData.startsWith('{') && trimmedData.endsWith('}')) {
+        try {
+          // Validate JSON format
+          const qrData = JSON.parse(trimmedData)
+
+          // Validate required fields
+          if (qrData.id && qrData.fullName && qrData.checksum) {
+            console.log('✅ Valid QR data detected for:', qrData.fullName)
+            await handleQRScan(trimmedData)
+            setScannerInputValue('') // Clear input
+            success(`QR code scanned successfully for ${qrData.fullName}!`)
+          } else {
+            console.warn('❌ QR data missing required fields:', qrData)
+            error('QR code missing required registration data')
+            setScannerInputValue('')
+          }
+        } catch (parseError) {
+          console.error('❌ Invalid JSON in QR code:', parseError)
+          error('QR code contains invalid data format')
+          setScannerInputValue('')
+        }
       } else {
-        error('Invalid QR code format')
+        console.warn('❌ QR data does not look like JSON:', trimmedData.substring(0, 50))
+        error('Invalid QR code format - expected registration QR code')
         setScannerInputValue('')
       }
     } catch (scanError) {
@@ -493,6 +564,29 @@ function AttendancePageContent() {
 
     return () => clearInterval(interval)
   }, [isConnected])
+
+  // Watch for registration changes and auto-close QR scanner if any user gets verified
+  useEffect(() => {
+    if (showQRScanner && registrations.length > 0) {
+      // Check if any registrations were recently verified
+      const recentlyVerified = registrations.filter(reg => reg.isVerified)
+
+      if (recentlyVerified.length > 0) {
+        console.log('🔍 Detected verified registrations, checking if QR scanner should close')
+
+        // Close QR scanner after a short delay to allow for proper verification
+        const closeTimer = setTimeout(() => {
+          if (showQRScannerRef.current) {
+            console.log('📱 Auto-closing QR scanner due to detected verification')
+            setShowQRScanner(false)
+            setScannerInputValue('')
+          }
+        }, 1000)
+
+        return () => clearTimeout(closeTimer)
+      }
+    }
+  }, [registrations, showQRScanner])
 
   // Removed auto-refresh for better performance
 
@@ -1059,7 +1153,7 @@ function AttendancePageContent() {
                             isUnverifying={unverifying === registration.id}
                             showVerifyButton={!registration.isVerified}
                             showUnverifyButton={registration.isVerified}
-                            showQRButton={registration.hasQRCode && !registration.isVerified}
+                            showQRButton={false} // Disable generic QR scan button
                             showQRViewButton={!!registration.qrCode && !registration.isVerified}
                           />
                         </div>

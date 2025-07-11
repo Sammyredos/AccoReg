@@ -2377,7 +2377,7 @@ export default function SettingsPage() {
             id="tab-select"
             value={activeTab}
             onChange={(e) => handleTabChange(e.target.value)}
-            className="mobile-dropdown w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-apercu-medium text-sm transition-all duration-200"
+            className="mobile-dropdown w-full px-3 py-1 bg-white border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-apercu-medium text-sm transition-all duration-200 h-9"
           >
             {settingsTabs
               .filter(tab => {

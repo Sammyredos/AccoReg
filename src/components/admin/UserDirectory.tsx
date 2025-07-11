@@ -157,7 +157,7 @@ export function UserDirectory({ isOpen, onClose, onSendMessage }: UserDirectoryP
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white h-10"
+                className="w-full px-3 py-1 border border-gray-300 rounded-md font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white h-9"
               >
                 {roles.map(role => (
                   <option key={role} value={role}>

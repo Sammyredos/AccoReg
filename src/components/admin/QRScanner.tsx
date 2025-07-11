@@ -1,5 +1,29 @@
 'use client'
 
+// Type declaration for jsQR
+declare module 'jsqr' {
+  interface QRCode {
+    data: string
+    location: {
+      topLeftCorner: { x: number; y: number }
+      topRightCorner: { x: number; y: number }
+      bottomLeftCorner: { x: number; y: number }
+      bottomRightCorner: { x: number; y: number }
+    }
+  }
+
+  function jsQR(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number,
+    options?: {
+      inversionAttempts?: 'dontInvert' | 'onlyInvert' | 'attemptBoth'
+    }
+  ): QRCode | null
+
+  export default jsQR
+}
+
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -143,56 +167,117 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
       setError(null)
       setSuccess(null)
 
-      // For now, we'll simulate QR processing since we need a QR library
-      // In a real implementation, you'd use a library like jsQR or qr-scanner
+      // Convert blob to image for QR code scanning
+      const imageUrl = URL.createObjectURL(blob)
+      const img = new Image()
 
-      // Try to read actual QR code from the image
-      // This is a placeholder - in production you'd use a proper QR scanning library
-
-      // For demonstration, let's try to get a real QR code from the registrations
-      // This simulates scanning an actual QR code from the system
-      try {
-        // Fetch a real registration to get actual QR data
-        const response = await fetch('/api/admin/attendance/registrations?limit=1')
-        const data = await response.json()
-
-        if (data.registrations && data.registrations.length > 0) {
-          const registration = data.registrations[0]
-          if (registration.qrCode) {
-            // Use the actual QR code from a real registration
-            await onScan(registration.qrCode)
-            setSuccess('QR code scanned successfully!')
-            return
-          }
-        }
-      } catch (fetchError) {
-        console.log('Could not fetch real QR data, using fallback')
-      }
-
-      // Fallback: Create a properly formatted test QR data that matches the expected format
-      const testQRData = JSON.stringify({
-        id: "test-registration-id",
-        fullName: "Test User",
-        gender: "Male",
-        dateOfBirth: "2005-01-01T00:00:00.000Z",
-        phoneNumber: "+1234567890",
-        emailAddress: "test@example.com",
-        timestamp: Date.now(),
-        checksum: "TEST123"
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
       })
 
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Create canvas to process the image
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        throw new Error('Could not get canvas context')
+      }
 
-      // Process the QR code data
-      await onScan(testQRData)
-      setSuccess('QR code scanned successfully!')
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx.drawImage(img, 0, 0)
+
+      // Get image data for QR scanning
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+      // Try to scan QR code using jsQR library
+      let qrCode = null
+      try {
+        // Import jsQR dynamically
+        const jsQR = (await import('jsqr')).default
+        qrCode = jsQR(imageData.data, imageData.width, imageData.height)
+      } catch (importError) {
+        console.warn('jsQR library not available, using fallback method')
+
+        // Fallback: Try to extract QR data from a test scenario
+        // This is for development/testing when jsQR is not available
+        await handleFallbackQRScan()
+        return
+      }
+
+      // Clean up
+      URL.revokeObjectURL(imageUrl)
+
+      if (qrCode && qrCode.data) {
+        console.log('🔍 QR Code detected:', qrCode.data.substring(0, 100) + '...')
+
+        // Validate QR data format
+        if (qrCode.data.startsWith('{') && qrCode.data.endsWith('}')) {
+          try {
+            // Verify it's valid JSON
+            JSON.parse(qrCode.data)
+
+            // Process the actual scanned QR code
+            await onScan(qrCode.data)
+            setSuccess('QR code scanned successfully!')
+
+            // Prevent duplicate scans of the same QR code
+            const qrData = JSON.parse(qrCode.data)
+            if (qrData.id && qrData.id === lastScannedId) {
+              setError('This QR code was already scanned recently')
+              return
+            }
+            setLastScannedId(qrData.id)
+
+          } catch (parseError) {
+            setError('Invalid QR code format - not valid JSON')
+          }
+        } else {
+          setError('QR code does not contain registration data')
+        }
+      } else {
+        setError('No QR code detected in image. Please ensure the QR code is clearly visible and try again.')
+      }
 
     } catch (err) {
       console.error('QR processing error:', err)
-      setError('Failed to process QR code. Please try again or use manual verification.')
+      setError('Failed to process image. Please try again or use manual verification.')
     } finally {
       setProcessing(false)
+    }
+  }
+
+  // Fallback method for testing when jsQR is not available
+  const handleFallbackQRScan = async () => {
+    try {
+      // In development, allow testing with a sample QR code
+      if (process.env.NODE_ENV === 'development') {
+        // Fetch a random registration for testing
+        const response = await fetch('/api/admin/attendance/registrations?limit=10')
+        const data = await response.json()
+
+        if (data.registrations && data.registrations.length > 0) {
+          // Get a random registration with QR code
+          const registrationsWithQR = data.registrations.filter((r: any) => r.qrCode)
+          if (registrationsWithQR.length > 0) {
+            const randomIndex = Math.floor(Math.random() * registrationsWithQR.length)
+            const registration = registrationsWithQR[randomIndex]
+
+            console.log('🧪 Development mode: Using random QR code for testing')
+            await onScan(registration.qrCode)
+            setSuccess(`Development test: Scanned QR for ${registration.fullName}`)
+            return
+          }
+        }
+      }
+
+      // If no real QR codes available, show helpful error
+      setError('QR scanning library not available. Please install jsQR package or use manual verification.')
+
+    } catch (fallbackError) {
+      console.error('Fallback QR scan error:', fallbackError)
+      setError('Unable to process QR code. Please use manual verification.')
     }
   }
 

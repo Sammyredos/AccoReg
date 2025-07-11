@@ -47,9 +47,9 @@ export function QRCodeDisplay({ qrData, size = 200, className = '' }: QRCodeDisp
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
+      <div className={`flex items-center justify-center aspect-square ${className}`}>
         <div className="flex flex-col items-center space-y-2">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-indigo-600" />
           <p className="text-xs text-gray-500">Generating QR code...</p>
         </div>
       </div>
@@ -58,9 +58,9 @@ export function QRCodeDisplay({ qrData, size = 200, className = '' }: QRCodeDisp
 
   if (error) {
     return (
-      <div className={`flex items-center justify-center bg-red-50 border border-red-200 rounded-lg ${className}`} style={{ width: size, height: size }}>
-        <div className="flex flex-col items-center space-y-2 p-4">
-          <AlertCircle className="h-8 w-8 text-red-500" />
+      <div className={`flex items-center justify-center bg-red-50 border border-red-200 rounded-lg aspect-square ${className}`}>
+        <div className="flex flex-col items-center space-y-2 p-2 sm:p-4">
+          <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
           <p className="text-xs text-red-600 text-center">{error}</p>
         </div>
       </div>
@@ -69,7 +69,7 @@ export function QRCodeDisplay({ qrData, size = 200, className = '' }: QRCodeDisp
 
   if (!qrImageUrl) {
     return (
-      <div className={`flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg ${className}`} style={{ width: size, height: size }}>
+      <div className={`flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg aspect-square ${className}`}>
         <p className="text-xs text-gray-500">No QR code available</p>
       </div>
     )
@@ -77,11 +77,10 @@ export function QRCodeDisplay({ qrData, size = 200, className = '' }: QRCodeDisp
 
   return (
     <div className={`${className}`}>
-      <img 
-        src={qrImageUrl} 
-        alt="QR Code for Registration" 
-        className="rounded-lg border border-gray-200 shadow-sm"
-        style={{ width: size, height: size }}
+      <img
+        src={qrImageUrl}
+        alt="QR Code for Registration"
+        className="w-full h-full object-contain rounded-lg border border-gray-200 shadow-sm"
       />
     </div>
   )

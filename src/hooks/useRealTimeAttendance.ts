@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 
 export interface AttendanceEvent {
-  type: 'verification' | 'status_change' | 'new_scan' | 'connected' | 'heartbeat'
+  type: 'verification' | 'status_change' | 'new_scan' | 'connected' | 'heartbeat' | 'error'
   data: {
     registrationId?: string
     fullName?: string
@@ -14,6 +14,7 @@ export interface AttendanceEvent {
     platoonName?: string
     roomName?: string
     message?: string
+    error?: string
   }
 }
 
@@ -21,6 +22,7 @@ export interface UseRealTimeAttendanceOptions {
   onVerification?: (event: AttendanceEvent) => void
   onStatusChange?: (event: AttendanceEvent) => void
   onNewScan?: (event: AttendanceEvent) => void
+  onError?: (event: AttendanceEvent) => void
   autoReconnect?: boolean
   reconnectInterval?: number
 }
@@ -30,6 +32,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
     onVerification,
     onStatusChange,
     onNewScan,
+    onError,
     autoReconnect = true,
     reconnectInterval = 5000
   } = options
@@ -141,6 +144,15 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
 
             case 'heartbeat':
               // Silent heartbeat - just update connection status
+              break
+
+            case 'error':
+              if (onError) {
+                onError(attendanceEvent)
+              }
+              if (attendanceEvent.data.error) {
+                console.error('🚨 Real-time error event:', attendanceEvent.data.error)
+              }
               break
 
             default:
