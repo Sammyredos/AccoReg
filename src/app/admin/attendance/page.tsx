@@ -101,6 +101,7 @@ function AttendancePageContent() {
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [scannerInputValue, setScannerInputValue] = useState('')
   const [lastQRScanId, setLastQRScanId] = useState<string | null>(null)
+  const [qrScannerOpenTime, setQrScannerOpenTime] = useState<number>(0)
 
   // Verification confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -148,20 +149,26 @@ function AttendancePageContent() {
         loadStats()
       }, 100) // Small delay to ensure backend is updated
 
-      // Show success notification for ALL verifications (cross-device sync)
-      if (event.data.fullName) {
-        success(`✅ ${event.data.fullName} verified successfully`)
+      // Show success notification ONLY for QR scans (not manual verifications)
+      // Manual verifications have their own success toast in the button handler
+      if (event.data.fullName && event.data.method === 'qr') {
+        success(`✅ ${event.data.fullName} verified via QR scan`)
       }
 
-      // Auto-close QR scanner modal ONLY for the specific scan we just made
+      // Auto-close QR scanner modal ONLY for QR scans that we initiated
       // Using ref to get current state and avoid closure issues
-      if (showQRScannerRef.current && lastQRScanId && event.data.registrationId === lastQRScanId) {
-        console.log('📱 Auto-closing QR scanner for our specific scan (ref-based)', event.data.registrationId)
-        setShowQRScanner(false)
-        setScannerInputValue('')
-        setLastQRScanId(null) // Clear tracking
+      // Also prevent immediate closure by checking if scanner has been open for at least 3 seconds
+      const timeSinceOpen = Date.now() - qrScannerOpenTime
+      if (showQRScannerRef.current && lastQRScanId && event.data.registrationId === lastQRScanId && event.data.method === 'qr' && timeSinceOpen > 3000) {
+        console.log('📱 Auto-closing QR scanner for our QR scan (ref-based)', event.data.registrationId)
+        // Add a delay to show the success message before closing
+        setTimeout(() => {
+          setShowQRScanner(false)
+          setScannerInputValue('')
+          setLastQRScanId(null) // Clear tracking
+        }, 2000) // 2 second delay to show success
       } else if (showQRScannerRef.current) {
-        console.log('📱 QR scanner open but this is not our scan, keeping open (ref-based)')
+        console.log('📱 QR scanner open but this is not our QR scan, is manual verification, or opened too recently - keeping open (ref-based)')
       }
 
       // Auto-close confirmation modal if it matches the verified user
@@ -672,7 +679,11 @@ function AttendancePageContent() {
           {/* Action Buttons - Responsive */}
           <div className="flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-3">
               <Button
-                onClick={() => setShowQRScanner(true)}
+                onClick={() => {
+                  setShowQRScanner(true)
+                  setQrScannerOpenTime(Date.now())
+                  setLastQRScanId(null) // Clear any previous tracking
+                }}
                 className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 w-full sm:w-auto"
               >
                 <QrCode className="h-4 w-4 mr-2" />
@@ -1162,7 +1173,11 @@ function AttendancePageContent() {
                             }}
                             onVerify={handleVerifyRequest}
                             onUnverify={handleUnverifyRequest}
-                            onScanQR={() => setShowQRScanner(true)}
+                            onScanQR={() => {
+                              setShowQRScanner(true)
+                              setQrScannerOpenTime(Date.now())
+                              setLastQRScanId(null) // Clear any previous tracking
+                            }}
                             onViewQR={handleViewQR}
                             isVerifying={verifying === registration.id}
                             isUnverifying={unverifying === registration.id}

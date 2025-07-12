@@ -39,10 +39,13 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const [success, setSuccess] = useState<string | null>(null)
   const [lastScannedId, setLastScannedId] = useState<string | null>(null)
   const [autoScanActive, setAutoScanActive] = useState(false)
+  const [scanAttempts, setScanAttempts] = useState(0)
+  const [scanFeedback, setScanFeedback] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastScanAttemptRef = useRef<number>(0)
 
   const streamRef = useRef<MediaStream | null>(null)
 
@@ -144,6 +147,8 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     }
 
     setAutoScanActive(true)
+    setScanAttempts(0)
+    setScanFeedback('')
     console.log('🔍 Starting automatic QR detection...')
 
     scanIntervalRef.current = setInterval(() => {
@@ -157,7 +162,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
           console.log('⏳ Video not ready yet - readyState:', video.readyState, 'dimensions:', video.videoWidth, 'x', video.videoHeight)
         }
       }
-    }, 300) // Scan every 300ms for good balance between speed and performance
+    }, 100) // Scan every 100ms for fast, responsive detection
   }
 
   // Stop automatic scanning
@@ -167,6 +172,8 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       scanIntervalRef.current = null
     }
     setAutoScanActive(false)
+    setScanFeedback('')
+    console.log('🛑 Stopped automatic QR detection')
   }
 
   // Perform automatic QR scan
@@ -189,9 +196,25 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     }
 
     try {
-      // Set canvas size to match video
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
+      // Increment scan attempts for user feedback
+      const currentAttempts = scanAttempts + 1
+      setScanAttempts(currentAttempts)
+
+      // Provide progressive feedback to guide users
+      if (currentAttempts === 5) {
+        setScanFeedback('🔍 Scanning for QR code...')
+      } else if (currentAttempts === 20) {
+        setScanFeedback('📱 Center QR code in frame')
+      } else if (currentAttempts === 40) {
+        setScanFeedback('💡 Ensure good lighting')
+      } else if (currentAttempts === 80) {
+        setScanFeedback('⚠️ Try manual "Scan Now" if needed')
+      }
+
+      // Optimize canvas size for faster processing (half resolution)
+      const scale = 0.6 // Process at 60% resolution for speed vs accuracy balance
+      canvas.width = video.videoWidth * scale
+      canvas.height = video.videoHeight * scale
 
       // Draw current video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -215,21 +238,26 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         return
       }
 
-      // Try different scanning options for better detection
-      const scanOptions = [
-        { inversionAttempts: 'attemptBoth' as const },
-        { inversionAttempts: 'onlyInvert' as const },
-        { inversionAttempts: 'dontInvert' as const }
-      ]
-
+      // Fast scanning - try normal first, then inverted if needed
       let qrCode: QRCodeResult | null = null
-      for (const options of scanOptions) {
-        try {
-          qrCode = jsQR(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
-          if (qrCode && qrCode.data) break
-        } catch (scanError) {
-          console.log('QR scan attempt failed with options:', options, scanError)
-        }
+
+      // First attempt: Normal scan (fastest)
+      qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert'
+      }) as QRCodeResult | null
+
+      // If no QR found and we've tried enough times, try inverted
+      if (!qrCode && currentAttempts > 30) {
+        qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'onlyInvert'
+        }) as QRCodeResult | null
+      }
+
+      // Last resort: try both (slower but thorough)
+      if (!qrCode && currentAttempts > 60) {
+        qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'attemptBoth'
+        }) as QRCodeResult | null
       }
 
       if (qrCode && qrCode.data) {
@@ -525,7 +553,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                     className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 w-full text-sm sm:text-base py-2 sm:py-3"
                   >
                     <Camera className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Start Camera</span>
+                    <span className="hidden sm:inline text-white">Start Camera</span>
                     <span className="sm:hidden text-white">Camera</span>
                   </Button>
 
@@ -553,7 +581,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                           <>
                             <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
                             <span className="text-sm text-green-700 font-medium">
-                              🔍 Auto-scanning active (every 200ms)
+                              🔍 Auto-scanning active (every 100ms)
                             </span>
                           </>
                         ) : (
@@ -577,6 +605,18 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                       )}
                     </div>
                   </div>
+
+                  {/* Scan feedback */}
+                  {scanFeedback && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <span className="font-apercu-regular text-sm text-blue-700">
+                          {scanFeedback}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Control buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
