@@ -100,6 +100,7 @@ function AttendancePageContent() {
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'verified' | 'unverified'>('all')
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [scannerInputValue, setScannerInputValue] = useState('')
+  const [lastQRScanId, setLastQRScanId] = useState<string | null>(null)
 
   // Verification confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -152,14 +153,15 @@ function AttendancePageContent() {
         success(`✅ ${event.data.fullName} verified successfully`)
       }
 
-      // Auto-close QR scanner modal for ANY verification (cross-device sync)
+      // Auto-close QR scanner modal ONLY for the specific scan we just made
       // Using ref to get current state and avoid closure issues
-      if (showQRScannerRef.current) {
-        console.log('📱 Auto-closing QR scanner due to verification (ref-based)')
+      if (showQRScannerRef.current && lastQRScanId && event.data.registrationId === lastQRScanId) {
+        console.log('📱 Auto-closing QR scanner for our specific scan (ref-based)', event.data.registrationId)
         setShowQRScanner(false)
         setScannerInputValue('')
-      } else {
-        console.log('📱 QR scanner not open, no need to close (ref-based)')
+        setLastQRScanId(null) // Clear tracking
+      } else if (showQRScannerRef.current) {
+        console.log('📱 QR scanner open but this is not our scan, keeping open (ref-based)')
       }
 
       // Auto-close confirmation modal if it matches the verified user
@@ -418,6 +420,17 @@ function AttendancePageContent() {
 
   const handleQRScan = async (qrData: string) => {
     try {
+      // Extract registration ID from QR data for tracking
+      try {
+        const parsedQR = JSON.parse(qrData)
+        if (parsedQR.id) {
+          setLastQRScanId(parsedQR.id)
+          console.log('📝 Tracking QR scan for ID:', parsedQR.id)
+        }
+      } catch (parseError) {
+        console.log('⚠️ Could not parse QR data for tracking')
+      }
+
       const response = await fetch('/api/admin/attendance/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -432,15 +445,17 @@ function AttendancePageContent() {
       if (response.ok) {
         // Refresh data with current filter state
         await Promise.all([loadStats(), loadRegistrations()])
-        success(`${capitalizeName(data.registration.fullName)} has been verified via QR code!`)
-        setShowQRScanner(false)
+        // Don't show toast here - the real-time handler will show it
+        // Don't close scanner here - let real-time handler do it for the specific scan
       } else {
         error(`QR verification failed: ${data.error}`)
+        setLastQRScanId(null) // Clear tracking on error
       }
 
     } catch (qrError) {
       console.error('Error verifying QR code:', qrError)
       error('Failed to verify QR code')
+      setLastQRScanId(null) // Clear tracking on error
     }
   }
 

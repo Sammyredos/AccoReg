@@ -15,7 +15,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
+
 import {
   X,
   Camera,
@@ -43,38 +43,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  // Real-time attendance updates to auto-close modal
-  useRealTimeAttendance({
-    onVerification: (event) => {
-      const { registrationId } = event.data
 
-      // Only auto-close modal if this verification matches what we just scanned
-      // Check if this matches our last scanned ID to avoid closing on unrelated verifications
-      // Add a small delay check to prevent immediate closure on modal open
-      if (isOpen && lastScannedId && registrationId === lastScannedId) {
-        console.log('🔄 Real-time verification detected for our scanned user, closing QR scanner')
-
-        // Don't show duplicate toast here - the main page will handle it
-        // Just close the modal after a brief delay
-        setTimeout(() => {
-          // Double-check that we still have the same scanned ID and modal is still open
-          if (lastScannedId === registrationId && isOpen) {
-            onCloseAction()
-            setLastScannedId(null)
-            setError(null)
-            setSuccess(null)
-            setProcessing(false)
-          }
-        }, 1500)
-      }
-      // Remove the else clause to prevent duplicate notifications
-    },
-
-    onStatusChange: (event) => {
-      // Handle any status changes that might affect the scanner
-      console.log('📊 Status change detected:', event.data)
-    }
-  })
   const streamRef = useRef<MediaStream | null>(null)
 
   // Reset state when modal opens
