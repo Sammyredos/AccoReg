@@ -51,6 +51,7 @@
     "clsx": "^2.1.1",
     "ioredis": "^5.4.1",
     "jose": "^6.0.11",
+    "jsqr": "^1.4.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.460.0",
     "next": "^15.3.3",
