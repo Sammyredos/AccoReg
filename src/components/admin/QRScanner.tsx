@@ -58,10 +58,35 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   useEffect(() => {
     if (isOpen) {
       console.log('🔄 QR Scanner opened, resetting state...')
+      // Complete state reset
       setLastScannedId(null)
       setError(null)
       setSuccess(null)
       setProcessing(false)
+      setScanning(false)
+      setAutoScanActive(false)
+      setScanAttempts(0)
+      setScanFeedback('')
+
+      // Clear any existing camera stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop()
+          console.log('🔄 Stopped existing camera track on modal open')
+        })
+        streamRef.current = null
+      }
+
+      // Clear any existing intervals
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
+    } else {
+      // Modal is closing - ensure complete cleanup
+      console.log('🔄 QR Scanner closing, performing cleanup...')
+      stopCamera()
+      stopAutoScan()
     }
   }, [isOpen])
 
@@ -136,12 +161,33 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   }
 
   const stopCamera = () => {
+    console.log('📹 Stopping camera and cleaning up...')
+
+    // Stop auto-scan first
+    stopAutoScan()
+
+    // Stop camera stream
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current.getTracks().forEach(track => {
+        track.stop()
+        console.log('📹 Camera track stopped:', track.kind)
+      })
       streamRef.current = null
     }
-    stopAutoScan()
+
+    // Reset video element
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+      console.log('📹 Video element cleared')
+    }
+
+    // Reset scanning state
     setScanning(false)
+    setAutoScanActive(false)
+    setScanAttempts(0)
+    setScanFeedback('')
+
+    console.log('📹 Camera cleanup complete')
   }
 
   // Start automatic QR code scanning
@@ -306,11 +352,15 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
             // Prevent duplicate scans of the same QR code
             if (parsedData.id === lastScannedId) {
+              console.log('⚠️ Duplicate QR scan detected, ignoring...')
               setError('This QR code was already scanned recently')
               setProcessing(false)
-              // Restart auto-scan after error
+              // Restart auto-scan after error (only if modal is still open)
               setTimeout(() => {
-                if (scanning) startAutoScan()
+                if (scanning && isOpen) {
+                  console.log('🔄 Restarting auto-scan after duplicate scan error')
+                  startAutoScan()
+                }
               }, 2000)
               return
             }
@@ -318,9 +368,15 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             // Set the scanned ID for tracking
             setLastScannedId(parsedData.id)
 
+            // Stop auto-scan immediately to prevent conflicts
+            stopAutoScan()
+
             // Process the QR code
             await onScanAction(qrData)
             setSuccess(`QR code detected for ${parsedData.fullName}!`)
+
+            // DO NOT restart auto-scan here - let the parent component handle modal state
+            console.log('✅ QR processing complete, letting parent handle modal state')
 
           } else {
             setError('QR code missing required registration data')
@@ -337,12 +393,15 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     } finally {
       setProcessing(false)
 
-      // Restart auto-scan after processing (success or error)
-      setTimeout(() => {
-        if (scanning && !processing) {
-          startAutoScan()
-        }
-      }, 2000) // Wait 2 seconds before restarting auto-scan
+      // Only restart auto-scan on error and if modal is still open
+      if (error && isOpen) {
+        setTimeout(() => {
+          if (scanning && !processing && isOpen) {
+            console.log('🔄 Restarting auto-scan after error')
+            startAutoScan()
+          }
+        }, 2000)
+      }
     }
   }
 
