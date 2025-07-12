@@ -40,9 +40,9 @@ function AdminLayoutContent({ children, title, description }: AdminLayoutProps) 
       {/* Mobile Sidebar */}
       <div className="lg:hidden">
         <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
             {branding.logoUrl ? (
-              <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-200">
+              <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
                 <img
                   src={branding.logoUrl}
                   alt="System Logo"
@@ -50,20 +50,21 @@ function AdminLayoutContent({ children, title, description }: AdminLayoutProps) 
                 />
               </div>
             ) : (
-              <div className="h-8 w-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <div className="h-8 w-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-apercu-bold text-sm">{systemInitials}</span>
               </div>
             )}
-            <h1 className="font-apercu-bold text-lg text-gray-900">{branding.systemName}</h1>
+            <h1 className="font-apercu-bold text-base sm:text-lg text-gray-900 truncate">{branding.systemName}</h1>
           </div>
 
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="flex-shrink-0 ml-2">
                 <Menu className="h-5 w-5" />
+                <span className="sr-only">Open navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64">
+            <SheetContent side="left" className="p-0 w-64 sm:w-72">
               <VisuallyHidden>
                 <SheetTitle>Navigation Menu</SheetTitle>
               </VisuallyHidden>

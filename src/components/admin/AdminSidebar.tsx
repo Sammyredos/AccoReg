@@ -75,6 +75,13 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'], // All roles can access
   },
   {
+    name: t('nav.platoons'),
+    href: '/admin/platoons',
+    icon: Shield,
+    badge: null,
+    requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff'], // Staff and above can manage platoons
+  },
+  {
     name: t('nav.communications'),
     href: '/admin/communications',
     icon: Mail,
@@ -113,7 +120,7 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
   {
     name: t('nav.userManagement'),
     href: '/admin/users',
-    icon: Shield,
+    icon: UserPlus,
     badge: null,
     requiredRoles: ['Super Admin', 'Admin', 'Manager'], // Super Admin, Admin, and Manager
   },
@@ -230,7 +237,7 @@ export function AdminSidebar({ className }: SidebarProps) {
     return (
     <div className={cn('flex h-full w-64 flex-col bg-white border-r border-gray-200', className)}>
       {/* Logo */}
-      <div className="flex h-16 items-center px-6 border-b border-gray-200">
+      <div className="flex h-16 items-center px-4 sm:px-6 border-b border-gray-200">
         <div className="flex items-center space-x-2">
           <SidebarLogo
             fallbackText={branding.systemName.charAt(0) || 'M'}
@@ -254,7 +261,7 @@ export function AdminSidebar({ className }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-1">
+      <nav className="flex-1 px-3 sm:px-4 py-4 sm:py-6 space-y-1 overflow-y-auto">
         {isLoadingUser ? (
           // Skeleton loader for navigation
           Array.from({ length: 6 }).map((_, i) => (
@@ -299,13 +306,13 @@ export function AdminSidebar({ className }: SidebarProps) {
         )}
       </nav>
 
-      <div className="px-4">
+      <div className="px-3 sm:px-4">
         <Separator />
       </div>
 
       {/* User section */}
-      <div className="p-4">
-        <div className="flex items-center space-x-3 mb-4">
+      <div className="p-3 sm:p-4 flex-shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
           {isLoadingUser ? (
             // Skeleton loader for user avatar
             <div className="h-10 w-10 bg-gray-200 rounded-full animate-pulse" />
@@ -344,24 +351,26 @@ export function AdminSidebar({ className }: SidebarProps) {
 
         {isLoadingUser ? (
           // Skeleton loader for logout button
-          <div className="h-8 w-full bg-gray-200 rounded animate-pulse" />
+          <div className="h-8 sm:h-9 w-full bg-gray-200 rounded animate-pulse" />
         ) : (
           <Button
             onClick={handleLogout}
             disabled={isLoggingOut}
             variant="outline"
             size="sm"
-            className="w-full font-apercu-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-8 sm:h-9 font-apercu-medium disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
           >
             {isLoggingOut ? (
               <>
-                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
-                <span>Signing Out...</span>
+                <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Signing Out...</span>
+                <span className="sm:hidden">Signing Out</span>
               </>
             ) : (
               <>
-                <LogOut className="h-4 w-4 mr-2" />
-                {t('common.signOut')}
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{t('common.signOut')}</span>
+                <span className="sm:hidden">Sign Out</span>
               </>
             )}
           </Button>

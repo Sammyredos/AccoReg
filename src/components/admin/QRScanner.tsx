@@ -49,6 +49,11 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
   const streamRef = useRef<MediaStream | null>(null)
 
+  // Helper function to refresh the page
+  const refreshPage = () => {
+    window.location.reload()
+  }
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -125,7 +130,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       }
     } catch (err) {
       console.error('Camera access error:', err)
-      setError('Unable to access camera. Please check permissions or try uploading an image instead.')
+      setError('Unable to access camera. Please check permissions, refresh the page, or try uploading an image instead.')
       setScanning(false)
     }
   }
@@ -234,7 +239,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         jsQR = (await import('jsqr')).default
       } catch (importError) {
         console.error('Failed to import jsQR:', importError)
-        setError('QR scanning library not available. Please refresh the page.')
+        setError('QR scanning library not available. Please refresh the page to reload the scanner.')
         return
       }
 
@@ -462,7 +467,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       }
 
       // If no real QR codes available, show helpful error
-      setError('QR scanning library not available. Please install jsQR package or use manual verification.')
+      setError('QR scanning library not available. Please refresh the page to reload the scanner or use manual verification.')
 
     } catch (fallbackError) {
       console.error('Fallback QR scan error:', fallbackError)
@@ -506,9 +511,29 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
           {/* Status Messages */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <span className="font-apercu-regular text-sm text-red-700">{error}</span>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <span className="font-apercu-regular text-sm text-red-700">{error}</span>
+              </div>
+              {(error.includes('library not available') || error.includes('refresh the page')) && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={refreshPage}
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Page
+                  </Button>
+                  <span className="text-xs text-red-600">
+                    {error.includes('library not available')
+                      ? 'This will reload the QR scanner library'
+                      : 'This may help resolve camera or scanner issues'
+                    }
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -630,9 +655,16 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                       <span className="sm:hidden">Upload</span>
                     </Button>
 
-                    {/* Manual test scan button for debugging */}
+                    {/* Manual scan button */}
                     <Button
-                      onClick={performAutoScan}
+                      onClick={async () => {
+                        try {
+                          await performAutoScan()
+                        } catch (scanError) {
+                          console.error('Manual scan failed:', scanError)
+                          setError('QR scanning failed. Please refresh the page to reload the scanner.')
+                        }
+                      }}
                       disabled={processing}
                       className="bg-blue-500 hover:bg-blue-600 w-full text-sm sm:text-base py-2 sm:py-3"
                     >
