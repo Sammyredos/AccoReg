@@ -295,10 +295,11 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
             // Process the QR code
             await onScanAction(qrData)
-            setSuccess(`QR code detected for ${parsedData.fullName}!`)
+            setSuccess(`${parsedData.fullName} has just been Verified with QR code`)
 
-            // QR processing complete - let the parent component handle modal state
-            console.log('✅ QR processing complete, letting parent handle modal state')
+            // Auto-stop camera after successful scan
+            console.log('✅ QR processing complete, stopping camera automatically')
+            stopCamera()
 
           } else {
             setError('QR code missing required registration data')
@@ -385,12 +386,14 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
             // Process the actual scanned QR code
             await onScanAction(qrCode.data)
-            setSuccess('QR code scanned successfully!')
+
+            // Extract participant name for success message and prevent duplicates
+            const qrData = JSON.parse(qrCode.data)
+            setSuccess(`${qrData.fullName} has just been Verified with QR code`)
 
             // Prevent duplicate scans of the same QR code
-            const qrData = JSON.parse(qrCode.data)
             if (qrData.id && qrData.id === lastScannedId) {
-              setError('This QR code was already scanned recently')
+              setError('This User QR code was already scanned recently')
               return
             }
             setLastScannedId(qrData.id)
@@ -431,7 +434,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
             console.log('🧪 Development mode: Using random QR code for testing')
             await onScanAction(registration.qrCode)
-            setSuccess(`Development test: Scanned QR for ${registration.fullName}`)
+            setSuccess(`${registration.fullName} has just been Verified with QR code (Development test)`)
             return
           }
         }
