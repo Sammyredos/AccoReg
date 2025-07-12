@@ -243,7 +243,7 @@ export class SecurityValidator {
                request.headers.get('x-real-ip') || 
                'unknown'
     
-    logger.securityEvent(event, {
+    logger.warn(`SECURITY: ${event}`, {
       ip,
       userAgent: request.headers.get('user-agent'),
       referer: request.headers.get('referer'),

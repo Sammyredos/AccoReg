@@ -1,27 +1,14 @@
 'use client'
 
-// Type declaration for jsQR
-declare module 'jsqr' {
-  interface QRCode {
-    data: string
-    location: {
-      topLeftCorner: { x: number; y: number }
-      topRightCorner: { x: number; y: number }
-      bottomLeftCorner: { x: number; y: number }
-      bottomRightCorner: { x: number; y: number }
-    }
+// QR Code type definition
+interface QRCodeResult {
+  data: string
+  location: {
+    topLeftCorner: { x: number; y: number }
+    topRightCorner: { x: number; y: number }
+    bottomLeftCorner: { x: number; y: number }
+    bottomRightCorner: { x: number; y: number }
   }
-
-  function jsQR(
-    data: Uint8ClampedArray,
-    width: number,
-    height: number,
-    options?: {
-      inversionAttempts?: 'dontInvert' | 'onlyInvert' | 'attemptBoth'
-    }
-  ): QRCode | null
-
-  export default jsQR
 }
 
 import { useState, useRef, useEffect } from 'react'
@@ -29,7 +16,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
-import { useToast } from '@/contexts/ToastContext'
 import {
   X,
   Camera,
@@ -42,11 +28,11 @@ import {
 
 interface QRScannerProps {
   isOpen: boolean
-  onClose: () => void
-  onScan: (qrData: string) => Promise<void>
+  onCloseAction: () => void
+  onScanAction: (qrData: string) => Promise<void>
 }
 
-export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
+export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProps) {
   const [scanning, setScanning] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,34 +43,31 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const { info } = useToast()
-
   // Real-time attendance updates to auto-close modal
-  const { isConnected } = useRealTimeAttendance({
+  useRealTimeAttendance({
     onVerification: (event) => {
-      const { registrationId, fullName, scannerName } = event.data
+      const { registrationId } = event.data
 
       // Only auto-close modal if this verification matches what we just scanned
       // Check if this matches our last scanned ID to avoid closing on unrelated verifications
+      // Add a small delay check to prevent immediate closure on modal open
       if (isOpen && lastScannedId && registrationId === lastScannedId) {
         console.log('🔄 Real-time verification detected for our scanned user, closing QR scanner')
 
-        // Show info about the verification
-        info(`✅ ${fullName} verified successfully`)
-
-        // Close the modal after a brief delay to show the success message
+        // Don't show duplicate toast here - the main page will handle it
+        // Just close the modal after a brief delay
         setTimeout(() => {
-          onClose()
-          setLastScannedId(null)
-          setError(null)
-          setSuccess(null)
-          setProcessing(false)
+          // Double-check that we still have the same scanned ID and modal is still open
+          if (lastScannedId === registrationId && isOpen) {
+            onCloseAction()
+            setLastScannedId(null)
+            setError(null)
+            setSuccess(null)
+            setProcessing(false)
+          }
         }, 1500)
-      } else if (isOpen) {
-        // Show notification for other verifications but don't close modal
-        console.log('🔄 Real-time verification detected for different user, keeping scanner open')
-        info(`✅ ${fullName} verified by ${scannerName || 'another scanner'}`)
       }
+      // Remove the else clause to prevent duplicate notifications
     },
 
     onStatusChange: (event) => {
@@ -93,6 +76,17 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
     }
   })
   const streamRef = useRef<MediaStream | null>(null)
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔄 QR Scanner opened, resetting state...')
+      setLastScannedId(null)
+      setError(null)
+      setSuccess(null)
+      setProcessing(false)
+    }
+  }, [isOpen])
 
   // Cleanup camera stream and auto-scan when component unmounts or closes
   useEffect(() => {
@@ -134,9 +128,28 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
           }, 500) // Small delay to ensure video is fully ready
         }
 
+        videoRef.current.onplaying = () => {
+          console.log('📹 Video is playing, ensuring auto-scan is active...')
+          // Backup trigger for auto-scan
+          setTimeout(() => {
+            if (!scanIntervalRef.current) {
+              console.log('🔄 Auto-scan not active, starting now...')
+              startAutoScan()
+            }
+          }, 1000)
+        }
+
         // Start playing the video
         await videoRef.current.play()
         console.log('📹 Video started playing')
+
+        // Additional fallback to ensure auto-scan starts
+        setTimeout(() => {
+          if (videoRef.current && videoRef.current.readyState >= 2 && !scanIntervalRef.current) {
+            console.log('🔄 Fallback: Starting auto-scan after 2 seconds...')
+            startAutoScan()
+          }
+        }, 2000)
       }
     } catch (err) {
       console.error('Camera access error:', err)
@@ -156,21 +169,26 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
 
   // Start automatic QR code scanning
   const startAutoScan = () => {
-    if (scanIntervalRef.current) return // Already scanning
+    if (scanIntervalRef.current) {
+      console.log('🔍 Auto-scan already active')
+      return // Already scanning
+    }
 
     setAutoScanActive(true)
     console.log('🔍 Starting automatic QR detection...')
 
     scanIntervalRef.current = setInterval(() => {
-      if (!processing && scanning && videoRef.current && videoRef.current.readyState === 4) {
-        // Check if video has valid dimensions
-        if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+      // More lenient readiness check
+      if (!processing && scanning && videoRef.current) {
+        const video = videoRef.current
+        // Check if video has valid dimensions and is ready
+        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
           performAutoScan()
         } else {
-          console.log('⏳ Video not ready yet, dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight)
+          console.log('⏳ Video not ready yet - readyState:', video.readyState, 'dimensions:', video.videoWidth, 'x', video.videoHeight)
         }
       }
-    }, 200) // Scan every 200ms for faster detection
+    }, 300) // Scan every 300ms for good balance between speed and performance
   }
 
   // Stop automatic scanning
@@ -219,7 +237,7 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
       }
 
       // Try to scan QR code using jsQR library with multiple attempts
-      let jsQR
+      let jsQR: any
       try {
         jsQR = (await import('jsqr')).default
       } catch (importError) {
@@ -230,15 +248,15 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
 
       // Try different scanning options for better detection
       const scanOptions = [
-        { inversionAttempts: 'attemptBoth' },
-        { inversionAttempts: 'onlyInvert' },
-        { inversionAttempts: 'dontInvert' }
+        { inversionAttempts: 'attemptBoth' as const },
+        { inversionAttempts: 'onlyInvert' as const },
+        { inversionAttempts: 'dontInvert' as const }
       ]
 
-      let qrCode = null
+      let qrCode: QRCodeResult | null = null
       for (const options of scanOptions) {
         try {
-          qrCode = jsQR(imageData.data, imageData.width, imageData.height, options)
+          qrCode = jsQR(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
           if (qrCode && qrCode.data) break
         } catch (scanError) {
           console.log('QR scan attempt failed with options:', options, scanError)
@@ -299,7 +317,7 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
             setLastScannedId(parsedData.id)
 
             // Process the QR code
-            await onScan(qrData)
+            await onScanAction(qrData)
             setSuccess(`QR code detected for ${parsedData.fullName}!`)
 
           } else {
@@ -326,29 +344,7 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
     }
   }
 
-  const captureAndScan = async () => {
-    if (!videoRef.current || !canvasRef.current) return
 
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
-
-    if (!context) return
-
-    // Set canvas size to match video
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-
-    // Draw current video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    // Convert canvas to image data
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        await processQRFromBlob(blob)
-      }
-    }, 'image/png')
-  }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -388,11 +384,11 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
 
       // Try to scan QR code using jsQR library
-      let qrCode = null
+      let qrCode: QRCodeResult | null = null
       try {
         // Import jsQR dynamically
         const jsQR = (await import('jsqr')).default
-        qrCode = jsQR(imageData.data, imageData.width, imageData.height)
+        qrCode = jsQR(imageData.data, imageData.width, imageData.height) as QRCodeResult | null
       } catch (importError) {
         console.warn('jsQR library not available, using fallback method')
 
@@ -415,7 +411,7 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
             JSON.parse(qrCode.data)
 
             // Process the actual scanned QR code
-            await onScan(qrCode.data)
+            await onScanAction(qrCode.data)
             setSuccess('QR code scanned successfully!')
 
             // Prevent duplicate scans of the same QR code
@@ -461,7 +457,7 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
             const registration = registrationsWithQR[randomIndex]
 
             console.log('🧪 Development mode: Using random QR code for testing')
-            await onScan(registration.qrCode)
+            await onScanAction(registration.qrCode)
             setSuccess(`Development test: Scanned QR for ${registration.fullName}`)
             return
           }
@@ -478,12 +474,14 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
   }
 
   const handleClose = () => {
+    console.log('🔄 Closing QR Scanner, cleaning up...')
     stopCamera()
+    stopAutoScan()
     setError(null)
     setSuccess(null)
     setLastScannedId(null)
     setProcessing(false)
-    onClose()
+    onCloseAction()
   }
 
   if (!isOpen) return null
@@ -559,7 +557,7 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
                   >
                     <Camera className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Start Camera</span>
-                    <span className="sm:hidden">Camera</span>
+                    <span className="sm:hidden text-white">Camera</span>
                   </Button>
 
                   <Button
@@ -634,8 +632,8 @@ export function QRScanner({ isOpen, onClose, onScan }: QRScannerProps) {
                       ) : (
                         <Scan className="h-4 w-4 mr-2" />
                       )}
-                      <span className="hidden sm:inline text-white">Test Scan</span>
-                      <span className="sm:hidden text-white">Test</span>
+                      <span className="hidden sm:inline text-white">Scan Now</span>
+                      <span className="sm:hidden text-white">Scan</span>
                     </Button>
 
                     <Button

@@ -1272,8 +1272,8 @@ function AttendancePageContent() {
       {/* QR Scanner Modal */}
       <QRScanner
         isOpen={showQRScanner}
-        onClose={() => setShowQRScanner(false)}
-        onScan={handleQRScan}
+        onCloseAction={() => setShowQRScanner(false)}
+        onScanAction={handleQRScan}
       />
 
       {/* Verification Confirmation Modal */}
