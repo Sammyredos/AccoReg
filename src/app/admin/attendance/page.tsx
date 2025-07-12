@@ -155,21 +155,8 @@ function AttendancePageContent() {
         success(`✅ ${event.data.fullName} verified via QR scan`)
       }
 
-      // Auto-close QR scanner modal ONLY for QR scans that we initiated
-      // Using ref to get current state and avoid closure issues
-      // Also prevent immediate closure by checking if scanner has been open for at least 3 seconds
-      const timeSinceOpen = Date.now() - qrScannerOpenTime
-      if (showQRScannerRef.current && lastQRScanId && event.data.registrationId === lastQRScanId && event.data.method === 'qr' && timeSinceOpen > 3000) {
-        console.log('📱 Auto-closing QR scanner for our QR scan (ref-based)', event.data.registrationId)
-        // Add a delay to show the success message before closing
-        setTimeout(() => {
-          setShowQRScanner(false)
-          setScannerInputValue('')
-          setLastQRScanId(null) // Clear tracking
-        }, 2000) // 2 second delay to show success
-      } else if (showQRScannerRef.current) {
-        console.log('📱 QR scanner open but this is not our QR scan, is manual verification, or opened too recently - keeping open (ref-based)')
-      }
+      // QR scanner stays open after successful scan - user must manually close it
+      console.log('📱 QR scanner remains open after verification - user can scan multiple QR codes')
 
       // Auto-close confirmation modal if it matches the verified user
       if (showConfirmModalRef.current && confirmTargetRef.current?.id === event.data.registrationId) {
@@ -185,15 +172,7 @@ function AttendancePageContent() {
         setQrViewTarget(null)
       }
 
-      // Backup mechanism: Force close QR scanner after a delay if it's still open
-      // This handles cases where the real-time event might not trigger immediately
-      setTimeout(() => {
-        if (showQRScannerRef.current) {
-          console.log('🔄 Backup: Force closing QR scanner after verification delay')
-          setShowQRScanner(false)
-          setScannerInputValue('')
-        }
-      }, 2000) // 2 second delay
+      // No auto-close - QR scanner remains open for multiple scans
     }, [success]), // Removed state dependencies since we're using refs
     onStatusChange: useCallback((event) => {
       console.log('📊 Real-time status change received:', event.data)
@@ -587,28 +566,7 @@ function AttendancePageContent() {
     return () => clearInterval(interval)
   }, [isConnected])
 
-  // Watch for registration changes and auto-close QR scanner if any user gets verified
-  useEffect(() => {
-    if (showQRScanner && registrations.length > 0) {
-      // Check if any registrations were recently verified
-      const recentlyVerified = registrations.filter(reg => reg.isVerified)
-
-      if (recentlyVerified.length > 0) {
-        console.log('🔍 Detected verified registrations, checking if QR scanner should close')
-
-        // Close QR scanner after a short delay to allow for proper verification
-        const closeTimer = setTimeout(() => {
-          if (showQRScannerRef.current) {
-            console.log('📱 Auto-closing QR scanner due to detected verification')
-            setShowQRScanner(false)
-            setScannerInputValue('')
-          }
-        }, 1000)
-
-        return () => clearTimeout(closeTimer)
-      }
-    }
-  }, [registrations, showQRScanner])
+  // QR scanner remains open for multiple scans - no auto-close on verification
 
   // Removed auto-refresh for better performance
 

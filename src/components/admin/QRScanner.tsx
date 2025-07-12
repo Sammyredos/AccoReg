@@ -38,9 +38,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [lastScannedId, setLastScannedId] = useState<string | null>(null)
-  const [autoScanActive, setAutoScanActive] = useState(false)
-  const [scanAttempts, setScanAttempts] = useState(0)
-  const [scanFeedback, setScanFeedback] = useState<string>('')
+  // Removed auto-scan functionality - manual scan only
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -64,9 +62,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       setSuccess(null)
       setProcessing(false)
       setScanning(false)
-      setAutoScanActive(false)
-      setScanAttempts(0)
-      setScanFeedback('')
 
       // Clear any existing camera stream
       if (streamRef.current) {
@@ -86,17 +81,19 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       // Modal is closing - ensure complete cleanup
       console.log('🔄 QR Scanner closing, performing cleanup...')
       stopCamera()
-      stopAutoScan()
     }
   }, [isOpen])
 
-  // Cleanup camera stream and auto-scan when component unmounts or closes
+  // Cleanup camera stream when component unmounts or closes
   useEffect(() => {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
       }
-      stopAutoScan()
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
     }
   }, [])
 
@@ -123,35 +120,17 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         }
 
         videoRef.current.oncanplay = () => {
-          console.log('📹 Video can play, starting auto-scan...')
-          // Start auto-scan when video is ready to play
-          setTimeout(() => {
-            startAutoScan()
-          }, 500) // Small delay to ensure video is fully ready
+          console.log('📹 Video can play, ready for manual scanning')
         }
 
         videoRef.current.onplaying = () => {
-          console.log('📹 Video is playing, ensuring auto-scan is active...')
-          // Backup trigger for auto-scan
-          setTimeout(() => {
-            if (!scanIntervalRef.current) {
-              console.log('🔄 Auto-scan not active, starting now...')
-              startAutoScan()
-            }
-          }, 1000)
+          console.log('📹 Video is playing, ready for manual scanning')
         }
 
         // Start playing the video
         await videoRef.current.play()
         console.log('📹 Video started playing')
-
-        // Additional fallback to ensure auto-scan starts
-        setTimeout(() => {
-          if (videoRef.current && videoRef.current.readyState >= 2 && !scanIntervalRef.current) {
-            console.log('🔄 Fallback: Starting auto-scan after 2 seconds...')
-            startAutoScan()
-          }
-        }, 2000)
+        setScanning(true)
       }
     } catch (err) {
       console.error('Camera access error:', err)
@@ -163,8 +142,11 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const stopCamera = () => {
     console.log('📹 Stopping camera and cleaning up...')
 
-    // Stop auto-scan first
-    stopAutoScan()
+    // Clear any scanning intervals
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
 
     // Stop camera stream
     if (streamRef.current) {
@@ -183,52 +165,14 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
     // Reset scanning state
     setScanning(false)
-    setAutoScanActive(false)
-    setScanAttempts(0)
-    setScanFeedback('')
 
     console.log('📹 Camera cleanup complete')
   }
 
-  // Start automatic QR code scanning
-  const startAutoScan = () => {
-    if (scanIntervalRef.current) {
-      console.log('🔍 Auto-scan already active')
-      return // Already scanning
-    }
+  // Manual scan only - auto-scan functionality removed
 
-    setAutoScanActive(true)
-    setScanAttempts(0)
-    setScanFeedback('')
-    console.log('🔍 Starting automatic QR detection...')
-
-    scanIntervalRef.current = setInterval(() => {
-      // More lenient readiness check
-      if (!processing && scanning && videoRef.current) {
-        const video = videoRef.current
-        // Check if video has valid dimensions and is ready
-        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-          performAutoScan()
-        } else {
-          console.log('⏳ Video not ready yet - readyState:', video.readyState, 'dimensions:', video.videoWidth, 'x', video.videoHeight)
-        }
-      }
-    }, 100) // Scan every 100ms for fast, responsive detection
-  }
-
-  // Stop automatic scanning
-  const stopAutoScan = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-    }
-    setAutoScanActive(false)
-    setScanFeedback('')
-    console.log('🛑 Stopped automatic QR detection')
-  }
-
-  // Perform automatic QR scan
-  const performAutoScan = async () => {
+  // Perform manual QR scan
+  const performManualScan = async () => {
     if (!videoRef.current || !canvasRef.current || processing) return
 
     const video = videoRef.current
@@ -237,35 +181,27 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
     if (!context) {
       console.log('❌ Canvas context not available')
+      setError('Camera not ready. Please try again.')
       return
     }
 
     // Check video dimensions
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       console.log('⏳ Video dimensions not ready:', video.videoWidth, 'x', video.videoHeight)
+      setError('Camera not ready. Please wait a moment and try again.')
       return
     }
 
     try {
-      // Increment scan attempts for user feedback
-      const currentAttempts = scanAttempts + 1
-      setScanAttempts(currentAttempts)
+      setProcessing(true)
+      setError(null)
+      setSuccess(null)
 
-      // Provide progressive feedback to guide users
-      if (currentAttempts === 5) {
-        setScanFeedback('🔍 Scanning for QR code...')
-      } else if (currentAttempts === 20) {
-        setScanFeedback('📱 Center QR code in frame')
-      } else if (currentAttempts === 40) {
-        setScanFeedback('💡 Ensure good lighting')
-      } else if (currentAttempts === 80) {
-        setScanFeedback('⚠️ Try manual "Scan Now" if needed')
-      }
+      console.log('🔍 Performing manual QR scan...')
 
-      // Optimize canvas size for faster processing (half resolution)
-      const scale = 0.6 // Process at 60% resolution for speed vs accuracy balance
-      canvas.width = video.videoWidth * scale
-      canvas.height = video.videoHeight * scale
+      // Set canvas dimensions to match video (full resolution for accuracy)
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
 
       // Draw current video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -276,10 +212,11 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       // Validate image data
       if (!imageData || imageData.data.length === 0) {
         console.log('❌ No image data captured')
+        setError('Unable to capture image from camera')
         return
       }
 
-      // Try to scan QR code using jsQR library with multiple attempts
+      // Try to scan QR code using jsQR library
       let jsQR: any
       try {
         jsQR = (await import('jsqr')).default
@@ -289,45 +226,40 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         return
       }
 
-      // Fast scanning - try normal first, then inverted if needed
+      // Try multiple scan approaches for better detection
       let qrCode: QRCodeResult | null = null
 
-      // First attempt: Normal scan (fastest)
+      // First attempt: Normal scan
       qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: 'dontInvert'
       }) as QRCodeResult | null
 
-      // If no QR found and we've tried enough times, try inverted
-      if (!qrCode && currentAttempts > 30) {
+      // Second attempt: Inverted scan
+      if (!qrCode) {
         qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: 'onlyInvert'
         }) as QRCodeResult | null
       }
 
-      // Last resort: try both (slower but thorough)
-      if (!qrCode && currentAttempts > 60) {
+      // Third attempt: Both approaches
+      if (!qrCode) {
         qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: 'attemptBoth'
         }) as QRCodeResult | null
       }
 
       if (qrCode && qrCode.data) {
-        console.log('🎯 QR Code automatically detected!', qrCode.data.substring(0, 50) + '...')
-
-        // Stop auto-scanning to prevent multiple detections
-        stopAutoScan()
-
-        // Process the detected QR code
+        console.log('🎯 QR Code detected!', qrCode.data.substring(0, 50) + '...')
         await processDetectedQR(qrCode.data)
       } else {
-        // Log every 20th attempt to avoid spam
-        if (Math.random() < 0.05) {
-          console.log('🔍 Auto-scan attempt - no QR code found (canvas:', canvas.width, 'x', canvas.height, ')')
-        }
+        console.log('❌ No QR code detected in current frame')
+        setError('No QR code detected. Please ensure the QR code is clearly visible and try again.')
       }
     } catch (error) {
-      // Log errors but don't show to user for auto-scan
-      console.error('Auto-scan error:', error)
+      console.error('Manual scan error:', error)
+      setError('QR scanning failed. Please try again.')
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -355,27 +287,17 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
               console.log('⚠️ Duplicate QR scan detected, ignoring...')
               setError('This QR code was already scanned recently')
               setProcessing(false)
-              // Restart auto-scan after error (only if modal is still open)
-              setTimeout(() => {
-                if (scanning && isOpen) {
-                  console.log('🔄 Restarting auto-scan after duplicate scan error')
-                  startAutoScan()
-                }
-              }, 2000)
               return
             }
 
             // Set the scanned ID for tracking
             setLastScannedId(parsedData.id)
 
-            // Stop auto-scan immediately to prevent conflicts
-            stopAutoScan()
-
             // Process the QR code
             await onScanAction(qrData)
             setSuccess(`QR code detected for ${parsedData.fullName}!`)
 
-            // DO NOT restart auto-scan here - let the parent component handle modal state
+            // QR processing complete - let the parent component handle modal state
             console.log('✅ QR processing complete, letting parent handle modal state')
 
           } else {
@@ -392,16 +314,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       setError('Failed to process QR code. Please try again.')
     } finally {
       setProcessing(false)
-
-      // Only restart auto-scan on error and if modal is still open
-      if (error && isOpen) {
-        setTimeout(() => {
-          if (scanning && !processing && isOpen) {
-            console.log('🔄 Restarting auto-scan after error')
-            startAutoScan()
-          }
-        }, 2000)
-      }
     }
   }
 
@@ -537,7 +449,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const handleClose = () => {
     console.log('🔄 Closing QR Scanner, cleaning up...')
     stopCamera()
-    stopAutoScan()
     setError(null)
     setSuccess(null)
     setLastScannedId(null)
@@ -653,54 +564,15 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Auto-scan status */}
-                  <div className={`border rounded-lg p-3 ${
-                    autoScanActive
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        {autoScanActive ? (
-                          <>
-                            <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-sm text-green-700 font-medium">
-                              🔍 Auto-scanning active (every 100ms)
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <div className="h-2 w-2 bg-gray-400 rounded-full"></div>
-                            <span className="text-sm text-gray-600">
-                              Auto-scan paused
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {autoScanActive && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={stopAutoScan}
-                          className="text-xs"
-                        >
-                          Pause
-                        </Button>
-                      )}
+                  {/* Camera Status */}
+                  <div className="border rounded-lg p-3 bg-green-50 border-green-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm text-green-700 font-medium">
+                        � Camera ready - Click "Scan Now" to scan QR codes
+                      </span>
                     </div>
                   </div>
-
-                  {/* Scan feedback */}
-                  {scanFeedback && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        <span className="font-apercu-regular text-sm text-blue-700">
-                          {scanFeedback}
-                        </span>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Control buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
@@ -718,7 +590,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                     <Button
                       onClick={async () => {
                         try {
-                          await performAutoScan()
+                          await performManualScan()
                         } catch (scanError) {
                           console.error('Manual scan failed:', scanError)
                           setError('QR scanning failed. Please refresh the page to reload the scanner.')
