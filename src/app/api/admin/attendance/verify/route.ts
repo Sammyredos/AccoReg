@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth-helpers'
-import { verifyQRCode } from '@/lib/qr-code'
+import { verifyQRCode, generateRegistrationQR } from '@/lib/qr-code'
 import { Logger } from '@/lib/logger'
 import { broadcastAttendanceEvent } from '../events/route'
 
@@ -94,6 +94,29 @@ export async function POST(request: NextRequest) {
         attendanceTime: new Date()
       }
     })
+
+    // Auto-regenerate QR code after verification to ensure fresh, reusable QR codes
+    try {
+      const qrResult = await generateRegistrationQR(registration.id)
+      if (qrResult.success) {
+        logger.info('QR code regenerated after verification', {
+          registrationId: registration.id,
+          participantName: registration.fullName,
+          verifiedBy: currentUser.email
+        })
+      } else {
+        logger.warn('Failed to regenerate QR code after verification', {
+          registrationId: registration.id,
+          error: qrResult.error
+        })
+      }
+    } catch (qrError) {
+      logger.error('Error regenerating QR code after verification', {
+        registrationId: registration.id,
+        error: qrError
+      })
+      // Don't fail the verification if QR regeneration fails
+    }
 
     logger.info('Registration verified successfully', {
       registrationId: registration.id,

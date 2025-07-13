@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth-helpers'
+import { generateRegistrationQR } from '@/lib/qr-code'
 import { Logger } from '@/lib/logger'
 
 const logger = new Logger('AttendanceUnverification')
@@ -159,6 +160,29 @@ export async function POST(request: NextRequest) {
       unverifiedBy: currentUser.email,
       forceUnverify
     })
+
+    // Auto-regenerate QR code after unverification to ensure fresh, reusable QR codes
+    try {
+      const qrResult = await generateRegistrationQR(registration.id)
+      if (qrResult.success) {
+        logger.info('QR code regenerated after unverification', {
+          registrationId: registration.id,
+          participantName: registration.fullName,
+          unverifiedBy: currentUser.email
+        })
+      } else {
+        logger.warn('Failed to regenerate QR code after unverification', {
+          registrationId: registration.id,
+          error: qrResult.error
+        })
+      }
+    } catch (qrError) {
+      logger.error('Error regenerating QR code after unverification', {
+        registrationId: registration.id,
+        error: qrError
+      })
+      // Don't fail the unverification if QR regeneration fails
+    }
 
     return NextResponse.json({
       success: true,
