@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { invalidateCache } from '@/lib/cache'
 import { RoomAllocationEmailService } from '@/lib/services/room-allocation-email'
+import { broadcastAttendanceEvent } from '@/app/api/admin/attendance/events/route'
 
 const prisma = new PrismaClient()
 
@@ -203,6 +204,30 @@ export async function POST(request: NextRequest) {
     if (allocations.length > 0) {
       await prisma.roomAllocation.createMany({
         data: allocations
+      })
+
+      // Broadcast real-time allocation events for each allocation
+      for (const allocation of allocations) {
+        const registration = [...maleRegistrations, ...femaleRegistrations].find(reg => reg.id === allocation.registrationId)
+        const room = [...maleRooms, ...femaleRooms].find(r => r.id === allocation.roomId)
+
+        if (registration && room) {
+          broadcastAttendanceEvent({
+            type: 'status_change',
+            data: {
+              registrationId: allocation.registrationId,
+              fullName: registration.fullName,
+              status: 'present',
+              timestamp: new Date().toISOString(),
+              roomName: room.name
+            }
+          })
+        }
+      }
+
+      console.log('🏠 Real-time random allocation events broadcasted:', {
+        totalAllocations: allocations.length,
+        allocatedBy: currentUser.email
       })
 
       // Invalidate cache to ensure fresh data is fetched

@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { generateRegistrationQR } from '@/lib/qr-code'
 import { Logger } from '@/lib/logger'
+import { broadcastAttendanceEvent } from '../events/route'
 
 const logger = new Logger('AttendanceUnverification')
 
@@ -23,10 +24,10 @@ export async function POST(request: NextRequest) {
 
     const currentUser = authResult.user!
 
-    // Check permissions - only Super Admin and Admin can unverify
-    if (!['Super Admin', 'Admin'].includes(currentUser.role?.name || '')) {
-      return NextResponse.json({ 
-        error: 'Insufficient permissions. Only Super Admin and Admin can unverify attendees.' 
+    // Check permissions - Super Admin, Admin, Manager, and Staff can unverify
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
+      return NextResponse.json({
+        error: 'Insufficient permissions. Only Super Admin, Admin, Manager, and Staff can unverify attendees.'
       }, { status: 403 })
     }
 
@@ -184,6 +185,24 @@ export async function POST(request: NextRequest) {
       // Don't fail the unverification if QR regeneration fails
     }
 
+    // Small delay to ensure database transaction is committed before broadcasting
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // Broadcast real-time event to all connected clients
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId: registration.id,
+        fullName: registration.fullName,
+        status: 'absent',
+        timestamp: new Date().toISOString(),
+        scannerName: currentUser.fullName || currentUser.email,
+        platoonName: registration.platoonAllocation?.platoon?.name,
+        roomName: registration.roomAllocation?.room?.name,
+        message: `${registration.fullName} has been unverified`
+      }
+    })
+
     return NextResponse.json({
       success: true,
       message: `${registration.fullName} has been unverified successfully${registration.roomAllocation ? ' and removed from room allocation' : ''}`,
@@ -218,7 +237,7 @@ export async function GET(request: NextRequest) {
     const currentUser = authResult.user!
 
     // Check permissions
-    if (!['Super Admin', 'Admin'].includes(currentUser.role?.name || '')) {
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

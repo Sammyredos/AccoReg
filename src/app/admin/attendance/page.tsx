@@ -13,6 +13,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { QRScanner } from '@/components/admin/QRScanner'
 import { QRCodeViewModal } from '@/components/modals/QRCodeViewModal'
 import { VerificationConfirmModal } from '@/components/modals/VerificationConfirmModal'
+import { AllocationBlockModal } from '@/components/modals/AllocationBlockModal'
 import { useAccommodationUpdates, AccommodationUpdatesProvider } from '@/contexts/AccommodationUpdatesContext'
 import { capitalizeName } from '@/lib/utils'
 import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
@@ -107,6 +108,21 @@ function AttendancePageContent() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<Registration | null>(null)
   const [confirmAction, setConfirmAction] = useState<'verify' | 'unverify'>('verify')
+  const [showAllocationBlockModal, setShowAllocationBlockModal] = useState(false)
+  const [allocationBlockData, setAllocationBlockData] = useState<{
+    participantName: string
+    participantEmail: string
+    allocationInfo: {
+      roomName: string
+      roomId: string
+      roomGender: string
+      roomCapacity: number
+      roomOccupancy: number
+      allocationDate: string
+    }
+  } | null>(null)
+
+
 
   // QR Code view modal state
   const [showQRViewModal, setShowQRViewModal] = useState(false)
@@ -144,10 +160,19 @@ function AttendancePageContent() {
       })
 
       // Force immediate data refresh for cross-device sync
+      console.log('🔄 Real-time verification event received, triggering updates')
+
+      // Immediate trigger
+      triggerStatsUpdate()
+
+      // Delayed refresh for data consistency
       setTimeout(() => {
         loadRegistrations(true) // Force refresh
         loadStats()
-      }, 100) // Small delay to ensure backend is updated
+        // Additional trigger for accommodation stats
+        triggerStatsUpdate()
+        console.log('🔄 Secondary verification update completed')
+      }, 50) // Reduced delay for faster response
 
       // Show success notification ONLY for QR scans (not manual verifications)
       // Manual verifications have their own success toast in the button handler
@@ -177,10 +202,19 @@ function AttendancePageContent() {
     onStatusChange: useCallback((event) => {
       console.log('📊 Real-time status change received:', event.data)
       // Force refresh data on any status changes
+      console.log('🔄 Real-time status change event received, triggering updates')
+
+      // Immediate trigger
+      triggerStatsUpdate()
+
+      // Delayed refresh for data consistency
       setTimeout(() => {
         loadRegistrations(true) // Force refresh
         loadStats()
-      }, 100)
+        // Additional trigger for accommodation stats
+        triggerStatsUpdate()
+        console.log('🔄 Secondary status change update completed')
+      }, 50) // Reduced delay for faster response
     }, []),
     onError: useCallback((event) => {
       console.log('🚨 Real-time error received:', event.data)
@@ -310,10 +344,43 @@ function AttendancePageContent() {
     }
   }
 
-  // Show unverify confirmation modal
-  const handleUnverifyRequest = (registrationId: string) => {
+  // Show unverify confirmation modal (with allocation check)
+  const handleUnverifyRequest = async (registrationId: string) => {
     const registration = registrations.find(r => r.id === registrationId)
-    if (registration) {
+    if (!registration) return
+
+    try {
+      // Check unverification eligibility using existing endpoint
+      const response = await fetch(`/api/admin/attendance/unverify?registrationId=${registrationId}`)
+      const data = await response.json()
+
+      if (response.ok && data.canUnverify) {
+        // Proceed with normal unverification
+        setConfirmTarget(registration)
+        setConfirmAction('unverify')
+        setShowConfirmModal(true)
+      } else if (data.hasRoomAllocation && data.roomDetails) {
+        // Show allocation block modal
+        setAllocationBlockData({
+          participantName: registration.fullName,
+          participantEmail: registration.emailAddress,
+          allocationInfo: {
+            roomName: data.roomDetails.roomName,
+            roomId: data.roomDetails.roomId,
+            roomGender: data.roomDetails.roomGender,
+            roomCapacity: data.roomDetails.roomCapacity,
+            roomOccupancy: data.roomDetails.currentOccupancy,
+            allocationDate: data.roomDetails.allocationDate
+          }
+        })
+        setShowAllocationBlockModal(true)
+      } else {
+        // Show error message
+        error(data.error || 'Cannot unverify participant')
+      }
+    } catch (error) {
+      console.error('Error checking unverification eligibility:', error)
+      // If check fails, proceed with normal unverification (fail-safe)
       setConfirmTarget(registration)
       setConfirmAction('unverify')
       setShowConfirmModal(true)
@@ -346,8 +413,19 @@ function AttendancePageContent() {
       if (response.ok) {
         // Refresh data with current filter state
         await Promise.all([loadStats(), loadRegistrations()])
+
         // Trigger accommodation stats update for real-time button visibility
+        console.log('🚀 Triggering stats update for verification at', new Date().toISOString())
+        console.time('verification-stats-trigger')
         triggerStatsUpdate()
+
+        // Additional trigger with delay to ensure accommodations page updates
+        setTimeout(() => {
+          triggerStatsUpdate()
+          console.log('🔄 Secondary stats update triggered for verification')
+          console.timeEnd('verification-stats-trigger')
+        }, 100)
+
         success(`${capitalizeName(data.registration.fullName)} has been verified successfully!`)
         setShowConfirmModal(false)
         setConfirmTarget(null)
@@ -374,7 +452,7 @@ function AttendancePageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           registrationId: confirmTarget.id,
-          forceUnverify: true
+          forceUnverify: false // Don't force - allocation check was already done
         })
       })
 
@@ -383,13 +461,46 @@ function AttendancePageContent() {
       if (response.ok) {
         // Refresh data
         await Promise.all([loadStats(), loadRegistrations()])
+
         // Trigger accommodation stats update for real-time button visibility
+        console.log('🚀 Triggering stats update for unverification at', new Date().toISOString())
+        console.time('unverification-stats-trigger')
         triggerStatsUpdate()
+
+        // Additional trigger with delay to ensure accommodations page updates
+        setTimeout(() => {
+          triggerStatsUpdate()
+          console.log('🔄 Secondary stats update triggered for unverification')
+          console.timeEnd('unverification-stats-trigger')
+        }, 100)
+
         success(data.message)
         setShowConfirmModal(false)
         setConfirmTarget(null)
       } else {
-        error(`Unverification failed: ${data.error}`)
+        // Check if it's a room allocation error
+        if (data.error === 'ROOM_ALLOCATED' && data.roomAllocation) {
+          // Close confirmation modal and show allocation block modal
+          setShowConfirmModal(false)
+          setConfirmTarget(null)
+
+          // Show allocation block modal with the returned data
+          setAllocationBlockData({
+            participantName: data.roomAllocation.registrantName,
+            participantEmail: confirmTarget.emailAddress,
+            allocationInfo: {
+              roomName: data.roomAllocation.roomName,
+              roomId: data.roomAllocation.roomId,
+              roomGender: data.roomAllocation.roomGender,
+              roomCapacity: data.roomAllocation.roomCapacity,
+              roomOccupancy: data.roomAllocation.currentOccupancy,
+              allocationDate: data.roomAllocation.allocationDate
+            }
+          })
+          setShowAllocationBlockModal(true)
+        } else {
+          error(`Unverification failed: ${data.error}`)
+        }
       }
     } catch (err) {
       console.error('Error unverifying registration:', err)
@@ -417,30 +528,74 @@ function AttendancePageContent() {
         console.log('⚠️ Could not parse QR data for tracking')
       }
 
-      const response = await fetch('/api/admin/attendance/verify', {
+      // First, check what action should be taken (verify/unverify/block)
+      const checkResponse = await fetch('/api/admin/attendance/qr-toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          method: 'qr',
-          qrCode: qrData
-        })
+        body: JSON.stringify({ qrCode: qrData })
       })
 
-      const data = await response.json()
+      const checkData = await checkResponse.json()
 
-      if (response.ok) {
-        // Refresh data with current filter state
-        await Promise.all([loadStats(), loadRegistrations()])
-        // Don't show toast here - the real-time handler will show it
-        // Don't close scanner here - let real-time handler do it for the specific scan
+      if (checkData.action === 'verify_ready') {
+        // Proceed with verification
+        const verifyResponse = await fetch('/api/admin/attendance/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            method: 'qr',
+            qrCode: qrData
+          })
+        })
+
+        const verifyData = await verifyResponse.json()
+
+        if (verifyResponse.ok) {
+          // Refresh data and trigger updates
+          await Promise.all([loadStats(), loadRegistrations()])
+          triggerStatsUpdate()
+          setTimeout(() => {
+            triggerStatsUpdate()
+            console.log('🔄 Secondary stats update triggered for QR verification')
+          }, 100)
+        } else {
+          error(`QR Verification failed: ${verifyData.error}`)
+          setLastQRScanId(null)
+        }
+
+      } else if (checkData.action === 'unverify_ready') {
+        // Show unverify confirmation for QR scan
+        const registration = registrations.find(r => r.id === checkData.registration.id)
+        if (registration) {
+          setConfirmTarget(registration)
+          setConfirmAction('unverify')
+          setShowConfirmModal(true)
+        }
+
+      } else if (checkData.action === 'unverify_blocked') {
+        // Show allocation block modal for QR scan
+        setAllocationBlockData({
+          participantName: checkData.registration.fullName,
+          participantEmail: checkData.registration.emailAddress,
+          allocationInfo: {
+            roomName: checkData.roomAllocation.roomName,
+            roomId: checkData.roomAllocation.roomId,
+            roomGender: checkData.roomAllocation.roomGender,
+            roomCapacity: checkData.roomAllocation.roomCapacity,
+            roomOccupancy: checkData.roomAllocation.currentOccupancy,
+            allocationDate: checkData.roomAllocation.allocationDate
+          }
+        })
+        setShowAllocationBlockModal(true)
+
       } else {
-        error(`QR verification failed: ${data.error}`)
-        setLastQRScanId(null) // Clear tracking on error
+        error(`QR Scan failed: ${checkData.error || 'Unknown error'}`)
+        setLastQRScanId(null)
       }
 
     } catch (qrError) {
-      console.error('Error verifying QR code:', qrError)
-      error('Failed to verify QR code')
+      console.error('Error scanning QR code:', qrError)
+      error('Failed to scan QR code')
       setLastQRScanId(null) // Clear tracking on error
     }
   }
@@ -1086,7 +1241,7 @@ function AttendancePageContent() {
               <div className="p-4 sm:p-6">
                 {registrations.length === 0 ? (
                   <div className="text-center py-8 sm:py-12">
-                    <div className="h-12 w-12 sm:h-16 sm:w-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="h-12 w-12 sm:h-16 sm:w-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                       <UserCheck className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                     </div>
                     <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">All Caught Up!</h3>
@@ -1096,7 +1251,7 @@ function AttendancePageContent() {
                   </div>
                 ) : filteredRegistrations.length === 0 ? (
                   <div className="text-center py-8 sm:py-12">
-                    <div className="h-12 w-12 sm:h-16 sm:w-16 bg-gradient-to-r from-gray-400 to-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="h-12 w-12 sm:h-16 sm:w-16 bg-gradient-to-br from-gray-400 to-gray-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                       <Search className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                     </div>
                     <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">No Matching Attendees</h3>
@@ -1282,6 +1437,20 @@ function AttendancePageContent() {
           }}
           action={confirmAction}
           loading={verifying === confirmTarget.id || unverifying === confirmTarget.id}
+        />
+      )}
+
+      {/* Allocation Block Modal */}
+      {allocationBlockData && (
+        <AllocationBlockModal
+          isOpen={showAllocationBlockModal}
+          onCloseAction={() => {
+            setShowAllocationBlockModal(false)
+            setAllocationBlockData(null)
+          }}
+          participantName={allocationBlockData.participantName}
+          participantEmail={allocationBlockData.participantEmail}
+          allocationInfo={allocationBlockData.allocationInfo}
         />
       )}
 

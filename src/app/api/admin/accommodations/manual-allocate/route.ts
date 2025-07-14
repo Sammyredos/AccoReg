@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { RoomAllocationEmailService } from '@/lib/services/room-allocation-email'
+import { broadcastAttendanceEvent } from '@/app/api/admin/attendance/events/route'
 
 const prisma = new PrismaClient()
 
@@ -159,6 +160,25 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Broadcast real-time allocation event
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId,
+        fullName: registration.fullName,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        roomName: room.name
+      }
+    })
+
+    console.log('🏠 Real-time allocation event broadcasted:', {
+      registrationId,
+      participantName: registration.fullName,
+      roomName: room.name,
+      allocatedBy: currentUser.email
+    })
+
     // Send room allocation email to the registrant
     try {
       const emailResult = await RoomAllocationEmailService.sendRoomAllocationEmailWithDefaults(
@@ -218,9 +238,22 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Find and delete the allocation
+    // Find and delete the allocation with participant details
     const allocation = await prisma.roomAllocation.findUnique({
-      where: { registrationId }
+      where: { registrationId },
+      include: {
+        registration: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        },
+        room: {
+          select: {
+            name: true
+          }
+        }
+      }
     })
 
     if (!allocation) {
@@ -232,6 +265,25 @@ export async function DELETE(request: NextRequest) {
 
     await prisma.roomAllocation.delete({
       where: { registrationId }
+    })
+
+    // Broadcast real-time deallocation event
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId,
+        fullName: allocation.registration.fullName,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        roomName: null // Participant is now unallocated
+      }
+    })
+
+    console.log('🏠 Real-time manual deallocation event broadcasted:', {
+      registrationId,
+      participantName: allocation.registration.fullName,
+      previousRoom: allocation.room.name,
+      deallocatedBy: currentUser.email
     })
 
     return NextResponse.json({

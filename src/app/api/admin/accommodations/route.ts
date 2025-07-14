@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { withCache, cacheKeys, invalidateCache } from '@/lib/cache'
+import { broadcastAttendanceEvent } from '@/app/api/admin/attendance/events/route'
 
 const prisma = new PrismaClient()
 
@@ -124,24 +125,28 @@ export async function GET(request: NextRequest) {
       ]
     })
 
-    // Calculate statistics - unallocated should only include VERIFIED participants
-    const verifiedUnallocated = accommodationData.verifiedRegistrations - accommodationData.allocatedRegistrations
+    // Calculate statistics - use ACTUAL count from database query for accuracy
+    const actualUnallocatedCount = unallocatedRegistrations.length // Use actual count from query
     const totalCapacity = accommodationData.totalCapacity._sum.capacity || 0
     const occupiedSpaces = accommodationData.occupiedSpaces || 0
 
-    // Debug logging for room occupancy calculation
-    console.log('🏠 Room Occupancy Debug:', {
+    // Debug logging for accommodation statistics
+    console.log('🏠 Accommodation Stats Debug:', {
+      totalRegistrations: accommodationData.totalRegistrations,
+      verifiedRegistrations: accommodationData.verifiedRegistrations,
+      allocatedRegistrations: accommodationData.allocatedRegistrations,
+      actualUnallocatedCount,
+      unallocatedFromQuery: unallocatedRegistrations.length,
       totalCapacity,
       occupiedSpaces,
-      calculation: totalCapacity > 0 ? Math.round((occupiedSpaces / totalCapacity) * 100) : 0,
-      rawCapacityData: accommodationData.totalCapacity
+      calculation: totalCapacity > 0 ? Math.round((occupiedSpaces / totalCapacity) * 100) : 0
     })
 
     const stats = {
       totalRegistrations: accommodationData.totalRegistrations,
       verifiedRegistrations: accommodationData.verifiedRegistrations,
       allocatedRegistrations: accommodationData.allocatedRegistrations,
-      unallocatedRegistrations: Math.max(0, verifiedUnallocated), // Only verified participants awaiting allocation
+      unallocatedRegistrations: actualUnallocatedCount, // Use actual count from database query
       allocationRate: accommodationData.verifiedRegistrations > 0 ? Math.round((accommodationData.allocatedRegistrations / accommodationData.verifiedRegistrations) * 100) : 0,
       totalRooms: accommodationData.totalRooms,
       activeRooms: accommodationData.activeRooms,
@@ -174,13 +179,20 @@ export async function GET(request: NextRequest) {
       return groups
     }, {} as Record<string, any[]>)
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       stats,
       roomsByGender,
       unallocatedByGender,
       message: 'Accommodation data retrieved successfully'
     })
+
+    // Add performance headers for real-time updates
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+
+    return response
 
   } catch (error) {
     console.error('Error fetching accommodation data:', error)
@@ -217,9 +229,22 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Check if allocation exists
+    // Check if allocation exists and get participant details
     const allocation = await prisma.roomAllocation.findUnique({
-      where: { registrationId }
+      where: { registrationId },
+      include: {
+        registration: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        },
+        room: {
+          select: {
+            name: true
+          }
+        }
+      }
     })
 
     if (!allocation) {
@@ -232,6 +257,25 @@ export async function DELETE(request: NextRequest) {
     // Remove allocation
     await prisma.roomAllocation.delete({
       where: { registrationId }
+    })
+
+    // Broadcast real-time deallocation event
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId,
+        fullName: allocation.registration.fullName,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        roomName: null // Participant is now unallocated
+      }
+    })
+
+    console.log('🏠 Real-time deallocation event broadcasted:', {
+      registrationId,
+      participantName: allocation.registration.fullName,
+      previousRoom: allocation.room.name,
+      deallocatedBy: currentUser.email
     })
 
     // Invalidate cache after modification

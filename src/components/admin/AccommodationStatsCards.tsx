@@ -3,6 +3,7 @@
  * Displays key accommodation metrics in a clean card layout
  */
 
+import React from 'react'
 import { Card } from '@/components/ui/card'
 import { StatsCard, StatsGrid } from '@/components/ui/stats-card'
 import {
@@ -32,7 +33,7 @@ interface AccommodationStatsCardsProps {
   loading?: boolean
 }
 
-export function AccommodationStatsCards({ stats, loading = false }: AccommodationStatsCardsProps) {
+export const AccommodationStatsCards = React.memo(function AccommodationStatsCards({ stats, loading = false }: AccommodationStatsCardsProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -100,7 +101,7 @@ export function AccommodationStatsCards({ stats, loading = false }: Accommodatio
       />
     </StatsGrid>
   )
-}
+})
 
 // Skeleton version for loading states
 export function AccommodationStatsCardsSkeleton() {

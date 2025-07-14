@@ -75,13 +75,6 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'], // All roles can access
   },
   {
-    name: t('nav.platoons'),
-    href: '/admin/platoons',
-    icon: Shield,
-    badge: null,
-    requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff'], // Staff and above can manage platoons
-  },
-  {
     name: t('nav.communications'),
     href: '/admin/communications',
     icon: Mail,

@@ -34,7 +34,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
     onNewScan,
     onError,
     autoReconnect = true,
-    reconnectInterval = 5000
+    reconnectInterval = 2000 // Reduced from 5000ms to 2000ms for faster reconnection
   } = options
 
   const [isConnected, setIsConnected] = useState(false)
@@ -89,7 +89,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       eventSourceRef.current = eventSource
 
       eventSource.onopen = () => {
-        console.log('✅ Real-time attendance connection established')
+        console.log('✅ Real-time attendance connection established at', new Date().toISOString())
         setIsConnected(true)
         setConnectionError(null)
         updateStableState('connected')
@@ -99,6 +99,9 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
           clearTimeout(reconnectTimeoutRef.current)
           reconnectTimeoutRef.current = null
         }
+
+        // Log connection success for debugging
+        console.log('🔗 EventSource readyState:', eventSource.readyState)
       }
 
       eventSource.onmessage = (event) => {
@@ -113,11 +116,12 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
             updateDisplayEventCount(newCount)
           }
 
-          console.log('📡 Received attendance event:', attendanceEvent)
+          console.log('📡 Received attendance event:', attendanceEvent.type, 'at', new Date().toISOString())
 
-          // Handle different event types
+          // Handle different event types with immediate processing
           switch (attendanceEvent.type) {
             case 'verification':
+              console.log('✅ Processing verification event for:', attendanceEvent.data.fullName)
               if (onVerification) {
                 onVerification(attendanceEvent)
               }
@@ -127,6 +131,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
               break
 
             case 'status_change':
+              console.log('🔄 Processing status change event:', attendanceEvent.data.message)
               if (onStatusChange) {
                 onStatusChange(attendanceEvent)
               }
@@ -171,12 +176,13 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
 
         eventSource.close()
 
-        // Auto-reconnect if enabled
+        // Auto-reconnect if enabled with immediate retry for better reliability
         if (autoReconnect && !reconnectTimeoutRef.current) {
           console.log(`🔄 Reconnecting in ${reconnectInterval}ms...`)
           updateStableState('connecting')
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectTimeoutRef.current = null
+            console.log('🔄 Attempting reconnection...')
             connect()
           }, reconnectInterval)
         }

@@ -1,21 +1,9 @@
 'use client'
 
-// QR Code type definition
-interface QRCodeResult {
-  data: string
-  location: {
-    topLeftCorner: { x: number; y: number }
-    topRightCorner: { x: number; y: number }
-    bottomLeftCorner: { x: number; y: number }
-    bottomRightCorner: { x: number; y: number }
-  }
-}
-
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
 import {
   X,
   Camera,
@@ -23,624 +11,529 @@ import {
   Scan,
   CheckCircle,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react'
 
+// QR Code result interface
+interface QRCodeResult {
+  data: string
+  location?: {
+    topLeftCorner: { x: number; y: number }
+    topRightCorner: { x: number; y: number }
+    bottomLeftCorner: { x: number; y: number }
+    bottomRightCorner: { x: number; y: number }
+  }
+}
+
+// Component props interface
 interface QRScannerProps {
   isOpen: boolean
   onCloseAction: () => void
   onScanAction: (qrData: string) => Promise<void>
 }
 
+// Environment detection utilities - safe for both client and server
+const isClient = typeof window !== 'undefined'
+const isDevelopment = isClient && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.includes('dev')
+)
+
 export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProps) {
+  // State management
   const [scanning, setScanning] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [lastScannedId, setLastScannedId] = useState<string | null>(null)
-  // Removed auto-scan functionality - manual scan only
+  const [autoScanActive, setAutoScanActive] = useState(false)
+  const [jsQRLoaded, setJsQRLoaded] = useState(false)
+  
+  // Refs for DOM elements and streams
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastScanAttemptRef = useRef<number>(0)
-
+  const scanIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const jsQRRef = useRef<any>(null)
 
-  // Helper function to refresh the page
-  const refreshPage = () => {
-    window.location.reload()
-  }
-
-  // Reset state when modal opens
+  // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      console.log('🔄 QR Scanner opened, resetting state...')
-      // Complete state reset
-      setLastScannedId(null)
       setError(null)
       setSuccess(null)
+      setLastScannedId(null)
       setProcessing(false)
-      setScanning(false)
-
-      // Clear any existing camera stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop()
-          console.log('🔄 Stopped existing camera track on modal open')
-        })
-        streamRef.current = null
-      }
-
-      // Clear any existing intervals
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current)
-        scanIntervalRef.current = null
-      }
+      loadJsQR()
     } else {
-      // Modal is closing - ensure complete cleanup
-      console.log('🔄 QR Scanner closing, performing cleanup...')
-      stopCamera()
+      cleanup()
     }
   }, [isOpen])
 
-  // Cleanup camera stream when component unmounts or closes
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current)
-        scanIntervalRef.current = null
-      }
+  // Load jsQR library dynamically
+  const loadJsQR = async () => {
+    if (jsQRRef.current) {
+      setJsQRLoaded(true)
+      return
     }
-  }, [])
 
+    try {
+      const jsQRModule = await import('jsqr')
+      jsQRRef.current = jsQRModule.default
+      setJsQRLoaded(true)
+      console.log('✅ jsQR library loaded successfully')
+    } catch (error) {
+      console.error('❌ Failed to load jsQR library:', error)
+      setJsQRLoaded(false)
+    }
+  }
+
+  // Cleanup function
+  const cleanup = () => {
+    stopCamera()
+    stopAutoScan()
+    setScanning(false)
+    setAutoScanActive(false)
+  }
+
+  // Stop camera stream
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }
+
+  // Stop auto-scanning
+  const stopAutoScan = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+    setAutoScanActive(false)
+  }
+
+  // Start camera for scanning
   const startCamera = async () => {
     try {
       setError(null)
       setScanning(true)
 
+      // Check if camera is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported in this browser')
+      }
+
+      // Request camera access
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment', // Use back camera if available
+        video: { 
+          facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
       })
 
       streamRef.current = stream
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-
-        // Set up event listeners for video
-        videoRef.current.onloadedmetadata = () => {
-          console.log('📹 Video metadata loaded, dimensions:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight)
-        }
-
-        videoRef.current.oncanplay = () => {
-          console.log('📹 Video can play, ready for manual scanning')
-        }
-
-        videoRef.current.onplaying = () => {
-          console.log('📹 Video is playing, ready for manual scanning')
-        }
-
-        // Start playing the video
         await videoRef.current.play()
-        console.log('📹 Video started playing')
-        setScanning(true)
+        
+        // Start auto-scanning after video is ready
+        setTimeout(() => {
+          if (jsQRLoaded) {
+            startAutoScan()
+          }
+        }, 1000)
       }
-    } catch (err) {
-      console.error('Camera access error:', err)
-      setError('Unable to access camera. Please check permissions, refresh the page, or try uploading an image instead.')
+
+    } catch (error: any) {
+      console.error('Camera error:', error)
       setScanning(false)
+      
+      if (error.name === 'NotAllowedError') {
+        setError('Camera access denied. Please allow camera access and try again.')
+      } else if (error.name === 'NotFoundError') {
+        setError('No camera found. Please connect a camera and try again.')
+      } else {
+        setError(`Camera error: ${error.message}`)
+      }
     }
   }
 
-  const stopCamera = () => {
-    console.log('📹 Stopping camera and cleaning up...')
-
-    // Clear any scanning intervals
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
+  // Start auto-scanning
+  const startAutoScan = () => {
+    if (!jsQRLoaded || !jsQRRef.current) {
+      console.log('jsQR not loaded, cannot start auto-scan')
+      return
     }
 
-    // Stop camera stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop()
-        console.log('📹 Camera track stopped:', track.kind)
-      })
-      streamRef.current = null
-    }
-
-    // Reset video element
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-      console.log('📹 Video element cleared')
-    }
-
-    // Reset scanning state
-    setScanning(false)
-
-    console.log('📹 Camera cleanup complete')
+    setAutoScanActive(true)
+    
+    scanIntervalRef.current = setInterval(() => {
+      scanFrame()
+    }, 500) // Scan every 500ms for better performance
   }
 
-  // Manual scan only - auto-scan functionality removed
-
-  // Perform manual QR scan
-  const performManualScan = async () => {
-    if (!videoRef.current || !canvasRef.current || processing) return
+  // Scan current video frame
+  const scanFrame = async () => {
+    if (!videoRef.current || !canvasRef.current || !jsQRRef.current) return
 
     const video = videoRef.current
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
-    if (!context) {
-      console.log('❌ Canvas context not available')
-      setError('Camera not ready. Please try again.')
-      return
-    }
-
-    // Check video dimensions
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      console.log('⏳ Video dimensions not ready:', video.videoWidth, 'x', video.videoHeight)
-      setError('Camera not ready. Please wait a moment and try again.')
-      return
-    }
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) return
 
     try {
-      setProcessing(true)
-      setError(null)
-      setSuccess(null)
-
-      console.log('🔍 Performing manual QR scan...')
-
-      // Set canvas dimensions to match video (full resolution for accuracy)
+      // Set canvas size to match video
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
 
-      // Draw current video frame to canvas
+      // Draw video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      // Get image data for QR scanning
+      // Get image data
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
 
-      // Validate image data
-      if (!imageData || imageData.data.length === 0) {
-        console.log('❌ No image data captured')
-        setError('Unable to capture image from camera')
-        return
-      }
+      if (!imageData || imageData.data.length === 0) return
 
-      // Try to scan QR code using jsQR library
-      let jsQR: any
-      try {
-        jsQR = (await import('jsqr')).default
-      } catch (importError) {
-        console.error('Failed to import jsQR:', importError)
-        setError('QR scanning library not available. Please refresh the page to reload the scanner.')
-        return
-      }
+      // Scan for QR code with multiple attempts
+      const scanOptions = [
+        { inversionAttempts: 'attemptBoth' as const },
+        { inversionAttempts: 'onlyInvert' as const },
+        { inversionAttempts: 'dontInvert' as const }
+      ]
 
-      // Try multiple scan approaches for better detection
       let qrCode: QRCodeResult | null = null
-
-      // First attempt: Normal scan
-      qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert'
-      }) as QRCodeResult | null
-
-      // Second attempt: Inverted scan
-      if (!qrCode) {
-        qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'onlyInvert'
-        }) as QRCodeResult | null
-      }
-
-      // Third attempt: Both approaches
-      if (!qrCode) {
-        qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'attemptBoth'
-        }) as QRCodeResult | null
+      for (const options of scanOptions) {
+        try {
+          qrCode = jsQRRef.current(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
+          if (qrCode && qrCode.data) break
+        } catch (scanError) {
+          // Continue to next option
+        }
       }
 
       if (qrCode && qrCode.data) {
-        console.log('🎯 QR Code detected!', qrCode.data.substring(0, 50) + '...')
+        console.log('🎯 QR Code detected:', qrCode.data.substring(0, 50) + '...')
+        stopAutoScan()
         await processDetectedQR(qrCode.data)
-      } else {
-        console.log('❌ No QR code detected in current frame')
-        setError('No QR code detected. Please ensure the QR code is clearly visible and try again.')
       }
+
     } catch (error) {
-      console.error('Manual scan error:', error)
-      setError('QR scanning failed. Please try again.')
-    } finally {
-      setProcessing(false)
+      // Silent error for auto-scan
+      console.log('Scan frame error:', error)
     }
   }
 
-  // Process detected QR code data
+  // Process detected QR code
   const processDetectedQR = async (qrData: string) => {
+    if (processing || qrData === lastScannedId) return
+
     try {
       setProcessing(true)
       setError(null)
-      setSuccess(null)
+      setLastScannedId(qrData)
 
-      console.log('🔍 Processing detected QR code:', qrData.substring(0, 100) + '...')
+      console.log('🔄 Processing QR code:', qrData.substring(0, 50) + '...')
+      
+      await onScanAction(qrData)
+      
+      setSuccess('QR code scanned successfully!')
+      
+      // Auto-close after success (optional)
+      setTimeout(() => {
+        handleClose()
+      }, 2000)
 
-      // Validate QR data format
-      if (qrData.startsWith('{') && qrData.endsWith('}')) {
-        try {
-          // Verify it's valid JSON
-          const parsedData = JSON.parse(qrData)
-
-          // Validate required fields
-          if (parsedData.id && parsedData.fullName && parsedData.checksum) {
-            console.log('✅ Valid QR data detected for:', parsedData.fullName)
-
-            // Prevent duplicate scans of the same QR code
-            if (parsedData.id === lastScannedId) {
-              console.log('⚠️ Duplicate QR scan detected, ignoring...')
-              setError('This QR code was already scanned recently')
-              setProcessing(false)
-              return
-            }
-
-            // Set the scanned ID for tracking
-            setLastScannedId(parsedData.id)
-
-            // Process the QR code
-            await onScanAction(qrData)
-            setSuccess(`${parsedData.fullName} has just been Verified with QR code`)
-
-            // Auto-stop camera after successful scan
-            console.log('✅ QR processing complete, stopping camera automatically')
-            stopCamera()
-
-          } else {
-            setError('QR code missing required registration data')
-          }
-        } catch (parseError) {
-          setError('Invalid QR code format - not valid JSON')
-        }
-      } else {
-        setError('QR code does not contain registration data')
-      }
-    } catch (err) {
-      console.error('QR processing error:', err)
-      setError('Failed to process QR code. Please try again.')
+    } catch (error: any) {
+      console.error('QR processing error:', error)
+      setError(error.message || 'Failed to process QR code')
     } finally {
       setProcessing(false)
     }
   }
 
-
-
+  // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    await processQRFromBlob(file)
+    try {
+      setError(null)
+      setProcessing(true)
+
+      if (!jsQRLoaded || !jsQRRef.current) {
+        throw new Error('QR scanner not ready. Please wait and try again.')
+      }
+
+      // Create image from file
+      const img = new Image()
+      const canvas = canvasRef.current
+
+      if (!canvas) throw new Error('Canvas not available')
+
+      img.onload = async () => {
+        try {
+          const context = canvas.getContext('2d')
+          if (!context) throw new Error('Canvas context not available')
+
+          // Set canvas size and draw image
+          canvas.width = img.width
+          canvas.height = img.height
+          context.drawImage(img, 0, 0)
+
+          // Get image data and scan
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          const qrCode = jsQRRef.current(imageData.data, imageData.width, imageData.height) as QRCodeResult | null
+
+          if (qrCode && qrCode.data) {
+            await processDetectedQR(qrCode.data)
+          } else {
+            setError('No QR code found in the uploaded image')
+          }
+        } catch (error: any) {
+          setError(`Failed to scan uploaded image: ${error.message}`)
+        } finally {
+          setProcessing(false)
+        }
+      }
+
+      img.onerror = () => {
+        setError('Failed to load uploaded image')
+        setProcessing(false)
+      }
+
+      img.src = URL.createObjectURL(file)
+
+    } catch (error: any) {
+      setError(error.message)
+      setProcessing(false)
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
-  const processQRFromBlob = async (blob: Blob) => {
+  // Development fallback for testing
+  const handleDevelopmentTest = async () => {
+    if (!isDevelopment) return
+
     try {
       setProcessing(true)
       setError(null)
-      setSuccess(null)
 
-      // Convert blob to image for QR code scanning
-      const imageUrl = URL.createObjectURL(blob)
-      const img = new Image()
+      // Try to fetch real registration data
+      const response = await fetch('/api/admin/attendance/registrations?limit=5')
+      const data = await response.json()
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-        img.src = imageUrl
-      })
-
-      // Create canvas to process the image
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        throw new Error('Could not get canvas context')
-      }
-
-      canvas.width = img.width
-      canvas.height = img.height
-      ctx.drawImage(img, 0, 0)
-
-      // Get image data for QR scanning
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-
-      // Try to scan QR code using jsQR library
-      let qrCode: QRCodeResult | null = null
-      try {
-        // Import jsQR dynamically
-        const jsQR = (await import('jsqr')).default
-        qrCode = jsQR(imageData.data, imageData.width, imageData.height) as QRCodeResult | null
-      } catch (importError) {
-        console.warn('jsQR library not available, using fallback method')
-
-        // Fallback: Try to extract QR data from a test scenario
-        // This is for development/testing when jsQR is not available
-        await handleFallbackQRScan()
-        return
-      }
-
-      // Clean up
-      URL.revokeObjectURL(imageUrl)
-
-      if (qrCode && qrCode.data) {
-        console.log('🔍 QR Code detected:', qrCode.data.substring(0, 100) + '...')
-
-        // Validate QR data format
-        if (qrCode.data.startsWith('{') && qrCode.data.endsWith('}')) {
-          try {
-            // Verify it's valid JSON
-            JSON.parse(qrCode.data)
-
-            // Process the actual scanned QR code
-            await onScanAction(qrCode.data)
-
-            // Extract participant name for success message and prevent duplicates
-            const qrData = JSON.parse(qrCode.data)
-            setSuccess(`${qrData.fullName} has just been Verified with QR code`)
-
-            // Prevent duplicate scans of the same QR code
-            if (qrData.id && qrData.id === lastScannedId) {
-              setError('This User QR code was already scanned recently')
-              return
-            }
-            setLastScannedId(qrData.id)
-
-          } catch (parseError) {
-            setError('Invalid QR code format - not valid JSON')
-          }
-        } else {
-          setError('QR code does not contain registration data')
+      if (data.registrations && data.registrations.length > 0) {
+        const registrationsWithQR = data.registrations.filter((r: any) => r.qrCode)
+        if (registrationsWithQR.length > 0) {
+          const randomReg = registrationsWithQR[Math.floor(Math.random() * registrationsWithQR.length)]
+          await processDetectedQR(randomReg.qrCode)
+          return
         }
-      } else {
-        setError('No QR code detected in image. Please ensure the QR code is clearly visible and try again.')
       }
 
-    } catch (err) {
-      console.error('QR processing error:', err)
-      setError('Failed to process image. Please try again or use manual verification.')
+      // Fallback to mock data
+      const mockQR = `QR_DEV_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      await processDetectedQR(mockQR)
+
+    } catch (error: any) {
+      setError(`Development test failed: ${error.message}`)
     } finally {
       setProcessing(false)
     }
   }
 
-  // Fallback method for testing when jsQR is not available
-  const handleFallbackQRScan = async () => {
-    try {
-      // In development, allow testing with a sample QR code
-      if (process.env.NODE_ENV === 'development') {
-        // Fetch a random registration for testing
-        const response = await fetch('/api/admin/attendance/registrations?limit=10')
-        const data = await response.json()
-
-        if (data.registrations && data.registrations.length > 0) {
-          // Get a random registration with QR code
-          const registrationsWithQR = data.registrations.filter((r: any) => r.qrCode)
-          if (registrationsWithQR.length > 0) {
-            const randomIndex = Math.floor(Math.random() * registrationsWithQR.length)
-            const registration = registrationsWithQR[randomIndex]
-
-            console.log('🧪 Development mode: Using random QR code for testing')
-            await onScanAction(registration.qrCode)
-            setSuccess(`${registration.fullName} has just been Verified with QR code (Development test)`)
-            return
-          }
-        }
-      }
-
-      // If no real QR codes available, show helpful error
-      setError('QR scanning library not available. Please refresh the page to reload the scanner or use manual verification.')
-
-    } catch (fallbackError) {
-      console.error('Fallback QR scan error:', fallbackError)
-      setError('Unable to process QR code. Please use manual verification.')
-    }
-  }
-
+  // Handle modal close
   const handleClose = () => {
-    console.log('🔄 Closing QR Scanner, cleaning up...')
-    stopCamera()
+    cleanup()
     setError(null)
     setSuccess(null)
-    setLastScannedId(null)
-    setProcessing(false)
     onCloseAction()
   }
 
+  // Don't render if modal is closed
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
       <Card className="w-full max-w-2xl bg-white max-h-[95vh] overflow-y-auto">
         <div className="p-3 sm:p-6">
-          {/* Header - Mobile Responsive */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
               <div className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Scan className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="font-apercu-bold text-base sm:text-lg text-gray-900 truncate">QR Code Scanner</h2>
-                <p className="font-apercu-regular text-xs sm:text-sm text-gray-600 hidden sm:block">Scan attendee QR codes for verification</p>
-                <p className="font-apercu-regular text-xs text-gray-600 sm:hidden">Scan QR codes</p>
+                <h2 className="font-bold text-base sm:text-lg text-gray-900 truncate">QR Code Scanner</h2>
+                <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Scan attendee QR codes for verification</p>
+                <p className="text-xs text-gray-600 sm:hidden">Scan QR codes</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleClose} className="flex-shrink-0 ml-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClose}
+              className="flex-shrink-0 h-8 w-8 p-0"
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Status Messages */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <span className="font-apercu-regular text-sm text-red-700">{error}</span>
-              </div>
-              {(error.includes('library not available') || error.includes('refresh the page')) && (
-                <div className="flex items-center space-x-2">
-                  <Button
-                    onClick={refreshPage}
-                    size="sm"
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Page
-                  </Button>
-                  <span className="text-xs text-red-600">
-                    {error.includes('library not available')
-                      ? 'This will reload the QR scanner library'
-                      : 'This may help resolve camera or scanner issues'
-                    }
-                  </span>
-                </div>
-              )}
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+              <span className="text-sm text-red-700">{error}</span>
             </div>
           )}
 
           {success && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="font-apercu-regular text-sm text-green-700">{success}</span>
+              <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+              <span className="text-sm text-green-700">{success}</span>
             </div>
           )}
 
-          {/* Scanner Interface */}
-          <div className="space-y-4">
-            {/* Camera View - Mobile Responsive */}
+          {/* Loading State */}
+          {!jsQRLoaded && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center space-x-2">
+              <RefreshCw className="h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
+              <span className="text-sm text-blue-700">Loading QR scanner...</span>
+            </div>
+          )}
+
+          {/* Scanner Status */}
+          {scanning && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <Camera className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm font-medium text-yellow-800">Camera Active</span>
+                {autoScanActive && (
+                  <Badge variant="secondary" className="text-xs">
+                    Auto-scanning
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-yellow-700">
+                Position QR code in front of camera. Scanner will automatically detect codes.
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            {/* Camera Scan Button */}
+            <Button
+              onClick={startCamera}
+              disabled={scanning || processing || !jsQRLoaded}
+              className="w-full h-12 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              {scanning ? 'Camera Active' : 'Scan with Camera'}
+            </Button>
+
+            {/* File Upload Button */}
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={processing || !jsQRLoaded}
+              variant="outline"
+              className="w-full h-12 border-2 border-dashed border-gray-300 hover:border-green-500 hover:bg-green-50"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload QR Image
+            </Button>
+          </div>
+
+          {/* Development Test Button */}
+          {isDevelopment && (
+            <div className="mb-6">
+              <Button
+                onClick={handleDevelopmentTest}
+                disabled={processing}
+                variant="secondary"
+                className="w-full h-10 bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Development Test Scan
+              </Button>
+              <p className="text-xs text-gray-500 mt-1 text-center">
+                Development mode: Test with random QR code
+              </p>
+            </div>
+          )}
+
+          {/* Camera Controls */}
+          {scanning && (
+            <div className="mb-6 flex flex-col sm:flex-row gap-2">
+              <Button
+                onClick={stopCamera}
+                variant="outline"
+                className="flex-1"
+              >
+                Stop Camera
+              </Button>
+              {jsQRLoaded && !autoScanActive && (
+                <Button
+                  onClick={startAutoScan}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <Scan className="h-4 w-4 mr-2" />
+                  Start Auto-Scan
+                </Button>
+              )}
+              {autoScanActive && (
+                <Button
+                  onClick={stopAutoScan}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Stop Auto-Scan
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Video and Canvas Elements */}
+          <div className="relative">
             {scanning && (
-              <div className="relative">
+              <div className="relative bg-black rounded-lg overflow-hidden">
                 <video
                   ref={videoRef}
-                  className="w-full h-48 sm:h-64 bg-gray-900 rounded-lg object-cover"
+                  className="w-full h-64 sm:h-80 object-cover"
                   playsInline
                   muted
                 />
-                <canvas ref={canvasRef} className="hidden" />
-                
-                {/* Scan Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 border-2 border-green-500 rounded-lg relative">
-                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-500"></div>
-                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-500"></div>
-                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-500"></div>
-                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-500"></div>
+                {autoScanActive && (
+                  <div className="absolute inset-0 border-2 border-green-400 rounded-lg">
+                    <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs">
+                      Scanning...
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
-            {/* Controls - Mobile Responsive */}
-            <div className="flex flex-col space-y-3">
-              {!scanning ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                  <Button
-                    onClick={startCamera}
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 w-full text-sm sm:text-base py-2 sm:py-3"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline text-white">Start Camera</span>
-                    <span className="sm:hidden text-white">Camera</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full text-sm sm:text-base py-2 sm:py-3"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Upload Image</span>
-                    <span className="sm:hidden">Upload</span>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Camera Status */}
-                  <div className="border rounded-lg p-3 bg-green-50 border-green-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm text-green-700 font-medium">
-                        � Camera ready - Click "Scan Now" to scan QR codes
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Control buttons */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full text-sm sm:text-base py-2 sm:py-3"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Upload Image</span>
-                      <span className="sm:hidden">Upload</span>
-                    </Button>
-
-                    {/* Manual scan button */}
-                    <Button
-                      onClick={async () => {
-                        try {
-                          await performManualScan()
-                        } catch (scanError) {
-                          console.error('Manual scan failed:', scanError)
-                          setError('QR scanning failed. Please refresh the page to reload the scanner.')
-                        }
-                      }}
-                      disabled={processing}
-                      className="bg-blue-500 hover:bg-blue-600 w-full text-sm sm:text-base py-2 sm:py-3"
-                    >
-                      {processing ? (
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Scan className="h-4 w-4 mr-2" />
-                      )}
-                      <span className="hidden sm:inline text-white">Scan Now</span>
-                      <span className="sm:hidden text-white">Scan</span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={stopCamera}
-                      className="w-full text-sm sm:text-base py-2 sm:py-3"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Stop Camera</span>
-                      <span className="sm:hidden">Stop</span>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Instructions - Mobile Responsive */}
-            <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-apercu-bold text-sm text-green-900">QR Scanner Ready</p>
-                  <p className="font-apercu-regular text-xs sm:text-sm text-green-700 mt-1">
-                    <span className="hidden sm:inline">Point your camera at a QR code or upload an image to scan. The system will automatically verify the attendee.</span>
-                    <span className="sm:hidden">Scan QR codes to verify attendees automatically.</span>
-                  </p>
-                </div>
-              </div>
-            </div>
+            <canvas
+              ref={canvasRef}
+              className="hidden"
+            />
           </div>
 
-          {/* Hidden file input */}
+          {/* Hidden File Input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -648,6 +541,30 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             onChange={handleFileUpload}
             className="hidden"
           />
+
+          {/* Processing Overlay */}
+          {processing && (
+            <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded-lg">
+              <div className="text-center">
+                <RefreshCw className="h-8 w-8 text-green-500 animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Processing QR code...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Instructions */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">How to use:</h3>
+            <ul className="text-xs text-gray-600 space-y-1">
+              <li>• Click "Scan with Camera" to use your device camera</li>
+              <li>• Click "Upload QR Image" to scan from a saved image</li>
+              <li>• Position QR code clearly in view for best results</li>
+              <li>• Scanner will automatically detect and process QR codes</li>
+              {isDevelopment && (
+                <li className="text-purple-600">• Development: Use test button for demo data</li>
+              )}
+            </ul>
+          </div>
         </div>
       </Card>
     </div>

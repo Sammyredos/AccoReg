@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useCallback, useRef, useEffect } from 'react'
+import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
 
 interface AccommodationUpdate {
   type: 'allocation' | 'deallocation' | 'room_update' | 'stats_update'
@@ -120,11 +121,61 @@ export function AccommodationUpdatesProvider({ children }: { children: React.Rea
   // Register refresh callback
   const onRefresh = useCallback((callback: () => void) => {
     refreshCallbacks.current.add(callback)
-    
+
     return () => {
       refreshCallbacks.current.delete(callback)
     }
   }, [])
+
+  // Listen to real-time attendance events for verification/unverification
+  useRealTimeAttendance({
+    onVerification: useCallback((event) => {
+      console.log('🏠 Accommodations: Real-time verification received:', event.data.fullName, 'at', new Date().toISOString())
+
+      // Immediate stats update with multiple triggers for reliability
+      triggerStatsUpdate()
+
+      // Broadcast verification update immediately
+      broadcastUpdate({
+        type: 'stats_update',
+        data: {
+          participantName: event.data.fullName,
+          totalAllocated: undefined, // Will be recalculated
+          totalUnallocated: undefined // Will be recalculated
+        },
+        timestamp: Date.now()
+      })
+
+      // Additional delayed trigger to ensure update
+      setTimeout(() => {
+        triggerStatsUpdate()
+        console.log('🔄 Secondary verification update triggered')
+      }, 50)
+    }, [triggerStatsUpdate, broadcastUpdate]),
+
+    onStatusChange: useCallback((event) => {
+      console.log('🏠 Accommodations: Real-time status change received:', event.data.message || 'Status change', 'at', new Date().toISOString())
+
+      // Immediate stats update
+      triggerStatsUpdate()
+
+      // Broadcast general update immediately
+      broadcastUpdate({
+        type: 'stats_update',
+        data: {
+          participantName: event.data.fullName,
+          message: event.data.message
+        },
+        timestamp: Date.now()
+      })
+
+      // Additional delayed trigger to ensure update
+      setTimeout(() => {
+        triggerStatsUpdate()
+        console.log('🔄 Secondary status change update triggered')
+      }, 50)
+    }, [triggerStatsUpdate, broadcastUpdate])
+  })
 
   const value: AccommodationUpdatesContextType = {
     triggerAllocationUpdate,
