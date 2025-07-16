@@ -25,6 +25,7 @@ export interface UseRealTimeAttendanceOptions {
   onError?: (event: AttendanceEvent) => void
   autoReconnect?: boolean
   reconnectInterval?: number
+  enabled?: boolean // Allow disabling the connection
 }
 
 export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}) {
@@ -34,7 +35,8 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
     onNewScan,
     onError,
     autoReconnect = true,
-    reconnectInterval = 2000 // Reduced from 5000ms to 2000ms for faster reconnection
+    reconnectInterval = 2000, // Reduced from 5000ms to 2000ms for faster reconnection
+    enabled = true // Default to enabled
   } = options
 
   const [isConnected, setIsConnected] = useState(false)
@@ -83,13 +85,33 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
         eventSourceRef.current.close()
       }
 
+      // Check if user is logged in by checking for auth token
+      const hasAuthToken = document.cookie.includes('auth-token=')
+      if (!hasAuthToken) {
+        console.warn('⚠️ No auth token found, skipping real-time connection')
+        setConnectionError('Not authenticated')
+        updateStableState('disconnected')
+        return
+      }
+
       console.log('🔄 Connecting to real-time attendance updates...')
-      
+
       const eventSource = new EventSource('/api/admin/attendance/events')
       eventSourceRef.current = eventSource
 
+      // Set a timeout to detect if connection fails to establish
+      const connectionTimeout = setTimeout(() => {
+        if (eventSource.readyState === EventSource.CONNECTING) {
+          console.warn('⚠️ Connection timeout - SSE endpoint may not be available')
+          eventSource.close()
+          setConnectionError('Connection timeout')
+          updateStableState('disconnected')
+        }
+      }, 10000) // 10 second timeout
+
       eventSource.onopen = () => {
         console.log('✅ Real-time attendance connection established at', new Date().toISOString())
+        clearTimeout(connectionTimeout) // Clear the connection timeout
         setIsConnected(true)
         setConnectionError(null)
         updateStableState('connected')
@@ -169,9 +191,24 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       }
 
       eventSource.onerror = (error) => {
-        console.error('❌ Real-time attendance connection error:', error)
+        // Only log errors in development
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Real-time attendance connection error:', error)
+          console.log(`🔍 EventSource readyState: ${eventSource.readyState} (0=CONNECTING, 1=OPEN, 2=CLOSED)`)
+        }
+
+        // Check the readyState to determine the type of error
+        const readyState = eventSource.readyState
+        let errorMessage = 'Connection lost'
+
+        if (readyState === EventSource.CONNECTING) {
+          errorMessage = 'Failed to connect to real-time updates'
+        } else if (readyState === EventSource.CLOSED) {
+          errorMessage = 'Connection closed by server'
+        }
+
         setIsConnected(false)
-        setConnectionError('Connection lost')
+        setConnectionError(errorMessage)
         updateStableState('disconnected')
 
         eventSource.close()
@@ -229,15 +266,21 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
     setTimeout(connect, 1000)
   }, [connect, disconnect])
 
-  // Auto-connect on mount
+  // Auto-connect on mount (only if enabled)
   useEffect(() => {
-    connect()
-    
+    if (enabled) {
+      connect()
+    } else {
+      console.log('🔇 Real-time attendance updates disabled')
+      setConnectionError('Disabled')
+      updateStableState('disconnected')
+    }
+
     // Cleanup on unmount
     return () => {
       disconnect()
     }
-  }, [connect, disconnect])
+  }, [enabled, connect, disconnect])
 
   // Handle page visibility changes
   useEffect(() => {

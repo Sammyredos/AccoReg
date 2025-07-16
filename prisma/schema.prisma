@@ -1,26 +1,23 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model Admin {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String
   name      String
   roleId    String?
-  role      Role?    @relation(fields: [roleId], references: [id])
-  isActive  Boolean  @default(true)
+  isActive  Boolean   @default(true)
   lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  role      Role?     @relation(fields: [roleId], references: [id])
 
   @@index([email])
   @@index([isActive])
@@ -28,20 +25,20 @@ model Admin {
 }
 
 model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
+  id              String    @id @default(cuid())
+  email           String    @unique
   name            String
   password        String
-  phoneNumber     String?  @unique
-  phoneVerified   Boolean  @default(false)
+  phoneNumber     String?   @unique
+  phoneVerified   Boolean   @default(false)
   phoneVerifiedAt DateTime?
   roleId          String
-  role            Role     @relation(fields: [roleId], references: [id])
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   lastLogin       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   createdBy       String?
+  role            Role      @relation(fields: [roleId], references: [id])
 
   @@index([email])
   @@index([isActive])
@@ -53,81 +50,61 @@ model Role {
   id          String       @id @default(cuid())
   name        String       @unique
   description String?
-  permissions Permission[]
-  users       User[]
-  admins      Admin[]
   isSystem    Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  admins      Admin[]
+  users       User[]
+  permissions Permission[] @relation("PermissionToRole")
 
   @@map("roles")
 }
 
 model Permission {
-  id          String @id @default(cuid())
-  name        String @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
   description String?
-  resource    String // e.g., "registrations", "users", "analytics"
-  action      String // e.g., "read", "write", "delete", "manage"
-  roles       Role[]
+  resource    String
+  action      String
+  roles       Role[]  @relation("PermissionToRole")
 
   @@map("permissions")
 }
 
 model Registration {
-  id        String   @id @default(cuid())
-
-  // Personal Information
-  fullName     String
-  dateOfBirth  DateTime
-  gender       String   // "Male" or "Female" only
-  address      String
-  phoneNumber  String
-  emailAddress String
-
-  // Contact Information
-  emergencyContactName         String
-  emergencyContactRelationship String
-  emergencyContactPhone        String
-
-  // Parent/Guardian Information (if under 18)
-  parentGuardianName  String?
-  parentGuardianPhone String?
-  parentGuardianEmail String?
-
-  // Roommate Request (optional)
+  id                                String          @id @default(cuid())
+  fullName                          String
+  dateOfBirth                       DateTime
+  age                               Int                 @default(0)
+  gender                            String
+  address                           String
+  branch                            String
+  phoneNumber                       String
+  emailAddress                      String
+  emergencyContactName              String
+  emergencyContactRelationship      String
+  emergencyContactPhone             String
+  parentGuardianName                String?
+  parentGuardianPhone               String?
+  parentGuardianEmail               String?
   roommateRequestConfirmationNumber String?
-
-  // Medical Information
-  medications    String? // JSON string or text field
-  allergies      String? // JSON string or text field
-  specialNeeds   String? // JSON string or text field
-
-  // Dietary Restrictions
-  dietaryRestrictions String? // JSON string or text field
-
-  // Parental Permission
-  parentalPermissionGranted Boolean @default(false)
-  parentalPermissionDate    DateTime?
-
-  // Attendance Verification (NEW)
-  isVerified        Boolean   @default(false)  // Physical verification status
-  verifiedAt        DateTime? // When verification occurred
-  verifiedBy        String?   // Admin who verified (email)
-  qrCode            String?   // QR code for verification
-  attendanceMarked  Boolean   @default(false)  // Whether attendance was marked
-  attendanceTime    DateTime? // When attendance was marked
-
-  // Unverification tracking
-  unverifiedAt      DateTime? // When unverification occurred
-  unverifiedBy      String?   // Admin who unverified (email)
-
-  // Room allocation (only for verified attendees)
-  roomAllocation RoomAllocation?
-
-  // System fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  medications                       String?
+  allergies                         String?
+  specialNeeds                      String?
+  dietaryRestrictions               String?
+  parentalPermissionGranted         Boolean         @default(false)
+  parentalPermissionDate            DateTime?
+  isVerified                        Boolean         @default(false)
+  verifiedAt                        DateTime?
+  verifiedBy                        String?
+  qrCode                            String?
+  attendanceMarked                  Boolean         @default(false)
+  attendanceTime                    DateTime?
+  unverifiedAt                      DateTime?
+  unverifiedBy                      String?
+  createdAt                         DateTime        @default(now())
+  updatedAt                         DateTime        @updatedAt
+  roomAllocation                    RoomAllocation?
 
   @@index([isVerified])
   @@index([verifiedAt])
@@ -135,21 +112,22 @@ model Registration {
   @@index([phoneNumber])
   @@index([fullName])
   @@index([gender])
+  @@index([branch])
   @@index([createdAt])
   @@map("registrations")
 }
 
 model Notification {
   id                String   @id @default(cuid())
-  type              String   // e.g., "new_registration", "system_update", "approval_required"
+  type              String
   title             String
   message           String
-  priority          String   @default("medium") // "low", "medium", "high"
+  priority          String   @default("medium")
   isRead            Boolean  @default(false)
-  recipientId       String?  // Admin/User ID who should receive this notification
-  metadata          String?  // JSON string for additional data
-  authorizedBy      String?  // Name of the user who authorized/triggered this action
-  authorizedByEmail String?  // Email of the user who authorized/triggered this action
+  recipientId       String?
+  metadata          String?
+  authorizedBy      String?
+  authorizedByEmail String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -158,14 +136,14 @@ model Notification {
 
 model Setting {
   id          String   @id @default(cuid())
-  category    String   // e.g., "userManagement", "security", "notifications", "system"
-  key         String   // e.g., "defaultRole", "twoFactor", "newRegistrationAlerts"
-  value       String   // JSON string to store any type of value
-  type        String   // "text", "email", "select", "toggle", "number"
-  options     String?  // JSON array of options for select type
-  name        String   // Display name
-  description String?  // Optional description
-  isSystem    Boolean  @default(false) // System settings that can't be deleted
+  category    String
+  key         String
+  value       String
+  type        String
+  options     String?
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -174,39 +152,36 @@ model Setting {
 }
 
 model Message {
-  id              String    @id @default(cuid())
-  subject         String
-  content         String
-  senderEmail     String
-  senderName      String
-  recipientEmail  String
-  recipientName   String
-  senderType      String    // "admin" or "user"
-  recipientType   String    // "admin" or "user"
-  status          String    @default("sent") // "sent", "delivered", "failed"
-  error           String?   // Error message if delivery failed
-  sentAt          DateTime  @default(now())
-  deliveredAt     DateTime?
-  readAt          DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  subject        String
+  content        String
+  senderEmail    String
+  senderName     String
+  recipientEmail String
+  recipientName  String
+  senderType     String
+  recipientType  String
+  status         String    @default("sent")
+  error          String?
+  sentAt         DateTime  @default(now())
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@map("messages")
 }
 
 model Room {
-  id          String   @id @default(cuid())
-  name        String   @unique // e.g., "Room Shiloh", "Room A1"
-  gender      String   // "Male" or "Female" only
-  capacity    Int      // Number of beds/persons the room can contain
-  isActive    Boolean  @default(true)
-  description String?  // Optional description
-
-  // Room allocations
+  id          String           @id @default(cuid())
+  name        String           @unique
+  gender      String
+  capacity    Int
+  isActive    Boolean          @default(true)
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   allocations RoomAllocation[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
   @@map("rooms")
 }
@@ -216,20 +191,18 @@ model RoomAllocation {
   registrationId String       @unique
   roomId         String
   allocatedAt    DateTime     @default(now())
-  allocatedBy    String?      // User who performed the allocation
-
-  // Relations
+  allocatedBy    String?
+  room           Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  room          Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@map("room_allocations")
 }
 
 model SystemConfig {
   id          String   @id @default(cuid())
-  key         String   @unique // e.g., "accommodation_max_age_gap"
-  value       String   // The configuration value
-  description String?  // Optional description
+  key         String   @unique
+  value       String
+  description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -247,4 +220,25 @@ model SMSVerification {
   updatedAt   DateTime @updatedAt
 
   @@map("sms_verifications")
+}
+
+model ChildrenRegistration {
+  id                  String   @id @default(cuid())
+  fullName            String
+  dateOfBirth         DateTime
+  age                 Int      @default(0)
+  gender              String
+  address             String
+  branch              String
+  parentGuardianName  String
+  parentGuardianPhone String
+  parentGuardianEmail String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([fullName])
+  @@index([gender])
+  @@index([branch])
+  @@index([createdAt])
+  @@map("children_registrations")
 }

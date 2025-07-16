@@ -703,8 +703,8 @@ function AccommodationsPageContent() {
       statsUnallocated: stats?.unallocatedRegistrations
     })
 
-    // Case 1: No rooms for both genders
-    if (!maleRoomsExist && !femaleRoomsExist) {
+    // Case 1: No rooms for both genders (only show after loading is complete)
+    if (!maleRoomsExist && !femaleRoomsExist && !isLoading) {
       return {
         disabled: true,
         message: 'No Rooms for Allocation',

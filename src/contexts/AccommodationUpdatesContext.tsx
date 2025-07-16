@@ -129,6 +129,7 @@ export function AccommodationUpdatesProvider({ children }: { children: React.Rea
 
   // Listen to real-time attendance events for verification/unverification
   useRealTimeAttendance({
+    enabled: true, // Keep enabled for accommodation updates
     onVerification: useCallback((event) => {
       console.log('🏠 Accommodations: Real-time verification received:', event.data.fullName, 'at', new Date().toISOString())
 

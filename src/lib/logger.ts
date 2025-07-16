@@ -74,6 +74,8 @@ const loggerInstance = new SimpleLogger()
 // Set level based on environment
 if (process.env.NODE_ENV === 'development') {
   loggerInstance.setLevel('debug')
+} else if (process.env.NODE_ENV === 'production') {
+  loggerInstance.setLevel('warn') // Only warnings and errors in production
 } else {
   loggerInstance.setLevel('info')
 }

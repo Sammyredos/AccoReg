@@ -11,8 +11,7 @@ import {
   Scan,
   CheckCircle,
   AlertTriangle,
-  RefreshCw,
-  Zap
+  RefreshCw
 } from 'lucide-react'
 
 // QR Code result interface
@@ -33,13 +32,7 @@ interface QRScannerProps {
   onScanAction: (qrData: string) => Promise<void>
 }
 
-// Environment detection utilities - safe for both client and server
-const isClient = typeof window !== 'undefined'
-const isDevelopment = isClient && (
-  window.location.hostname === 'localhost' || 
-  window.location.hostname === '127.0.0.1' ||
-  window.location.hostname.includes('dev')
-)
+
 
 export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProps) {
   // State management
@@ -323,37 +316,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     }
   }
 
-  // Development fallback for testing
-  const handleDevelopmentTest = async () => {
-    if (!isDevelopment) return
 
-    try {
-      setProcessing(true)
-      setError(null)
-
-      // Try to fetch real registration data
-      const response = await fetch('/api/admin/attendance/registrations?limit=5')
-      const data = await response.json()
-
-      if (data.registrations && data.registrations.length > 0) {
-        const registrationsWithQR = data.registrations.filter((r: any) => r.qrCode)
-        if (registrationsWithQR.length > 0) {
-          const randomReg = registrationsWithQR[Math.floor(Math.random() * registrationsWithQR.length)]
-          await processDetectedQR(randomReg.qrCode)
-          return
-        }
-      }
-
-      // Fallback to mock data
-      const mockQR = `QR_DEV_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      await processDetectedQR(mockQR)
-
-    } catch (error: any) {
-      setError(`Development test failed: ${error.message}`)
-    } finally {
-      setProcessing(false)
-    }
-  }
 
   // Handle modal close
   const handleClose = () => {
@@ -457,23 +420,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             </Button>
           </div>
 
-          {/* Development Test Button */}
-          {isDevelopment && (
-            <div className="mb-6">
-              <Button
-                onClick={handleDevelopmentTest}
-                disabled={processing}
-                variant="secondary"
-                className="w-full h-10 bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Development Test Scan
-              </Button>
-              <p className="text-xs text-gray-500 mt-1 text-center">
-                Development mode: Test with random QR code
-              </p>
-            </div>
-          )}
+
 
           {/* Camera Controls */}
           {scanning && (
@@ -560,9 +507,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
               <li>• Click "Upload QR Image" to scan from a saved image</li>
               <li>• Position QR code clearly in view for best results</li>
               <li>• Scanner will automatically detect and process QR codes</li>
-              {isDevelopment && (
-                <li className="text-purple-600">• Development: Use test button for demo data</li>
-              )}
             </ul>
           </div>
         </div>

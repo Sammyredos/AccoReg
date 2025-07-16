@@ -48,6 +48,7 @@ interface Registration {
   dateOfBirth: string
   gender: string
   address: string
+  branch: string
   phoneNumber: string
   emailAddress: string
   emergencyContactName: string
@@ -85,17 +86,7 @@ export default function AdminRegistrations() {
     total: 0,
     pages: 0
   })
-  const [analyticsData, setAnalyticsData] = useState<{
-    registrationsToday: number
-    registrationsThisWeek: number
-    registrationsThisMonth: number
-    averageAge: number
-  }>({
-    registrationsToday: 0,
-    registrationsThisWeek: 0,
-    registrationsThisMonth: 0,
-    averageAge: 0
-  })
+
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -121,6 +112,13 @@ export default function AdminRegistrations() {
     type: 'error',
     title: '',
     description: ''
+  })
+
+  const [analyticsData, setAnalyticsData] = useState({
+    registrationsToday: 0,
+    registrationsThisWeek: 0,
+    registrationsThisMonth: 0,
+    averageAge: 0
   })
 
   const { success, error } = useToast()
@@ -462,6 +460,7 @@ export default function AdminRegistrations() {
       emailAddress: registrationData.emailAddress || '',
       phoneNumber: registrationData.phoneNumber || '',
       address: registrationData.address || '',
+      branch: registrationData.branch || '',
       emergencyContactName: registrationData.emergencyContactName || '',
       emergencyContactRelationship: registrationData.emergencyContactRelationship || '',
       emergencyContactPhone: registrationData.emergencyContactPhone || '',
@@ -1368,6 +1367,10 @@ export default function AdminRegistrations() {
                       <label className="block font-apercu-medium text-xs sm:text-sm text-gray-600 mb-1">Address</label>
                       <p className="font-apercu-regular text-sm sm:text-base text-gray-900 break-words">{selectedRegistration.address}</p>
                     </div>
+                    <div className="bg-blue-50 p-3 sm:p-4 rounded-lg border border-blue-200">
+                      <label className="block font-apercu-medium text-xs sm:text-sm text-gray-600 mb-1">Branch</label>
+                      <p className="font-apercu-regular text-sm sm:text-base text-gray-900">{selectedRegistration.branch || 'Not Specified'}</p>
+                    </div>
                   </div>
                 </div>
 
@@ -1717,6 +1720,44 @@ export default function AdminRegistrations() {
                         disabled={isEditing}
                         placeholder="Enter full address"
                       />
+                    </div>
+                    <div>
+                      <label className="block font-apercu-medium text-sm text-gray-700 mb-2">
+                        Branch
+                      </label>
+                      <select
+                        value={editFormData.branch || ''}
+                        onChange={(e) => handleEditFormChange('branch', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        disabled={isEditing}
+                      >
+                        <option value="">Select Branch</option>
+                        <option value="Iyana Ipaja">Iyana Ipaja</option>
+                        <option value="Bajomo">Bajomo</option>
+                        <option value="Badagry">Badagry</option>
+                        <option value="Bada">Bada</option>
+                        <option value="Itele">Itele</option>
+                        <option value="Atan">Atan</option>
+                        <option value="Ijoko">Ijoko</option>
+                        <option value="Sango">Sango</option>
+                        <option value="Ifo">Ifo</option>
+                        <option value="Gudugba">Gudugba</option>
+                        <option value="Great City">Great City</option>
+                        <option value="Abeokuta">Abeokuta</option>
+                        <option value="Oseile">Oseile</option>
+                        <option value="Ayetoro 1">Ayetoro 1</option>
+                        <option value="Ayetoro 2">Ayetoro 2</option>
+                        <option value="Imeko">Imeko</option>
+                        <option value="Sagamu">Sagamu</option>
+                        <option value="Ikorodu">Ikorodu</option>
+                        <option value="Ibadan">Ibadan</option>
+                        <option value="Akure">Akure</option>
+                        <option value="Iju">Iju</option>
+                        <option value="Osogbo">Osogbo</option>
+                        <option value="Ikire">Ikire</option>
+                        <option value="Ido Ekiti">Ido Ekiti</option>
+                        <option value="Not a Member">Not a Member</option>
+                      </select>
                     </div>
                   </div>
                 </div>

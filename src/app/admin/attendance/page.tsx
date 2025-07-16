@@ -17,6 +17,7 @@ import { AllocationBlockModal } from '@/components/modals/AllocationBlockModal'
 import { useAccommodationUpdates, AccommodationUpdatesProvider } from '@/contexts/AccommodationUpdatesContext'
 import { capitalizeName } from '@/lib/utils'
 import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
+import { useUser } from '@/contexts/UserContext'
 
 import {
   Activity,
@@ -91,6 +92,7 @@ interface Registration {
 
 function AttendancePageContent() {
   const { success, error } = useToast()
+  const { currentUser } = useUser()
   const { triggerStatsUpdate } = useAccommodationUpdates()
   const [stats, setStats] = useState<AttendanceStats | null>(null)
   const [registrations, setRegistrations] = useState<Registration[]>([])
@@ -149,7 +151,10 @@ function AttendancePageContent() {
   }, [showQRViewModal])
 
   // Real-time attendance updates with stable state and cross-device sync
+  // Enable for all authenticated users (including Staff)
+  const canUseRealTime = ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser?.role?.name || '')
   const { isConnected, connectionError, isConnecting, lastEvent, eventCount } = useRealTimeAttendance({
+    enabled: canUseRealTime,
     onVerification: useCallback((event) => {
       console.log('🔄 Real-time verification received:', event.data)
       console.log('🔍 Current modal states (from refs):', {

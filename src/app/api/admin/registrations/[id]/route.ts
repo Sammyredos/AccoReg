@@ -160,6 +160,7 @@ export async function PUT(
       emailAddress,
       phoneNumber,
       address,
+      branch,
       emergencyContactName,
       emergencyContactRelationship,
       emergencyContactPhone,
@@ -203,16 +204,27 @@ export async function PUT(
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 })
     }
 
+    // Calculate age from date of birth
+    const birthDate = new Date(dateOfBirth)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+
     // Update the registration
     const updatedRegistration = await prisma.registration.update({
       where: { id },
       data: {
         fullName,
-        dateOfBirth,
+        dateOfBirth: birthDate,
+        age,
         gender,
         emailAddress,
         phoneNumber,
         address,
+        branch: branch || 'Not Specified',
         emergencyContactName,
         emergencyContactRelationship,
         emergencyContactPhone,
