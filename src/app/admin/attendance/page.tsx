@@ -103,8 +103,7 @@ function AttendancePageContent() {
   const [verificationFilter, setVerificationFilter] = useState<'all' | 'verified' | 'unverified'>('all')
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [scannerInputValue, setScannerInputValue] = useState('')
-  const [lastQRScanId, setLastQRScanId] = useState<string | null>(null)
-  const [qrScannerOpenTime, setQrScannerOpenTime] = useState<number>(0)
+  // Removed unused state variables for production
 
   // Verification confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -153,7 +152,7 @@ function AttendancePageContent() {
   // Real-time attendance updates with stable state and cross-device sync
   // Enable for all authenticated users (including Staff)
   const canUseRealTime = ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser?.role?.name || '')
-  const { isConnected, connectionError, isConnecting, lastEvent, eventCount } = useRealTimeAttendance({
+  const { isConnected, connectionError, isConnecting, eventCount } = useRealTimeAttendance({
     enabled: canUseRealTime,
     onVerification: useCallback((event) => {
       console.log('🔄 Real-time verification received:', event.data)
@@ -515,10 +514,7 @@ function AttendancePageContent() {
     }
   }
 
-  const handleGoToAccommodations = () => {
-    // Navigate to accommodations page
-    window.open('/admin/accommodations', '_blank')
-  }
+  // Removed unused function for production
 
   const handleQRScan = async (qrData: string) => {
     try {
@@ -529,7 +525,7 @@ function AttendancePageContent() {
           setLastQRScanId(parsedQR.id)
           console.log('📝 Tracking QR scan for ID:', parsedQR.id)
         }
-      } catch (parseError) {
+      } catch {
         console.log('⚠️ Could not parse QR data for tracking')
       }
 
