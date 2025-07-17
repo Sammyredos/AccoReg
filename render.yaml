@@ -13,18 +13,10 @@ services:
       npm ci &&
       echo "🔧 Generating Prisma client..." &&
       npx prisma generate &&
-      echo "� Running registration diagnostics..." &&
-      npx tsx scripts/diagnose-register-endpoint.ts &&
-      echo "🔧 Running comprehensive registration fix..." &&
-      npx tsx scripts/comprehensive-register-fix.ts &&
-      echo "✅ Database fixes completed" &&
-      echo "� Running production-specific migrations..." &&
-      (npx tsx scripts/production-migration.ts && echo "✅ Production migrations completed" || echo "⚠️ Production migrations completed with warnings") &&
-      echo "� Creating children registrations table..." &&
-      (npx tsx scripts/create-children-table.ts && echo "✅ Children table created" || echo "⚠️ Children table creation completed with warnings") &&
-      echo "� Fixing missing age column..." &&
-      (npx tsx scripts/fix-missing-age-column.ts && echo "✅ Age column fixed" || echo "⚠️ Age column fix completed with warnings") &&
-      echo "���👑 Setting up Super Admin account..." &&
+      echo "🗄️ Deploying database migrations..." &&
+      npx prisma migrate deploy &&
+      echo "✅ Database migrations deployed" &&
+      echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
       (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
@@ -38,176 +30,143 @@ services:
       npm prune --production &&
       echo "🎉 Mopgomyouth production build completed successfully!" &&
       echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
-      echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!" &&
-      echo "📊 Build size analysis:" &&
-      du -sh .next || true &&
-      echo "✅ NEW FEATURES DEPLOYED:" &&
-      echo "  🏢 Branch selection required for new registrations" &&
-      echo "  � Real-time analytics and statistics dashboard" &&
-      echo "  👥 Staff-level access to real-time attendance features" &&
-      echo "  🔄 Enhanced SSE connection with better error handling" &&
-      echo "  🧹 Cleaned production code (removed test/debug files)" &&
-      echo "  📱 Mobile-responsive analytics and attendance verification" &&
-      echo "🚀 Production deployment optimized for performance and security"
-    startCommand: NODE_ENV=production npm start
-    healthCheckPath: /api/health
+      echo "📊 Build Summary:" &&
+      echo "  ✅ Dependencies installed and optimized" &&
+      echo "  ✅ Database schema deployed" &&
+      echo "  ✅ Admin account configured" &&
+      echo "  ✅ System settings initialized" &&
+      echo "  ✅ Branding and roles configured" &&
+      echo "  ✅ Next.js application built for production" &&
+      echo "  ✅ Production dependencies optimized" &&
+      echo "🚀 Ready for deployment!"
+    startCommand: |
+      echo "🌟 Starting Mopgomyouth Youth Registration System..." &&
+      echo "🔧 Environment: Production" &&
+      echo "🗄️ Database: PostgreSQL" &&
+      echo "🌐 Starting server..." &&
+      npm start
     envVars:
-      # Core Application Settings
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: youth-registration-database
-          property: connectionString
-      - key: NEXTAUTH_SECRET
-        generateValue: true
-      - key: NEXTAUTH_URL
-        value: https://mopgomyouth.onrender.com
-      - key: SUPER_ADMIN_PASSWORD
-        value: SuperAdmin123!
-      - key: JWT_SECRET
-        generateValue: true
-      - key: ENCRYPTION_KEY
-        generateValue: true
-
-      # Performance & Caching
-      - key: REDIS_URL
-        value: ""
-      - key: RATE_LIMIT_ENABLED
-        value: "true"
-      - key: LOG_LEVEL
-        value: "warn"
-      - key: HEALTH_CHECK_ENABLED
-        value: "true"
-
-      # Build Optimizations
-      - key: SKIP_TYPE_CHECK
-        value: "false"
       - key: NEXT_TELEMETRY_DISABLED
-        value: "1"
-      - key: ANALYZE
-        value: "false"
-
-      # GDPR & Compliance
-      - key: GDPR_ENABLED
-        value: "true"
-      - key: DATA_RETENTION_DAYS
-        value: "2555"
-      - key: CONSENT_VERSION
-        value: "1.0"
-      # Email Configuration
-      - key: SMTP_HOST
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
-        value: samuel.obadina93@gmail.com
-      - key: SMTP_PASS
-        value: gdjr ryiz gjwx yekm
-      - key: SMTP_SECURE
-        value: "false"
-      - key: EMAIL_FROM_NAME
-        value: MopgomYouth
-      - key: EMAIL_REPLY_TO
-        value: noreply@mopgomyouth.com
-      - key: ADMIN_EMAILS
-        value: admin@youthreg.com,samuel.obadina93@gmail.com
-      - key: EMAIL_NOTIFICATIONS_ENABLED
-        value: "true"
-      - key: SEND_REGISTRATION_EMAILS
-        value: "true"
-      - key: SEND_ADMIN_NOTIFICATIONS
-        value: "true"
-
-      # Security & Headers
-      - key: SECURITY_HEADERS_ENABLED
-        value: "true"
-      - key: CSP_ENABLED
-        value: "true"
-      - key: HSTS_ENABLED
-        value: "true"
-      - key: BACKUP_ENCRYPTION
-        value: "true"
-      - key: BACKUP_ENCRYPTION_KEY
-        generateValue: true
-
-      # Production Performance
-      - key: MAX_REQUEST_SIZE
-        value: "10mb"
-      - key: BODY_PARSER_LIMIT
-        value: "10mb"
-      - key: CONNECTION_POOL_SIZE
-        value: "15"
-      - key: QUERY_TIMEOUT
-        value: "30000"
-      - key: SSE_KEEP_ALIVE_TIMEOUT
-        value: "65000"
-      - key: HTTP_TIMEOUT
-        value: "120000"
-
-      # Monitoring & Analytics
-      - key: ENABLE_ANALYTICS
-        value: "true"
-      - key: ENABLE_PERFORMANCE_MONITORING
-        value: "true"
-      - key: ERROR_REPORTING_ENABLED
-        value: "true"
-
-      # Real-Time Features (Enhanced)
-      - key: REALTIME_ENABLED
-        value: "true"
-      - key: SSE_HEARTBEAT_INTERVAL
-        value: "15000"
-      - key: SSE_RECONNECT_INTERVAL
-        value: "2000"
-      - key: REALTIME_EVENT_TIMEOUT
-        value: "60000"
-      - key: MAX_SSE_CONNECTIONS
-        value: "100"
-      - key: SSE_CONNECTION_TIMEOUT
-        value: "10000"
-      - key: STAFF_REALTIME_ACCESS
-        value: "true"
-
-      # QR Code & Attendance Features
-      - key: QR_AUTO_CLOSE_ENABLED
-        value: "true"
-      - key: ATTENDANCE_REALTIME_UPDATES
-        value: "true"
-      - key: HIDE_QR_FOR_VERIFIED
-        value: "true"
-      - key: AUTO_REFRESH_ATTENDANCE
-        value: "true"
-
-      # Mobile & Responsive Optimizations
-      - key: MOBILE_OPTIMIZED
-        value: "true"
-      - key: RESPONSIVE_CHARTS
-        value: "true"
-      - key: TOUCH_FRIENDLY_UI
-        value: "true"
-
-      # Branch & Registration Features
-      - key: BRANCH_SELECTION_REQUIRED
-        value: "true"
-      - key: BRANCH_VALIDATION_ENABLED
-        value: "true"
-      - key: LEGACY_BRANCH_FALLBACK
-        value: "Not Specified"
-
-      # Analytics & Statistics
-      - key: ANALYTICS_ENABLED
-        value: "true"
+        value: 1
+      - key: PRISMA_GENERATE_SKIP_AUTOINSTALL
+        value: true
+      - key: SKIP_ENV_VALIDATION
+        value: false
       - key: REAL_TIME_STATS
-        value: "true"
-      - key: STATS_CACHE_DURATION
-        value: "300000"
-      - key: ANALYTICS_RETENTION_DAYS
-        value: "90"
-
-databases:
-  - name: youth-registration-database
-    plan: free
-    databaseName: youth_registration
-    user: youth_user
-    region: oregon
+        value: true
+      - key: STAFF_REALTIME_ACCESS
+        value: true
+      - key: BRANCH_SELECTION_REQUIRED
+        value: true
+      - key: ANALYTICS_ENABLED
+        value: true
+      - key: SYSTEM_NAME
+        value: Mopgomyouth
+      - key: ORGANIZATION_NAME
+        value: Mopgomglobal
+      - key: SUPPORT_EMAIL
+        value: admin@mopgomglobal.com
+      - key: DEFAULT_ADMIN_EMAIL
+        value: admin@mopgomglobal.com
+      - key: DEFAULT_ADMIN_PASSWORD
+        value: Admin123!
+      - key: MINIMUM_AGE
+        value: 13
+      - key: REGISTRATION_OPEN
+        value: true
+      - key: ENABLE_SMS_NOTIFICATIONS
+        value: false
+      - key: ENABLE_EMAIL_NOTIFICATIONS
+        value: true
+      - key: QR_CODE_ENABLED
+        value: true
+      - key: AUTO_VERIFY_REGISTRATIONS
+        value: false
+      - key: ALLOW_DUPLICATE_REGISTRATIONS
+        value: false
+      - key: ENABLE_PARENTAL_PERMISSION
+        value: true
+      - key: ENABLE_EMERGENCY_CONTACTS
+        value: true
+      - key: ENABLE_MEDICAL_INFO
+        value: true
+      - key: ENABLE_DIETARY_RESTRICTIONS
+        value: true
+      - key: ENABLE_SPECIAL_NEEDS
+        value: true
+      - key: ENABLE_ACCOMMODATIONS
+        value: true
+      - key: ENABLE_ROOM_ALLOCATION
+        value: true
+      - key: ENABLE_QR_VERIFICATION
+        value: true
+      - key: ENABLE_BULK_OPERATIONS
+        value: true
+      - key: ENABLE_ANALYTICS
+        value: true
+      - key: ENABLE_REPORTS
+        value: true
+      - key: ENABLE_NOTIFICATIONS
+        value: true
+      - key: ENABLE_USER_MANAGEMENT
+        value: true
+      - key: ENABLE_ROLE_MANAGEMENT
+        value: true
+      - key: ENABLE_SETTINGS_MANAGEMENT
+        value: true
+      - key: ENABLE_BACKUP_RESTORE
+        value: true
+      - key: ENABLE_AUDIT_LOGS
+        value: true
+      - key: ENABLE_REAL_TIME_UPDATES
+        value: true
+      - key: ENABLE_MOBILE_RESPONSIVE
+        value: true
+      - key: ENABLE_DARK_MODE
+        value: false
+      - key: ENABLE_MULTI_LANGUAGE
+        value: false
+      - key: DEFAULT_LANGUAGE
+        value: en
+      - key: DEFAULT_TIMEZONE
+        value: America/Los_Angeles
+      - key: DEFAULT_CURRENCY
+        value: USD
+      - key: ENABLE_PAYMENT_PROCESSING
+        value: false
+      - key: ENABLE_SOCIAL_LOGIN
+        value: false
+      - key: ENABLE_TWO_FACTOR_AUTH
+        value: false
+      - key: SESSION_TIMEOUT_MINUTES
+        value: 60
+      - key: MAX_LOGIN_ATTEMPTS
+        value: 5
+      - key: PASSWORD_MIN_LENGTH
+        value: 8
+      - key: REQUIRE_PASSWORD_COMPLEXITY
+        value: true
+      - key: ENABLE_PASSWORD_RESET
+        value: true
+      - key: ENABLE_ACCOUNT_LOCKOUT
+        value: true
+      - key: ENABLE_SECURITY_HEADERS
+        value: true
+      - key: ENABLE_RATE_LIMITING
+        value: true
+      - key: ENABLE_CORS
+        value: true
+      - key: ENABLE_COMPRESSION
+        value: true
+      - key: ENABLE_CACHING
+        value: true
+      - key: CACHE_TTL_SECONDS
+        value: 300
+      - key: ENABLE_MONITORING
+        value: true
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_DEBUG_MODE
+        value: false

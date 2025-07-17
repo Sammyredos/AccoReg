@@ -1200,7 +1200,7 @@ function RegistrationForm() {
                   {/* Branch Field */}
                   <div className="space-y-2">
                     <label htmlFor="branch" className="block text-sm font-apercu-medium text-gray-700">
-                      Branch *
+                      Church Branch *
                     </label>
                     <div className="relative">
                       <select

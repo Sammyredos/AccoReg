@@ -1021,7 +1021,7 @@ export default function ChildrenRegistrationPage() {
                     {/* Branch */}
                     <div className="space-y-2 sm:col-span-2">
                       <label htmlFor="branch" className="block text-sm font-apercu-medium text-gray-700">
-                        Branch *
+                        Church Branch *
                       </label>
                       <select
                         name="branch"
