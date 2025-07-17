@@ -55,11 +55,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Calculate age from date of birth
+    const today = new Date()
+    let age = today.getFullYear() - dateOfBirth.getFullYear()
+    const monthDiff = today.getMonth() - dateOfBirth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+      age--
+    }
+
     // Create registration
     const registration = await prisma.registration.create({
       data: {
         fullName: data.fullName,
         dateOfBirth: dateOfBirth,
+        age: age,
         gender: data.gender,
         address: data.address,
         branch: data.branch,
@@ -149,8 +158,31 @@ export async function POST(request: NextRequest) {
     })
 
     return response
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration submission error:', error)
+
+    // Handle missing column errors (like age column)
+    if (error.code === 'P2022') {
+      return NextResponse.json(
+        {
+          error: 'System updating',
+          message: 'Registration system is being updated. Please try again in a few minutes.'
+        },
+        { status: 503 }
+      )
+    }
+
+    // Handle unique constraint violations
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        {
+          error: 'Duplicate registration',
+          message: 'A registration with this information already exists.'
+        },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

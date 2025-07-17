@@ -34,6 +34,8 @@
     "create:children-table": "npx tsx scripts/create-children-table.ts",
     "fix:missing-age-column": "npx tsx scripts/fix-missing-age-column.ts",
     "test:analytics-api": "npx tsx scripts/test-analytics-api.ts",
+    "emergency:fix-production": "npx tsx scripts/emergency-fix-production.ts",
+    "manual:fix-production": "npx tsx scripts/manual-production-fix.ts",
     "db:generate": "prisma generate",
     "db:generate:dev": "prisma generate --schema=prisma/schema.dev.prisma",
     "db:push": "prisma db push",

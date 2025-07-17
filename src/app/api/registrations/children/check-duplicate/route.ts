@@ -15,18 +15,32 @@ export async function POST(request: NextRequest) {
     const normalizedName = fullName.toLowerCase().trim()
 
     // Check for existing children registration with same name, age, and gender (enhanced duplicate validation)
-    // First get all registrations and filter in JavaScript for SQLite compatibility
-    const allRegistrations = await prisma.childrenRegistration.findMany({
-      select: {
-        id: true,
-        fullName: true,
-        parentGuardianEmail: true,
-        parentGuardianPhone: true,
-        dateOfBirth: true,
-        gender: true,
-        createdAt: true
+    // Handle missing table gracefully
+    let allRegistrations: any[] = []
+
+    try {
+      allRegistrations = await prisma.childrenRegistration.findMany({
+        select: {
+          id: true,
+          fullName: true,
+          parentGuardianEmail: true,
+          parentGuardianPhone: true,
+          dateOfBirth: true,
+          gender: true,
+          createdAt: true
+        }
+      })
+    } catch (error: any) {
+      // If table doesn't exist, return no duplicates found
+      if (error.code === 'P2021' && error.message.includes('does not exist')) {
+        console.log('Children registrations table does not exist, no duplicates possible')
+        return NextResponse.json({
+          isDuplicate: false,
+          message: 'No duplicates found'
+        })
       }
-    })
+      throw error
+    }
 
     // Enhanced duplicate validation: Check for same name + gender + date of birth combination
     // This is the primary duplicate check for children registrations

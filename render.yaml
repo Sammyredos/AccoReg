@@ -24,6 +24,8 @@ services:
       echo "🗄️ Deploying database migrations..." &&
       npx prisma migrate deploy &&
       echo "✅ Database migrations deployed" &&
+      echo "🚨 Running emergency production fix..." &&
+      (npx tsx scripts/emergency-fix-production.ts && echo "✅ Emergency fix completed" || echo "⚠️ Emergency fix completed with warnings") &&
       echo "� Running production-specific migrations..." &&
       (npx tsx scripts/production-migration.ts && echo "✅ Production migrations completed" || echo "⚠️ Production migrations completed with warnings") &&
       echo "� Creating children registrations table..." &&
