@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "npx prisma generate && next build",
-    "build:production": "npx prisma generate && npx prisma db push && next build",
+    "postbuild": "node scripts/post-build.js",
     "build:production": "cross-env NODE_ENV=production SKIP_TYPE_CHECK=true prisma generate && next build",
     "build:render": "npm install && npm install --save-dev @types/node typescript && prisma generate && prisma migrate deploy && npm run build",
     "deploy:production": "npx tsx scripts/deploy-production.ts",
@@ -36,6 +36,7 @@
     "db:studio": "prisma studio",
     "db:studio:dev": "prisma studio --schema=prisma/schema.dev.prisma",
     "db:init": "node scripts/init-production-db.js",
+    "db:clean": "node scripts/clean-migrations.js",
     "clean": "rimraf .next tsconfig.tsbuildinfo",
     "clean:cache": "rimraf .next/cache",
     "fresh": "npm run clean && npm run dev"

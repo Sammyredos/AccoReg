@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     // Check if this is a valid initialization request
     const body = await request.json().catch(() => ({}))
     const initKey = body.initKey || request.headers.get('x-init-key')
-    
+
     // Simple security check - require a key to prevent abuse
     const expectedKey = process.env.INIT_KEY || 'init-db-2024'
     if (initKey !== expectedKey) {
@@ -22,6 +22,23 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔧 Manual database initialization requested...')
+
+    // First sync the schema if needed
+    if (body.syncSchema && process.env.DATABASE_URL) {
+      try {
+        const { execSync } = require('child_process')
+        console.log('📊 Syncing database schema...')
+        execSync('npx prisma db push --accept-data-loss', {
+          stdio: 'pipe',
+          env: { ...process.env }
+        })
+        console.log('✅ Schema synced')
+      } catch (syncError: any) {
+        console.warn('⚠️ Schema sync failed:', syncError.message)
+      }
+    }
+
+    // Initialize the database
     await initializeDatabase()
 
     return NextResponse.json({

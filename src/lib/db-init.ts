@@ -24,6 +24,29 @@ async function performInitialization(): Promise<void> {
   try {
     console.log('🚀 Checking database initialization...')
 
+    // First, try to ensure the database schema is up to date
+    try {
+      // Test database connection by trying a simple query
+      await prisma.$queryRaw`SELECT 1`
+    } catch (error: any) {
+      console.log('📊 Database schema may need to be created...')
+
+      // If we're in production and have the ability to run prisma commands
+      if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
+        try {
+          const { execSync } = require('child_process')
+          console.log('🔧 Attempting to sync database schema...')
+          execSync('npx prisma db push --accept-data-loss', {
+            stdio: 'pipe',
+            env: { ...process.env }
+          })
+          console.log('✅ Database schema synced')
+        } catch (syncError) {
+          console.warn('⚠️ Could not sync schema automatically:', syncError)
+        }
+      }
+    }
+
     // Check if database is already initialized by looking for settings
     const existingSettings = await prisma.setting.findFirst({
       where: { category: 'system' }
