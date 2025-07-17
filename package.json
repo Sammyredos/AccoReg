@@ -12,7 +12,7 @@
     "test:production": "npx tsx scripts/test-production-setup.ts",
     "test:email": "npx tsx scripts/test-email-debug.ts",
     "postinstall": "prisma generate",
-    "start": "next start",
+    "start": "node server.js",
     "start:production": "cross-env NODE_ENV=production next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",

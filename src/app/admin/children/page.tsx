@@ -543,6 +543,7 @@ export default function ChildrenRegistrationsPage() {
                   emailAddress: registration.parentGuardianEmail, // Show parent email as primary contact
                   phoneNumber: registration.parentGuardianPhone, // Show parent phone as primary contact
                   gender: registration.gender,
+                  branch: registration.branch || 'Not Specified',
                   age: registration.age,
                   dateOfBirth: registration.dateOfBirth,
                   createdAt: registration.createdAt

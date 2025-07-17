@@ -1161,6 +1161,7 @@ export default function AdminRegistrations() {
                 emailAddress: registration.emailAddress,
                 phoneNumber: registration.phoneNumber,
                 gender: registration.gender,
+                branch: registration.branch || 'Not Specified',
                 age: calculateAge(registration.dateOfBirth),
                 dateOfBirth: registration.dateOfBirth,
                 createdAt: registration.createdAt,

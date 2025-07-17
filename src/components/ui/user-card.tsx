@@ -17,7 +17,8 @@ import {
   UserX,
   QrCode,
   Clock,
-  Trash2
+  Trash2,
+  Building2
 } from 'lucide-react'
 import { capitalizeName } from '@/lib/utils'
 
@@ -28,6 +29,7 @@ interface UserCardProps {
     emailAddress: string
     phoneNumber: string
     gender: string
+    branch?: string
     age?: number
     dateOfBirth?: string
     createdAt: string
@@ -197,6 +199,14 @@ export function UserCard({
               {user.phoneNumber}
             </span>
           </div>
+          {user.branch && (
+            <div className="flex items-center text-xs lg:text-sm text-gray-600">
+              <Building2 className="h-3 w-3 lg:h-4 lg:w-4 mr-2 text-gray-400 flex-shrink-0" />
+              <span className="font-apercu-regular">
+                {user.branch}
+              </span>
+            </div>
+          )}
           <div className="flex items-center text-xs lg:text-sm text-gray-600">
             <Calendar className="h-3 w-3 lg:h-4 lg:w-4 mr-2 text-gray-400 flex-shrink-0" />
             <span className="font-apercu-regular">

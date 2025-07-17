@@ -100,6 +100,13 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    console.log('Registration created:', {
+      id: registration.id,
+      fullName: registration.fullName,
+      branch: registration.branch,
+      savedSuccessfully: true
+    })
+
     // Return success response immediately after saving to database
     const response = NextResponse.json({
       success: true,
