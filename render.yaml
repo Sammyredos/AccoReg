@@ -9,20 +9,13 @@ services:
     previewsEnabled: false
     buildCommand: |
       echo "🚀 Starting Mopgomyouth production build process..." &&
-      echo "📦 Installing dependencies with production optimizations..." &&
-      npm ci --production=false --legacy-peer-deps &&
-      echo "🔧 Installing build dependencies..." &&
-      npm install --save-dev @types/node typescript tsx --legacy-peer-deps &&
-      echo "✅ Dependencies installed successfully" &&
-      echo "🧹 Cleaning previous build artifacts..." &&
-      rm -rf .next || true &&
-      echo "🔧 Fixing Prisma client configuration..." &&
-      (npx tsx scripts/fix-prisma-client.ts && echo "✅ Prisma client fixed" || echo "⚠️ Prisma client fix completed with warnings") &&
-      echo "🔧 Generating optimized Prisma client..." &&
+      echo "📦 Installing dependencies..." &&
+      npm ci &&
+      echo "🔧 Generating Prisma client..." &&
       npx prisma generate &&
-      echo "✅ Prisma client generated" &&
       echo "🗄️ Setting up database..." &&
-      (npx tsx scripts/simple-production-setup.ts && echo "✅ Database setup completed" || echo "⚠️ Database setup completed with warnings") &&
+      npx tsx scripts/simple-production-setup.ts &&
+      echo "✅ Database setup completed" &&
       echo "� Running production-specific migrations..." &&
       (npx tsx scripts/production-migration.ts && echo "✅ Production migrations completed" || echo "⚠️ Production migrations completed with warnings") &&
       echo "� Creating children registrations table..." &&
