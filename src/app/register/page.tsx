@@ -67,7 +67,7 @@ const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13, skipAge
 
   // Branch validation - required field
   if (!data.branch?.trim()) {
-    errors.push({ field: 'branch', message: 'Please select a branch' })
+    errors.push({ field: 'branch', message: 'Please select a church branch' })
   }
 
   if (!data.phoneNumber?.trim()) {
@@ -421,7 +421,7 @@ function RegistrationForm() {
     if (allErrors.length > 0) {
       // Find which step has the first error and navigate to it
       const firstError = allErrors[0]
-      const step1Fields = ['fullName', 'dateOfBirth', 'gender', 'address', 'phoneNumber', 'emailAddress']
+      const step1Fields = ['fullName', 'dateOfBirth', 'gender', 'address', 'branch', 'phoneNumber', 'emailAddress']
       const step2Fields = ['parentGuardianName', 'parentGuardianPhone']
 
       let errorStep = 3 // Default to step 3

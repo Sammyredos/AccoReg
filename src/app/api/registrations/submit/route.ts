@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     ]
 
     for (const field of requiredFields) {
-      if (!data[field]) {
+      if (!data[field] || (typeof data[field] === 'string' && data[field].trim() === '')) {
         return NextResponse.json(
           {
             error: `${field} is required`,
@@ -63,6 +63,15 @@ export async function POST(request: NextRequest) {
       age--
     }
 
+    // Ensure branch is properly set (not empty or just whitespace)
+    const branchValue = data.branch?.trim() || 'Not Specified'
+
+    console.log('Registration data:', {
+      fullName: data.fullName,
+      branch: data.branch,
+      branchValue: branchValue
+    })
+
     // Create registration
     const registration = await prisma.registration.create({
       data: {
@@ -71,7 +80,7 @@ export async function POST(request: NextRequest) {
         age: age,
         gender: data.gender,
         address: data.address,
-        branch: data.branch,
+        branch: branchValue,
         phoneNumber: data.phoneNumber,
         emailAddress: data.emailAddress,
         // Use emergency contact info (either manually entered or copied from parent)

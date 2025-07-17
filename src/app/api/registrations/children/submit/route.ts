@@ -124,6 +124,9 @@ export async function POST(request: NextRequest) {
     // Create the children registration (handle missing table)
     let registration
     try {
+      // Ensure branch is properly set
+      const branchValue = data.branch?.trim() || 'Not Specified'
+
       registration = await prisma.childrenRegistration.create({
         data: {
           fullName: data.fullName.trim(),
@@ -131,7 +134,7 @@ export async function POST(request: NextRequest) {
           age,
           gender: data.gender,
           address: data.address.trim(),
-          branch: data.branch,
+          branch: branchValue,
           parentGuardianName: data.parentGuardianName.trim(),
           parentGuardianPhone: data.parentGuardianPhone.trim(),
           parentGuardianEmail: data.parentGuardianEmail.toLowerCase().trim()
@@ -193,7 +196,7 @@ export async function POST(request: NextRequest) {
             age,
             gender: data.gender,
             address: data.address.trim(),
-            branch: data.branch,
+            branch: branchValue,
             parentGuardianName: data.parentGuardianName.trim(),
             parentGuardianPhone: data.parentGuardianPhone.trim(),
             parentGuardianEmail: data.parentGuardianEmail.toLowerCase().trim()
