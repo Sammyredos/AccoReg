@@ -19,21 +19,12 @@ services:
       echo "🔧 Generating optimized Prisma client..." &&
       npx prisma generate &&
       echo "✅ Prisma client generated" &&
-      echo "🗄️ Running production health check..." &&
-      (npx tsx scripts/production-health-check.ts && echo "✅ Production health check passed" || echo "⚠️ Health check completed with warnings") &&
-      echo "🔄 AUTO-HANDLING SCHEMA CHANGES AND MIGRATIONS..." &&
-      echo "  📋 Step 1: Checking for schema changes..." &&
-      (npx prisma db pull --force && echo "  ✅ Current schema pulled" || echo "  ⚠️ Schema pull completed") &&
-      echo "  📋 Step 2: Pushing any new schema changes..." &&
-      (npx prisma db push --accept-data-loss && echo "  ✅ Schema changes pushed to database" || echo "  ⚠️ No schema changes to push") &&
-      echo "  📋 Step 3: Deploying formal migrations..." &&
-      (npx prisma migrate deploy && echo "  ✅ Migrations deployed successfully" || echo "  ⚠️ No migrations to deploy") &&
-      echo "  📋 Step 4: Regenerating Prisma client with latest schema..." &&
-      npx prisma generate &&
-      echo "  ✅ Prisma client regenerated with latest schema" &&
-      echo "🔧 Verifying database connection and schema sync..." &&
-      (npx prisma db pull --force && echo "✅ Database connection and schema verified" || echo "⚠️ Database verification completed") &&
-      echo "👑 Setting up Super Admin account..." &&
+      echo "🗄️ Deploying database migrations..." &&
+      npx prisma migrate deploy &&
+      echo "✅ Database migrations deployed" &&
+      echo "� Running production-specific migrations..." &&
+      (npx tsx scripts/production-migration.ts && echo "✅ Production migrations completed" || echo "⚠️ Production migrations completed with warnings") &&
+      echo "�👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
       (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
@@ -42,7 +33,7 @@ services:
       echo "👥 Setting up roles and permissions..." &&
       (npx tsx scripts/create-staff-role.ts && echo "✅ Roles and permissions configured" || echo "⚠️ Role setup skipped") &&
       echo "🏗️ Building Next.js application with production optimizations..." &&
-      NODE_ENV=production SKIP_TYPE_CHECK=true npm run build &&
+      NODE_ENV=production npm run build &&
       echo "🧹 Cleaning up development dependencies..." &&
       npm prune --production &&
       echo "🎉 Mopgomyouth production build completed successfully!" &&
@@ -50,10 +41,14 @@ services:
       echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!" &&
       echo "📊 Build size analysis:" &&
       du -sh .next || true &&
-      echo "🔄 Real-time features enabled: Attendance updates, QR auto-close, live status" &&
-      echo "📱 Mobile-responsive analytics and attendance verification ready" &&
-      echo "🚀 Production deployment optimized for performance and security" &&
-      echo "✅ AUTO-SCHEMA MIGRATION: All schema changes automatically applied!"
+      echo "✅ NEW FEATURES DEPLOYED:" &&
+      echo "  🏢 Branch selection required for new registrations" &&
+      echo "  � Real-time analytics and statistics dashboard" &&
+      echo "  👥 Staff-level access to real-time attendance features" &&
+      echo "  🔄 Enhanced SSE connection with better error handling" &&
+      echo "  🧹 Cleaned production code (removed test/debug files)" &&
+      echo "  📱 Mobile-responsive analytics and attendance verification" &&
+      echo "🚀 Production deployment optimized for performance and security"
     startCommand: NODE_ENV=production npm start
     healthCheckPath: /api/health
     envVars:
@@ -87,7 +82,7 @@ services:
 
       # Build Optimizations
       - key: SKIP_TYPE_CHECK
-        value: "true"
+        value: "false"
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
       - key: ANALYZE
@@ -158,17 +153,21 @@ services:
       - key: ERROR_REPORTING_ENABLED
         value: "true"
 
-      # Real-Time Features
+      # Real-Time Features (Enhanced)
       - key: REALTIME_ENABLED
         value: "true"
       - key: SSE_HEARTBEAT_INTERVAL
-        value: "30000"
+        value: "15000"
       - key: SSE_RECONNECT_INTERVAL
-        value: "5000"
+        value: "2000"
       - key: REALTIME_EVENT_TIMEOUT
         value: "60000"
       - key: MAX_SSE_CONNECTIONS
         value: "100"
+      - key: SSE_CONNECTION_TIMEOUT
+        value: "10000"
+      - key: STAFF_REALTIME_ACCESS
+        value: "true"
 
       # QR Code & Attendance Features
       - key: QR_AUTO_CLOSE_ENABLED
@@ -188,13 +187,23 @@ services:
       - key: TOUCH_FRIENDLY_UI
         value: "true"
 
-      # AUTO-MIGRATION SETTINGS
-      - key: AUTO_SCHEMA_MIGRATION
+      # Branch & Registration Features
+      - key: BRANCH_SELECTION_REQUIRED
         value: "true"
-      - key: PRISMA_AUTO_PUSH
+      - key: BRANCH_VALIDATION_ENABLED
         value: "true"
-      - key: ACCEPT_DATA_LOSS_ON_MIGRATION
+      - key: LEGACY_BRANCH_FALLBACK
+        value: "Not Specified"
+
+      # Analytics & Statistics
+      - key: ANALYTICS_ENABLED
         value: "true"
+      - key: REAL_TIME_STATS
+        value: "true"
+      - key: STATS_CACHE_DURATION
+        value: "300000"
+      - key: ANALYTICS_RETENTION_DAYS
+        value: "90"
 
 databases:
   - name: youth-registration-database

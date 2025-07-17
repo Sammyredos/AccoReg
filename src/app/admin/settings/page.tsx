@@ -956,10 +956,10 @@ export default function SettingsPage() {
   // Data Management Functions
   const handleBackupData = async () => {
     try {
-      success('Creating Backup', 'Preparing comprehensive database backup...')
+      success('Creating Backup', 'Preparing system backup...')
 
-      console.log('Starting comprehensive backup request...')
-      const response = await fetch('/api/admin/backup?action=download', {
+      console.log('Starting backup request...')
+      const response = await fetch('/api/admin/settings/backup', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -977,13 +977,13 @@ export default function SettingsPage() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `accoreg-complete-backup-${new Date().toISOString().split('T')[0]}.json`
+        a.download = `system-backup-${new Date().toISOString().split('T')[0]}.json`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
 
-        success('Complete Backup Created', 'Full database backup including all users, registrations, and settings has been downloaded successfully.')
+        success('Backup Created', 'System backup has been downloaded successfully.')
       } else {
         const errorText = await response.text()
         console.error('Backup error response:', errorText)
@@ -1026,7 +1026,7 @@ export default function SettingsPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/admin/backup/import', {
+      const response = await fetch('/api/admin/settings/import', {
         method: 'POST',
         body: formData,
       })
@@ -1034,15 +1034,13 @@ export default function SettingsPage() {
       const data = await response.json()
 
       if (response.ok) {
-        success('Complete Import Successful', `Database import completed successfully! Imported: ${data.stats.imported} records, Skipped: ${data.stats.skipped} duplicates, Errors: ${data.stats.errors}`)
+        success('Import Successful', 'Data has been imported successfully. Settings will be refreshed automatically.')
         // Reload settings to reflect changes
         setTimeout(() => {
           loadSettings()
-          // Update branding context if system name was imported
-          if (data.stats.details?.settings?.imported > 0) {
-            refreshBranding()
-          }
-          console.log('Complete database imported:', data.stats)
+          // Update branding context
+          updateSystemName(data.systemName || 'MopgomYouth')
+          console.log('Data imported, system name:', data.systemName || 'MopgomYouth')
         }, 1000)
       } else {
         throw new Error(data.error || 'Failed to import data')
@@ -2035,13 +2033,13 @@ export default function SettingsPage() {
                   <Download className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="font-apercu-bold text-sm text-gray-900">Complete Database Backup</h4>
-                  <p className="font-apercu-bold text-xs text-gray-500">Export entire database</p>
+                  <h4 className="font-apercu-bold text-sm text-gray-900">Backup Data</h4>
+                  <p className="font-apercu-bold text-xs text-gray-500">Export system data</p>
                 </div>
               </div>
             </div>
             <p className="font-apercu-bold text-xs text-gray-600 mb-3">
-              Download a complete backup of your entire database including all users, registrations, accommodations, settings, and system data.
+              Download a complete backup of your system data including settings, users, and configurations.
             </p>
             <Button
               size="sm"
@@ -2049,7 +2047,7 @@ export default function SettingsPage() {
               onClick={handleBackupData}
             >
               <Download className="h-4 w-4 mr-2" />
-              Download Complete Backup
+              Download Backup
             </Button>
           </div>
 
@@ -2061,13 +2059,13 @@ export default function SettingsPage() {
                   <Upload className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="font-apercu-bold text-sm text-gray-900">Import Complete Database</h4>
-                  <p className="font-apercu-bold text-xs text-gray-500">Restore from backup</p>
+                  <h4 className="font-apercu-bold text-sm text-gray-900">Import Data</h4>
+                  <p className="font-apercu-bold text-xs text-gray-500">Import configurations</p>
                 </div>
               </div>
             </div>
             <p className="font-apercu-bold text-xs text-gray-600 mb-3">
-              Import complete database from a backup file. This will restore all users, registrations, accommodations, and settings.
+              Import system data from a backup file or migrate from another system.
             </p>
             <div className="relative">
               <input
@@ -2093,7 +2091,7 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Import Complete Database
+                    Import Data
                   </>
                 )}
               </Button>

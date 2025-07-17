@@ -4,12 +4,9 @@ import { authenticateRequest } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('Children registrations API called')
-
     // Authenticate user
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      console.error('Authentication failed:', authResult.error)
       return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
@@ -67,9 +64,9 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { parentGuardianName: { contains: search, mode: 'insensitive' } },
-        { parentGuardianEmail: { contains: search, mode: 'insensitive' } }
+        { fullName: { contains: search } },
+        { parentGuardianName: { contains: search } },
+        { parentGuardianEmail: { contains: search } }
       ]
     }
 
@@ -77,11 +74,8 @@ export async function GET(request: NextRequest) {
       where.gender = gender
     }
 
-    console.log('Querying children registrations with where clause:', where)
-
     // Get total count
     const total = await prisma.childrenRegistration.count({ where })
-    console.log('Total children registrations found:', total)
 
     // Get registrations
     const registrations = await prisma.childrenRegistration.findMany({
@@ -103,8 +97,6 @@ export async function GET(request: NextRequest) {
         updatedAt: true
       }
     })
-
-    console.log('Retrieved registrations count:', registrations.length)
 
     // Calculate age for each registration
     const registrationsWithAge = registrations.map(reg => {
@@ -140,23 +132,8 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching children registrations:', error)
-
-    // Provide more specific error information
-    let errorMessage = 'Failed to fetch children registrations'
-    let errorDetails = ''
-
-    if (error instanceof Error) {
-      errorDetails = error.message
-      console.error('Error details:', error.message)
-      console.error('Error stack:', error.stack)
-    }
-
     return NextResponse.json(
-      {
-        error: errorMessage,
-        details: errorDetails,
-        timestamp: new Date().toISOString()
-      },
+      { error: 'Failed to fetch children registrations' },
       { status: 500 }
     )
   }

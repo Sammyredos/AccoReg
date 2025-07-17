@@ -532,7 +532,7 @@ export async function sendRegistrationConfirmationEmail(registration: any) {
     return { success: true }
   } catch (error) {
     console.error('Failed to send registration confirmation email:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' }
+    return { success: false, error: error.message }
   }
 }
 
@@ -556,6 +556,6 @@ export async function sendRegistrationNotification(registration: any) {
     return { success: true }
   } catch (error) {
     console.error('Failed to send registration notification:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' }
+    return { success: false, error: error.message }
   }
 }
