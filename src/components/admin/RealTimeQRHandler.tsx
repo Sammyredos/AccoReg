@@ -24,7 +24,6 @@ export function RealTimeQRHandler({
   const { success, info } = useToast()
 
   const { isConnected, lastEvent } = useRealTimeAttendance({
-    enabled: true, // Keep enabled for QR handler
     onVerification: (event) => {
       const { registrationId, fullName, scannerName } = event.data
 
@@ -86,7 +85,6 @@ export function useRealTimeQRHandler({
   const { success, info } = useToast()
 
   const realTimeData = useRealTimeAttendance({
-    enabled: true, // Keep enabled for QR handler
     onVerification: (event) => {
       const { registrationId, fullName, scannerName } = event.data
 

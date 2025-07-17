@@ -136,8 +136,9 @@ function getLikelyNextPages(currentPath: string): string[] {
     ],
     '/admin/registrations': [
       '/admin/users',
-      '/admin/accommodations',
-      '/admin/communications'
+      '/admin/accommodations', 
+      '/admin/communications',
+      '/admin/analytics'
     ],
     '/admin/users': [
       '/admin/registrations',
@@ -149,12 +150,14 @@ function getLikelyNextPages(currentPath: string): string[] {
       '/admin/registrations',
       '/admin/users',
       '/admin/platoons',
-      '/admin/reports'
+      '/admin/reports',
+      '/admin/analytics'
     ],
     '/admin/platoons': [
       '/admin/accommodations',
       '/admin/registrations',
-      '/admin/users'
+      '/admin/users',
+      '/admin/analytics'
     ],
     '/admin/communications': [
       '/admin/notifications',
@@ -168,7 +171,14 @@ function getLikelyNextPages(currentPath: string): string[] {
       '/admin/users',
       '/admin/dashboard'
     ],
+    '/admin/analytics': [
+      '/admin/reports',
+      '/admin/dashboard',
+      '/admin/registrations',
+      '/admin/users'
+    ],
     '/admin/reports': [
+      '/admin/analytics',
       '/admin/dashboard',
       '/admin/settings',
       '/admin/registrations'

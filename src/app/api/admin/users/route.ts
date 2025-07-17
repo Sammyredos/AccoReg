@@ -33,13 +33,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const roleId = searchParams.get('roleId') || ''
 
-    // Build where clause for search and filtering (PostgreSQL compatible)
+    // Build where clause for search and filtering
     const whereClause: any = {}
     if (search) {
-      const searchLower = search.toLowerCase()
+      // SQLite doesn't support mode: 'insensitive', so we'll use contains without it
+      // The search will be case-sensitive, but we can handle this in the frontend
       whereClause.OR = [
-        { name: { contains: searchLower } },
-        { email: { contains: searchLower } }
+        { name: { contains: search } },
+        { email: { contains: search } }
       ]
     }
     if (roleId) {

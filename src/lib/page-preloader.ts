@@ -51,7 +51,11 @@ const ADMIN_ROUTES: PageRoute[] = [
     component: 'notifications',
     config: { priority: 'medium', prefetch: true, preload: true, cache: true }
   },
-
+  {
+    path: '/admin/analytics',
+    component: 'analytics',
+    config: { priority: 'medium', prefetch: true, preload: false, cache: true }
+  },
   {
     path: '/admin/reports',
     component: 'reports',

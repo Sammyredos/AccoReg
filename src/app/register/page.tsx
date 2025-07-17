@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useReactiveSystemName } from '@/components/ui/reactive-system-name'
 import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, ArrowRight, Check, User, Calendar, Users, Shield, AlertCircle, Clock, Baby } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, User, Calendar, Users, Shield, Loader2 } from 'lucide-react'
 
 // Types
 interface ValidationError {
@@ -20,7 +20,6 @@ interface FormData {
   dateOfBirth: string
   gender: string
   address: string
-  branch: string
   phoneNumber: string
   emailAddress: string
   emergencyContactName: string
@@ -34,7 +33,7 @@ interface FormData {
 }
 
 // Validation functions
-const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13, skipAgeCheck: boolean = false): ValidationError[] => {
+const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13): ValidationError[] => {
   const errors: ValidationError[] = []
 
   if (!data.fullName?.trim()) {
@@ -49,7 +48,7 @@ const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13, skipAge
     const birthDate = new Date(data.dateOfBirth)
     if (isNaN(birthDate.getTime())) {
       errors.push({ field: 'dateOfBirth', message: 'Please enter a valid date' })
-    } else if (!skipAgeCheck) {
+    } else {
       const age = calculateAge(data.dateOfBirth)
       if (age < minimumAge) {
         errors.push({ field: 'dateOfBirth', message: `You must be at least ${minimumAge} years old to register` })
@@ -63,15 +62,6 @@ const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13, skipAge
 
   if (!data.address?.trim()) {
     errors.push({ field: 'address', message: 'Address is required' })
-  }
-
-  // Branch validation - only validate if branch field exists in form
-  // This ensures backward compatibility with production deployments
-  if (typeof window !== 'undefined') {
-    const branchField = document.getElementById('branch') as HTMLSelectElement
-    if (branchField && !data.branch?.trim()) {
-      errors.push({ field: 'branch', message: 'Please select a branch' })
-    }
   }
 
   if (!data.phoneNumber?.trim()) {
@@ -162,7 +152,6 @@ const getInitialFormData = (): FormData => ({
   dateOfBirth: '',
   gender: '',
   address: '',
-  branch: '',
   phoneNumber: '',
   emailAddress: '',
   emergencyContactName: '',
@@ -179,7 +168,6 @@ const getInitialFormData = (): FormData => ({
 function RegistrationForm() {
   const systemName = useReactiveSystemName()
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(getInitialFormData)
 
@@ -195,8 +183,6 @@ function RegistrationForm() {
     isFormClosed: false
   })
   const [settingsLoading, setSettingsLoading] = useState(true)
-  const [showAgeModal, setShowAgeModal] = useState(false)
-  const [userAge, setUserAge] = useState<number | null>(null)
 
   const totalSteps = 3
 
@@ -210,6 +196,7 @@ function RegistrationForm() {
       setErrors([])
       setLoading(false)
       setSuccess(false)
+      setSubmitError('')
       setStepTransitioning(false)
 
       // Clear the reset parameter from URL without page reload
@@ -246,19 +233,6 @@ function RegistrationForm() {
     return error?.message
   }
 
-  // Check age and show modal if below minimum age
-  const checkAgeAndShowModal = (dateOfBirth: string) => {
-    if (!dateOfBirth) return false
-
-    const age = calculateAge(dateOfBirth)
-    if (age < registrationSettings.minimumAge) {
-      setUserAge(age)
-      setShowAgeModal(true)
-      return true
-    }
-    return false
-  }
-
   // Manual reset function
   const resetForm = () => {
     setFormData(getInitialFormData())
@@ -266,6 +240,7 @@ function RegistrationForm() {
     setErrors([])
     setLoading(false)
     setSuccess(false)
+    setSubmitError('')
     setStepTransitioning(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -374,13 +349,7 @@ function RegistrationForm() {
     let stepErrors: ValidationError[] = []
 
     if (currentStep === 1) {
-      // First check age without validation errors
-      if (checkAgeAndShowModal(formData.dateOfBirth)) {
-        return // Stop here if age modal is shown
-      }
-
-      // Then validate normally (skipping age check since we handled it above)
-      stepErrors = validateStep1(formData, registrationSettings.minimumAge, true)
+      stepErrors = validateStep1(formData, registrationSettings.minimumAge)
     } else if (currentStep === 2) {
       stepErrors = validateStep2(formData)
     }
@@ -454,6 +423,7 @@ function RegistrationForm() {
     }
 
     setLoading(true)
+    setSubmitError('')
     setLoadingMessage('Checking for duplicate registrations...')
 
     try {
@@ -477,10 +447,15 @@ function RegistrationForm() {
           }
         } else if (duplicateCheck.hasSimilarNames) {
           // For similar names, highlight the name field
-          duplicateErrors.push({ field: 'fullName', message: 'A similar name already exists in our database add Initials' })
+          duplicateErrors.push({ field: 'fullName', message: 'A similar name already exists in our database' })
         }
 
         setErrors(duplicateErrors)
+
+        // Create a comprehensive error message with contact information
+        const errorMessage = `Your registration information already exists in our database. Please contact support for assistance. If you believe this is an error, our support team will help resolve it.`
+
+        setSubmitError(errorMessage)
 
         // Navigate to step 1 where the duplicate fields are
         if (currentStep !== 1) {
@@ -639,109 +614,6 @@ function RegistrationForm() {
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-        {/* Age Validation Modal */}
-        {showAgeModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-md mx-auto shadow-2xl border-0 bg-white overflow-hidden">
-              <CardContent className="p-0">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-orange-500 to-red-600 px-6 py-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-apercu-bold text-white mb-1">
-                        Age Requirement Not Met
-                      </h3>
-                      <p className="text-orange-100 font-apercu-regular text-sm">
-                        You're too young for this registration form
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="px-6 py-6 space-y-6">
-                  <div className="text-center space-y-4">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full">
-                      <Baby className="w-8 h-8 text-orange-600" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <h4 className="font-apercu-bold text-gray-900 text-lg">
-                        Children/Teen Registration Required
-                      </h4>
-                      <p className="text-gray-600 font-apercu-regular text-sm leading-relaxed">
-                        At {userAge} years old, you need to use our specialized children registration form.
-                        This form is designed for participants under {registrationSettings.minimumAge} years old.
-                      </p>
-                    </div>
-
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0">
-                          <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <AlertCircle className="w-4 h-4 text-blue-600" />
-                          </div>
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h5 className="font-apercu-bold text-blue-800 text-sm mb-1">
-                            What's Different?
-                          </h5>
-                          <ul className="text-blue-700 font-apercu-regular text-xs space-y-1">
-                            <li>• Simplified form designed for younger participants</li>
-                            <li>• Parent/Guardian information collection</li>
-                            <li>• Information collection only</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Button
-                      onClick={() => setShowAgeModal(false)}
-                      variant="outline"
-                      className="flex-1 font-apercu-medium py-3 border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const params = new URLSearchParams({
-                          name: formData.fullName || '',
-                          dob: formData.dateOfBirth || '',
-                          gender: formData.gender || '',
-                          address: formData.address || '',
-                          phone: formData.phoneNumber || '',
-                          email: formData.emailAddress || ''
-                        })
-
-                        // Try to navigate to children form, with fallback
-                        try {
-                          router.push(`/register/children?${params.toString()}`)
-                        } catch (error) {
-                          // Fallback: Allow registration on main form if children form is not available
-                          console.warn('Children form not available, allowing registration on main form')
-                          setShowAgeModal(false)
-                        }
-                      }}
-                      className="flex-1 font-apercu-medium py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
-                    >
-                      <Baby className="w-4 h-4 mr-2" />
-                       Children Form
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {/* Header */}
         <div className="mb-8">
           <Button variant="ghost" asChild className="mb-6 font-apercu-medium">
@@ -764,109 +636,42 @@ function RegistrationForm() {
           </div>
         </div>
 
-        {/* Enhanced Progress Indicator */}
-        <div className="mb-8 sm:mb-10">
-          <div className="relative">
-            {/* Progress Bar Background */}
-            <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 rounded-full"></div>
-
-            {/* Active Progress Bar */}
-            <div className={`absolute top-4 left-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-500 ease-in-out ${
-              currentStep >= 2 ? 'w-1/2' : 'w-0'
-            } ${currentStep >= 3 ? 'w-full' : ''}`}></div>
-
-            {/* Step Indicators */}
-            <div className="relative flex justify-between">
-              {/* Step 1 */}
-              <div className="flex flex-col items-center">
-                <div className={`relative flex items-center justify-center w-8 h-8 rounded-full text-sm font-apercu-bold transition-all duration-300 ${
-                  currentStep >= 1
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200'
-                    : 'bg-white border-2 border-gray-300 text-gray-500'
-                }`}>
-                  {currentStep > 1 ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    '1'
-                  )}
-                  {currentStep === 1 && (
-                    <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
-                  )}
-                </div>
-                <div className="mt-3 text-center">
-                  <div className={`text-sm font-apercu-bold transition-colors duration-300 ${
-                    currentStep >= 1 ? 'text-indigo-600' : 'text-gray-500'
-                  }`}>
-                    Personal Info
-                  </div>
-                  <div className="text-xs text-gray-500 font-apercu-regular mt-1">
-                    Basic details
-                  </div>
-                </div>
+        {/* Progress Indicator */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center justify-between px-2 sm:px-0">
+            <div className="flex items-center flex-1">
+              <div className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm font-apercu-medium ${
+                currentStep >= 1 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                1
               </div>
-
-              {/* Step 2 */}
-              <div className="flex flex-col items-center">
-                <div className={`relative flex items-center justify-center w-8 h-8 rounded-full text-sm font-apercu-bold transition-all duration-300 ${
-                  currentStep >= 2
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200'
-                    : 'bg-white border-2 border-gray-300 text-gray-500'
-                }`}>
-                  {currentStep > 2 ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    '2'
-                  )}
-                  {currentStep === 2 && (
-                    <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
-                  )}
-                </div>
-                <div className="mt-3 text-center">
-                  <div className={`text-sm font-apercu-bold transition-colors duration-300 ${
-                    currentStep >= 2 ? 'text-indigo-600' : 'text-gray-500'
-                  }`}>
-                    Parent Info
-                  </div>
-                  <div className="text-xs text-gray-500 font-apercu-regular mt-1">
-                    Guardian details
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="flex flex-col items-center">
-                <div className={`relative flex items-center justify-center w-8 h-8 rounded-full text-sm font-apercu-bold transition-all duration-300 ${
-                  currentStep >= 3
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200'
-                    : 'bg-white border-2 border-gray-300 text-gray-500'
-                }`}>
-                  3
-                  {currentStep === 3 && (
-                    <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
-                  )}
-                </div>
-                <div className="mt-3 text-center">
-                  <div className={`text-sm font-apercu-bold transition-colors duration-300 ${
-                    currentStep >= 3 ? 'text-indigo-600' : 'text-gray-500'
-                  }`}>
-                    Emergency
-                  </div>
-                  <div className="text-xs text-gray-500 font-apercu-regular mt-1">
-                    Contact info
-                  </div>
-                </div>
+              <div className="ml-1 sm:ml-2 lg:ml-3 flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-apercu-medium text-gray-900 truncate">Personal Info</p>
+                <p className="text-xs text-gray-500 hidden sm:block">Basic details</p>
               </div>
             </div>
-          </div>
-
-          {/* Step Counter */}
-          <div className="flex justify-center mt-6">
-            <div className="inline-flex items-center px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
-                <span className="text-sm font-apercu-medium text-gray-700">
-                  Step {currentStep} of 3
-                </span>
+            <div className={`w-2 sm:w-4 lg:w-8 h-1 rounded-full mx-0.5 sm:mx-1 ${currentStep >= 2 ? 'bg-indigo-600' : 'bg-gray-200'}`}></div>
+            <div className="flex items-center flex-1">
+              <div className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm font-apercu-medium ${
+                currentStep >= 2 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                2
+              </div>
+              <div className="ml-1 sm:ml-2 lg:ml-3 flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-apercu-medium text-gray-900 truncate">Parent Info</p>
+                <p className="text-xs text-gray-500 hidden sm:block">Guardian details</p>
+              </div>
+            </div>
+            <div className={`w-2 sm:w-4 lg:w-8 h-1 rounded-full mx-0.5 sm:mx-1 ${currentStep >= 3 ? 'bg-indigo-600' : 'bg-gray-200'}`}></div>
+            <div className="flex items-center flex-1">
+              <div className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm font-apercu-medium ${
+                currentStep >= 3 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                3
+              </div>
+              <div className="ml-1 sm:ml-2 lg:ml-3 flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-apercu-medium text-gray-900 truncate">Emergency</p>
+                <p className="text-xs text-gray-500 hidden sm:block">Contact info</p>
               </div>
             </div>
           </div>
@@ -900,18 +705,29 @@ function RegistrationForm() {
             <div className={`transition-opacity duration-150 ${stepTransitioning ? 'opacity-50' : 'opacity-100'}`}>
             {/* Step 1: Personal Information */}
             {currentStep === 1 && (
-              <CardContent className="space-y-6 p-4 sm:p-6 lg:p-8">
-                {/* Step Header */}
-                <div className="text-center mb-6 sm:mb-8">
-                  <h2 className="text-xl sm:text-2xl font-apercu-bold text-gray-900 mb-2">
+              <CardContent className="space-y-6 p-6 sm:p-8">
+                <div className="text-center pb-4 sm:pb-6 border-b border-gray-100">
+                  <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-3 sm:mb-4 shadow-lg">
+                    <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                  </div>
+                  <CardTitle className="text-lg sm:text-xl lg:text-2xl font-apercu-bold text-gray-900 mb-2 px-2">
                     Personal Information
-                  </h2>
-                  <p className="text-sm sm:text-base text-gray-600 font-apercu-regular">
+                  </CardTitle>
+                  <CardDescription className="text-sm sm:text-base font-apercu-regular text-gray-600 px-2">
                     Please provide your basic information to get started
-                  </p>
-                  <div className="mt-3 sm:mt-4">
-                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs sm:text-sm font-apercu-medium">
-                      {getStep1Progress()}% Complete
+                  </CardDescription>
+
+                  {/* Progress Bar */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs font-apercu-medium text-gray-600 mb-2">
+                      <span>Form Progress</span>
+                      <span>{getStep1Progress()}% Complete</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${getStep1Progress()}%` }}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -949,16 +765,7 @@ function RegistrationForm() {
                   </div>
                 )}
 
-                {/* Personal Information Section */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-6 border border-blue-100 mb-6">
-                  <div className="flex items-center mb-4 sm:mb-6">
-                    <div className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl mr-3 shadow-md">
-                      <User className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-apercu-bold text-gray-900">Personal Information</h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Full Name Field */}
                   <div className="space-y-2">
                     <label htmlFor="fullName" className="block text-sm font-apercu-medium text-gray-700">
@@ -971,10 +778,10 @@ function RegistrationForm() {
                         id="fullName"
                         value={formData.fullName}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border-2 rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 transition-all duration-200 ${
                           getFieldError('fullName')
-                            ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
-                            : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
+                            ? 'border-red-400 focus:border-red-500 focus:ring-red-500 bg-red-50 shadow-red-100'
+                            : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md focus:ring-indigo-500 focus:border-indigo-500'
                         }`}
                         placeholder="Enter your full legal name"
                       />
@@ -1009,7 +816,7 @@ function RegistrationForm() {
                         id="gender"
                         value={formData.gender}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                           getFieldError('gender')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1063,9 +870,9 @@ function RegistrationForm() {
                               setFormData(prev => ({ ...prev, dateOfBirth: newDate }))
                             }
                           }}
-                          className={`block w-full px-3 py-1 border-2 rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
+                          className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                             getFieldError('dateOfBirth')
-                              ? 'border-red-500 focus:border-red-600 focus:ring-red-500 bg-red-50 shadow-lg shadow-red-100 ring-2 ring-red-200'
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                               : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
                           }`}
                         >
@@ -1092,9 +899,9 @@ function RegistrationForm() {
                               setFormData(prev => ({ ...prev, dateOfBirth: newDate }))
                             }
                           }}
-                          className={`block w-full px-3 py-1 border-2 rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
+                          className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                             getFieldError('dateOfBirth')
-                              ? 'border-red-500 focus:border-red-600 focus:ring-red-500 bg-red-50 shadow-lg shadow-red-100 ring-2 ring-red-200'
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                               : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
                           }`}
                         >
@@ -1130,9 +937,9 @@ function RegistrationForm() {
                               setFormData(prev => ({ ...prev, dateOfBirth: newDate }))
                             }
                           }}
-                          className={`block w-full px-3 py-1 border-2 rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
+                          className={`block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 h-9 ${
                             getFieldError('dateOfBirth')
-                              ? 'border-red-500 focus:border-red-600 focus:ring-red-500 bg-red-50 shadow-lg shadow-red-100 ring-2 ring-red-200'
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                               : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
                           }`}
                         >
@@ -1184,7 +991,7 @@ function RegistrationForm() {
                         value={formData.address}
                         onChange={handleChange}
                         rows={3}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 resize-none ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 resize-none ${
                           getFieldError('address')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1209,68 +1016,6 @@ function RegistrationForm() {
                     )}
                   </div>
 
-                  {/* Branch Field */}
-                  <div className="space-y-2">
-                    <label htmlFor="branch" className="block text-sm font-apercu-medium text-gray-700">
-                      Branch *
-                    </label>
-                    <div className="relative">
-                      <select
-                        name="branch"
-                        id="branch"
-                        value={formData.branch}
-                        onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
-                          getFieldError('branch')
-                            ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
-                            : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
-                        }`}
-                      >
-                        <option value="">Select Branch</option>
-                        <option value="Iyana Ipaja">Iyana Ipaja</option>
-                        <option value="Bajomo">Bajomo</option>
-                        <option value="Badagry">Badagry</option>
-                        <option value="Bada">Bada</option>
-                        <option value="Itele">Itele</option>
-                        <option value="Atan">Atan</option>
-                        <option value="Ijoko">Ijoko</option>
-                        <option value="Sango">Sango</option>
-                        <option value="Ifo">Ifo</option>
-                        <option value="Gudugba">Gudugba</option>
-                        <option value="Great City">Great City</option>
-                        <option value="Abeokuta">Abeokuta</option>
-                        <option value="Oseile">Oseile</option>
-                        <option value="Ayetoro 1">Ayetoro 1</option>
-                        <option value="Ayetoro 2">Ayetoro 2</option>
-                        <option value="Imeko">Imeko</option>
-                        <option value="Sagamu">Sagamu</option>
-                        <option value="Ikorodu">Ikorodu</option>
-                        <option value="Ibadan">Ibadan</option>
-                        <option value="Akure">Akure</option>
-                        <option value="Iju">Iju</option>
-                        <option value="Osogbo">Osogbo</option>
-                        <option value="Ikire">Ikire</option>
-                        <option value="Ido Ekiti">Ido Ekiti</option>
-                        <option value="Not a Member">Not a Member</option>
-                      </select>
-                      {formData.branch && !getFieldError('branch') && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {getFieldError('branch') && (
-                      <p className="text-sm text-red-600 font-apercu-regular flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        {getFieldError('branch')}
-                      </p>
-                    )}
-                  </div>
-
                   {/* Phone Number Field */}
                   <div className="space-y-2">
                     <label htmlFor="phoneNumber" className="block text-sm font-apercu-medium text-gray-700">
@@ -1283,7 +1028,7 @@ function RegistrationForm() {
                         id="phoneNumber"
                         value={formData.phoneNumber}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
                           getFieldError('phoneNumber')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1309,7 +1054,7 @@ function RegistrationForm() {
                   </div>
 
                   {/* Email Address Field */}
-                  <div className="space-y-2 lg:col-span-2">
+                  <div className="space-y-2">
                     <label htmlFor="emailAddress" className="block text-sm font-apercu-medium text-gray-700">
                       Email Address *
                     </label>
@@ -1320,7 +1065,7 @@ function RegistrationForm() {
                         id="emailAddress"
                         value={formData.emailAddress}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
                           getFieldError('emailAddress')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1343,7 +1088,6 @@ function RegistrationForm() {
                         {getFieldError('emailAddress')}
                       </p>
                     )}
-                  </div>
                   </div>
                 </div>
 
@@ -1400,16 +1144,7 @@ function RegistrationForm() {
                   </div>
                 </div>
 
-                {/* Parent/Guardian Information Section */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 sm:p-6 border border-green-100 mb-6">
-                  <div className="flex items-center mb-4 sm:mb-6">
-                    <div className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl mr-3 shadow-md">
-                      <Users className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-apercu-bold text-gray-900">Parent/Guardian Information</h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Parent/Guardian Name */}
                   <div className="space-y-2">
                     <label htmlFor="parentGuardianName" className="block text-sm font-apercu-medium text-gray-700">
@@ -1422,7 +1157,7 @@ function RegistrationForm() {
                         id="parentGuardianName"
                         value={formData.parentGuardianName}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
                           getFieldError('parentGuardianName')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1459,7 +1194,7 @@ function RegistrationForm() {
                         id="parentGuardianPhone"
                         value={formData.parentGuardianPhone}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
                           getFieldError('parentGuardianPhone')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1496,7 +1231,7 @@ function RegistrationForm() {
                         id="parentGuardianEmail"
                         value={formData.parentGuardianEmail}
                         onChange={handleChange}
-                        className="block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md"
+                        className="block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md"
                         placeholder="Enter parent/guardian email (optional)"
                       />
                       {formData.parentGuardianEmail && (
@@ -1510,7 +1245,6 @@ function RegistrationForm() {
                   </div>
 
 
-                  </div>
                 </div>
 
                 {/* Navigation */}
@@ -1616,16 +1350,7 @@ function RegistrationForm() {
                   </div>
                 )}
 
-                {/* Emergency Contact Information Section */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4 sm:p-6 border border-orange-100 mb-6">
-                  <div className="flex items-center mb-4 sm:mb-6">
-                    <div className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl mr-3 shadow-md">
-                      <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-apercu-bold text-gray-900">Emergency Contact Information</h3>
-                  </div>
-
-                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${formData.useParentAsEmergencyContact ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${formData.useParentAsEmergencyContact ? 'opacity-50 pointer-events-none' : ''}`}>
                   {/* Emergency Contact Name */}
                   <div className="space-y-2">
                     <label htmlFor="emergencyContactName" className="block text-sm font-apercu-medium text-gray-700">
@@ -1638,7 +1363,7 @@ function RegistrationForm() {
                         id="emergencyContactName"
                         value={formData.emergencyContactName}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
                           getFieldError('emergencyContactName')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1675,7 +1400,7 @@ function RegistrationForm() {
                         id="emergencyContactPhone"
                         value={formData.emergencyContactPhone}
                         onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                        className={`block w-full px-4 py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
                           getFieldError('emergencyContactPhone')
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
                             : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
@@ -1711,7 +1436,7 @@ function RegistrationForm() {
                         id="emergencyContactRelationship"
                         value={formData.emergencyContactRelationship}
                         onChange={handleChange}
-                        className="block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md"
+                        className="block w-full px-3 py-1 border rounded-md shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md h-9"
                       >
                         <option value="">Select Relationship</option>
                         <option value="Parent">Parent</option>
@@ -1729,7 +1454,6 @@ function RegistrationForm() {
                         </div>
                       )}
                     </div>
-                  </div>
                   </div>
                 </div>
 
@@ -1764,9 +1488,57 @@ function RegistrationForm() {
           </form>
           )}
 
+          {/* Error Display */}
+          {submitError && (
+            <CardContent className="pt-0">
+              <div className="p-6 bg-red-50 border-2 border-red-300 rounded-lg shadow-sm" data-error-message>
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">!</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-lg font-apercu-bold text-red-800 mb-3">Registration Not Permitted</h4>
 
+                    {/* Show specific field errors if any */}
+                    {errors.length > 0 && (
+                      <div className="mb-4 p-4 bg-red-100 rounded-lg border border-red-200">
+                        <p className="text-sm font-apercu-medium text-red-800 mb-3">The following information already exists in our database:</p>
+                        <ul className="text-sm text-red-700 space-y-2">
+                          {errors.map((error, index) => (
+                            <li key={index} className="flex items-center">
+                              <span className="w-2 h-2 bg-red-500 rounded-full mr-3"></span>
+                              {error.message}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
+                    <div className="mb-4">
+                      <p className="text-sm text-red-700 font-apercu-regular mb-3">
+                        Your registration information already exists in our database. Please contact support:
+                      </p>
 
+                      <div className="text-center space-y-2">
+                        <a href="tel:+2348023882300" className="block text-red-700 hover:text-red-900 font-apercu-medium transition-colors">
+                          +234 802 388 2300
+                        </a>
+                        <a href="tel:+2348064394424" className="block text-red-700 hover:text-red-900 font-apercu-medium transition-colors">
+                          +234 806 439 4424
+                        </a>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-red-600 font-apercu-regular">
+                      If you believe this is an error, our support team will help resolve it quickly.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          )}
         </Card>
       </div>
     </div>

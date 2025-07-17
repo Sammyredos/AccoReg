@@ -57,12 +57,11 @@ export async function GET(request: NextRequest) {
     // Build where clause for search and status
     const where: any = {}
 
-    // Add search conditions (PostgreSQL compatible)
+    // Add search conditions
     if (search) {
-      const searchLower = search.toLowerCase()
       where.OR = [
-        { fullName: { contains: searchLower } },
-        { emailAddress: { contains: searchLower } },
+        { fullName: { contains: search, mode: 'insensitive' as const } },
+        { emailAddress: { contains: search, mode: 'insensitive' as const } },
         { phoneNumber: { contains: search } }
       ]
     }

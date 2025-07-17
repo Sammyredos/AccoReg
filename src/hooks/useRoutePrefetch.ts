@@ -139,7 +139,8 @@ class RoutePrefetchManager {
         '/api/admin/notifications/recent?limit=5'
       ],
       '/admin/registrations': [
-        '/api/registrations?limit=50'
+        '/api/registrations?limit=50',
+        '/api/admin/analytics'
       ],
       '/admin/users': [
         '/api/admin/users',
@@ -157,7 +158,10 @@ class RoutePrefetchManager {
         '/api/admin/notifications',
         '/api/admin/notification-templates'
       ],
-
+      '/admin/analytics': [
+        '/api/admin/analytics',
+        '/api/admin/reports'
+      ],
       '/admin/settings': [
         '/api/admin/settings',
         '/api/admin/system-status'
@@ -242,7 +246,8 @@ class RoutePrefetchManager {
       '/admin/accommodations': ['/admin/registrations', '/admin/users', '/admin/reports'],
       '/admin/communications': ['/admin/notifications', '/admin/users', '/admin/settings'],
       '/admin/notifications': ['/admin/communications', '/admin/settings', '/admin/dashboard'],
-      '/admin/reports': ['/admin/dashboard', '/admin/settings'],
+      '/admin/analytics': ['/admin/reports', '/admin/dashboard', '/admin/registrations'],
+      '/admin/reports': ['/admin/analytics', '/admin/dashboard', '/admin/settings'],
       '/admin/settings': ['/admin/users', '/admin/communications', '/admin/dashboard']
     }
 
