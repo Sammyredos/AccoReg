@@ -21,9 +21,7 @@ services:
       echo "✅ Prisma client generated" &&
       echo "🗄️ Running production health check..." &&
       (npx tsx scripts/production-health-check.ts && echo "✅ Production health check passed" || echo "⚠️ Health check completed with warnings") &&
-      echo "🗄️ Checking database schema and applying updates..." &&
-      (npx tsx scripts/auto-db-update.ts && echo "✅ Database schema updated automatically") &&
-      echo "🗄️ Deploying any pending migrations..." &&
+      echo "🗄️ Deploying database migrations..." &&
       npx prisma migrate deploy &&
       echo "✅ Database migrations deployed" &&
       echo "👑 Setting up Super Admin account..." &&
@@ -34,11 +32,11 @@ services:
       (npx tsx scripts/update-branding.ts && echo "✅ Branding updated successfully" || echo "⚠️ Branding update skipped") &&
       echo "👥 Setting up roles and permissions..." &&
       (npx tsx scripts/create-staff-role.ts && echo "✅ Roles and permissions configured" || echo "⚠️ Role setup skipped") &&
-      echo "🏗️ Building Next.js application with PostgreSQL production optimizations..." &&
+      echo "🏗️ Building Next.js application with production optimizations..." &&
       NODE_ENV=production npm run build &&
       echo "🧹 Cleaning up development dependencies..." &&
       npm prune --production &&
-      echo "🎉 PostgreSQL Production build completed successfully!" &&
+      echo "🎉 Mopgomyouth production build completed successfully!" &&
       echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
       echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!" &&
       echo "📊 Build size analysis:" &&
@@ -161,30 +159,6 @@ services:
         value: "60000"
       - key: MAX_SSE_CONNECTIONS
         value: "100"
-
-      # Auto-Update Features
-      - key: AUTO_DB_UPDATE_ENABLED
-        value: "true"
-      - key: DB_UPDATE_CHECK_INTERVAL
-        value: "3600000"
-      - key: AUTO_SCHEMA_SYNC
-        value: "true"
-      - key: BACKUP_BEFORE_UPDATE
-        value: "true"
-
-      # PostgreSQL Production Settings
-      - key: DATABASE_URL
-        fromDatabase:
-          name: youth-registration-database
-          property: connectionString
-      - key: POSTGRES_PRISMA_URL
-        fromDatabase:
-          name: youth-registration-database
-          property: connectionString
-      - key: POSTGRES_URL_NON_POOLING
-        fromDatabase:
-          name: youth-registration-database
-          property: connectionString
 
       # QR Code & Attendance Features
       - key: QR_AUTO_CLOSE_ENABLED

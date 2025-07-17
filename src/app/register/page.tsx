@@ -65,9 +65,13 @@ const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13, skipAge
     errors.push({ field: 'address', message: 'Address is required' })
   }
 
-  // Branch validation - required field
-  if (!data.branch?.trim()) {
-    errors.push({ field: 'branch', message: 'Please select a branch' })
+  // Branch validation - only validate if branch field exists in form
+  // This ensures backward compatibility with production deployments
+  if (typeof window !== 'undefined') {
+    const branchField = document.getElementById('branch') as HTMLSelectElement
+    if (branchField && !data.branch?.trim()) {
+      errors.push({ field: 'branch', message: 'Please select a branch' })
+    }
   }
 
   if (!data.phoneNumber?.trim()) {
@@ -716,7 +720,15 @@ function RegistrationForm() {
                           phone: formData.phoneNumber || '',
                           email: formData.emailAddress || ''
                         })
-                        router.push(`/register/children?${params.toString()}`)
+
+                        // Try to navigate to children form, with fallback
+                        try {
+                          router.push(`/register/children?${params.toString()}`)
+                        } catch (error) {
+                          // Fallback: Allow registration on main form if children form is not available
+                          console.warn('Children form not available, allowing registration on main form')
+                          setShowAgeModal(false)
+                        }
                       }}
                       className="flex-1 font-apercu-medium py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
                     >

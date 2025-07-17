@@ -13,12 +13,12 @@ export async function POST(request: NextRequest) {
       'dateOfBirth',
       'gender',
       'address',
-      'branch',
       'phoneNumber',
       'emailAddress',
       'parentGuardianName',
       'parentGuardianPhone'
       // parentGuardianEmail is optional
+      // branch is optional for backward compatibility with production
     ]
 
     for (const field of requiredFields) {
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         dateOfBirth: dateOfBirth,
         gender: data.gender,
         address: data.address,
-        branch: data.branch,
+        branch: data.branch || 'Not Specified',
         phoneNumber: data.phoneNumber,
         emailAddress: data.emailAddress,
         // Use emergency contact info (either manually entered or copied from parent)
