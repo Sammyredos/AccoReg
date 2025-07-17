@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { defaultBackup } from '@/lib/backup'
+import { IncrementalBackupManager } from '@/lib/backup-incremental'
 import { createLogger } from '@/lib/logger'
 import { promises as fs } from 'fs'
 import path from 'path'
@@ -44,62 +45,123 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const filename = searchParams.get('filename')
     const action = searchParams.get('action') || 'download'
+    const backupType = searchParams.get('type') || 'full' // 'full' or 'incremental'
 
     // If no filename provided, create a new backup and download it
     if (!filename && action === 'create-and-download') {
-      logger.info('Creating new backup for download', { userId: currentUser.id })
-      
-      const createResult = await defaultBackup.createBackup()
-      
-      if (!createResult.success || !createResult.filename) {
-        logger.error('Failed to create backup for download', {
-          error: createResult.error,
-          userId: currentUser.id
-        })
-        return NextResponse.json({
-          error: 'Failed to create backup',
-          details: createResult.error
-        }, { status: 500 })
-      }
+      logger.info('Creating new backup for download', {
+        userId: currentUser.id,
+        backupType
+      })
 
-      // Now download the created backup
-      const backupDir = process.env.BACKUP_DIR || './backups'
-      const filepath = path.join(backupDir, createResult.filename)
+      if (backupType === 'incremental') {
+        // Create incremental backup (JSON format)
+        const incrementalManager = new IncrementalBackupManager()
 
-      try {
-        const fileBuffer = await fs.readFile(filepath)
-        const fileStats = await fs.stat(filepath)
-        
-        logger.info('Backup created and downloaded successfully', {
-          userId: currentUser.id,
-          filename: createResult.filename,
-          size: fileStats.size
-        })
+        try {
+          const startTime = Date.now()
+          const backupData = await incrementalManager.createIncrementalBackup()
+          const savedFilename = await incrementalManager.saveIncrementalBackup(backupData)
+          const duration = Date.now() - startTime
 
-        // Set appropriate headers for file download
-        const headers = new Headers()
-        headers.set('Content-Type', 'application/octet-stream')
-        headers.set('Content-Disposition', `attachment; filename="${createResult.filename}"`)
-        headers.set('Content-Length', fileStats.size.toString())
-        headers.set('X-Backup-Info', JSON.stringify({
-          filename: createResult.filename,
-          size: fileStats.size,
-          sizeFormatted: formatFileSize(fileStats.size),
-          created: fileStats.mtime.toISOString(),
-          duration: createResult.duration
-        }))
+          const backupDir = process.env.BACKUP_DIR || './backups'
+          const filepath = path.join(backupDir, savedFilename)
 
-        return new NextResponse(fileBuffer, { headers })
-        
-      } catch (error) {
-        logger.error('Failed to read backup file for download', {
-          error: error instanceof Error ? error.message : String(error),
-          userId: currentUser.id,
-          filename: createResult.filename
-        })
-        return NextResponse.json({
-          error: 'Failed to read backup file'
-        }, { status: 500 })
+          const fileBuffer = await fs.readFile(filepath)
+          const fileStats = await fs.stat(filepath)
+
+          logger.info('Incremental backup created and downloaded successfully', {
+            userId: currentUser.id,
+            filename: savedFilename,
+            size: fileStats.size,
+            duration
+          })
+
+          // Set appropriate headers for JSON download
+          const headers = new Headers()
+          headers.set('Content-Type', 'application/json')
+          headers.set('Content-Disposition', `attachment; filename="${savedFilename}"`)
+          headers.set('Content-Length', fileStats.size.toString())
+          headers.set('X-Backup-Info', JSON.stringify({
+            filename: savedFilename,
+            size: fileStats.size,
+            sizeFormatted: formatFileSize(fileStats.size),
+            created: fileStats.mtime.toISOString(),
+            duration,
+            type: 'incremental',
+            format: 'json',
+            recordCounts: backupData.metadata.recordCounts
+          }))
+
+          return new NextResponse(fileBuffer, { headers })
+
+        } catch (error) {
+          logger.error('Failed to create incremental backup for download', {
+            error: error instanceof Error ? error.message : String(error),
+            userId: currentUser.id
+          })
+          return NextResponse.json({
+            error: 'Failed to create incremental backup',
+            details: error instanceof Error ? error.message : String(error)
+          }, { status: 500 })
+        }
+
+      } else {
+        // Create full backup (SQL format)
+        const createResult = await defaultBackup.createBackup()
+
+        if (!createResult.success || !createResult.filename) {
+          logger.error('Failed to create backup for download', {
+            error: createResult.error,
+            userId: currentUser.id
+          })
+          return NextResponse.json({
+            error: 'Failed to create backup',
+            details: createResult.error
+          }, { status: 500 })
+        }
+
+        // Now download the created backup
+        const backupDir = process.env.BACKUP_DIR || './backups'
+        const filepath = path.join(backupDir, createResult.filename)
+
+        try {
+          const fileBuffer = await fs.readFile(filepath)
+          const fileStats = await fs.stat(filepath)
+
+          logger.info('Backup created and downloaded successfully', {
+            userId: currentUser.id,
+            filename: createResult.filename,
+            size: fileStats.size
+          })
+
+          // Set appropriate headers for SQL file download
+          const headers = new Headers()
+          headers.set('Content-Type', 'application/octet-stream')
+          headers.set('Content-Disposition', `attachment; filename="${createResult.filename}"`)
+          headers.set('Content-Length', fileStats.size.toString())
+          headers.set('X-Backup-Info', JSON.stringify({
+            filename: createResult.filename,
+            size: fileStats.size,
+            sizeFormatted: formatFileSize(fileStats.size),
+            created: fileStats.mtime.toISOString(),
+            duration: createResult.duration,
+            type: 'full',
+            format: createResult.filename.endsWith('.gz') ? 'sql.gz' : 'sql'
+          }))
+
+          return new NextResponse(fileBuffer, { headers })
+
+        } catch (error) {
+          logger.error('Failed to read backup file for download', {
+            error: error instanceof Error ? error.message : String(error),
+            userId: currentUser.id,
+            filename: createResult.filename
+          })
+          return NextResponse.json({
+            error: 'Failed to read backup file'
+          }, { status: 500 })
+        }
       }
     }
 

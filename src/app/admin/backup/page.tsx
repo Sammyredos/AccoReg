@@ -90,7 +90,7 @@ export default function BackupManagementPage() {
   const [merging, setMerging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [restoreImmediately, setRestoreImmediately] = useState(false)
-  const [mergeMode, setMergeMode] = useState(false)
+  const [mergeMode, setMergeMode] = useState(true) // Default to smart merge mode
   const [mergeAnalysis, setMergeAnalysis] = useState<MergeAnalysis | null>(null)
   const [conflictResolution, setConflictResolution] = useState('backup_wins')
   const [preserveNewer, setPreserveNewer] = useState(true)
@@ -173,14 +173,17 @@ export default function BackupManagementPage() {
     }
   }
 
-  const createAndDownloadBackup = async () => {
+  const createAndDownloadBackup = async (backupType: 'full' | 'incremental' = 'incremental') => {
     try {
       setCreating(true)
-      toast.info('Creating backup...', {
+      const isIncremental = backupType === 'incremental'
+
+      toast.info(`Creating ${isIncremental ? 'incremental' : 'full'} backup...`, {
         description: 'This may take a few moments'
       })
 
-      const response = await fetch('/api/admin/backup/download?action=create-and-download', {
+      const url = `/api/admin/backup/download?action=create-and-download&type=${backupType}`
+      const response = await fetch(url, {
         credentials: 'include'
       })
 
@@ -200,8 +203,11 @@ export default function BackupManagementPage() {
         document.body.removeChild(link)
         window.URL.revokeObjectURL(url)
 
-        toast.success('Backup created and downloaded', {
-          description: `File: ${info.filename} (${info.sizeFormatted})`
+        const backupTypeLabel = info.type === 'incremental' ? 'Incremental' : 'Full'
+        const formatLabel = info.format === 'json' ? 'JSON' : 'SQL'
+
+        toast.success(`${backupTypeLabel} backup created and downloaded`, {
+          description: `${formatLabel} file: ${info.filename} (${info.sizeFormatted})`
         })
 
         // Refresh backup list
@@ -506,6 +512,20 @@ export default function BackupManagementPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Backup Management</h1>
         <p className="text-gray-600">Create, download, upload, and restore database backups</p>
+
+        {/* Helpful Tip */}
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start">
+            <CheckCircle className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-medium text-blue-900 mb-1">💡 Recommended: Use Smart Backup</h3>
+              <p className="text-sm text-blue-700">
+                Smart Backup (JSON format) preserves your current data while safely adding new records.
+                It's perfect for syncing data between environments or restoring specific records without losing recent changes.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Create New Backup */}
@@ -516,41 +536,94 @@ export default function BackupManagementPage() {
               <Database className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Create New Backup</h2>
-              <p className="text-gray-600">Generate and download a complete database backup</p>
+              <h2 className="text-xl font-bold text-gray-900">Create Smart Backup</h2>
+              <p className="text-gray-600">Generate safe, mergeable backups that preserve your current data</p>
             </div>
           </div>
-          <Button
-            onClick={createAndDownloadBackup}
-            disabled={creating}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {creating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Create & Download
-              </>
-            )}
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={() => createAndDownloadBackup('incremental')}
+              disabled={creating}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Create Smart Backup
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => createAndDownloadBackup('full')}
+              disabled={creating}
+              variant="outline"
+              className="border-red-600 text-red-600 hover:bg-red-50"
+              size="sm"
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Full Backup (Destructive)
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-          <div className="flex items-center">
-            <Shield className="h-4 w-4 mr-2 text-green-600" />
-            Includes all data and settings
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+          <div className="bg-green-50 p-4 rounded-lg border-2 border-green-300">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium text-green-900">Smart Backup (Recommended)</h3>
+              <Badge className="bg-green-600 text-white text-xs">JSON</Badge>
+            </div>
+            <div className="space-y-2 text-green-700">
+              <div className="flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Preserves all current data
+              </div>
+              <div className="flex items-center">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Smart conflict resolution
+              </div>
+              <div className="flex items-center">
+                <Shield className="h-4 w-4 mr-2" />
+                Safe merge operations
+              </div>
+              <div className="flex items-center">
+                <FileText className="h-4 w-4 mr-2" />
+                Structured, readable format
+              </div>
+            </div>
           </div>
-          <div className="flex items-center">
-            <HardDrive className="h-4 w-4 mr-2 text-blue-600" />
-            Compressed for smaller file size
-          </div>
-          <div className="flex items-center">
-            <Clock className="h-4 w-4 mr-2 text-orange-600" />
-            Automatic cleanup of old backups
+          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium text-red-900">Full Backup (Destructive)</h3>
+              <Badge variant="destructive" className="text-xs">SQL</Badge>
+            </div>
+            <div className="space-y-2 text-red-700">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                Overwrites existing data
+              </div>
+              <div className="flex items-center">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Deletes current records
+              </div>
+              <div className="flex items-center">
+                <HardDrive className="h-4 w-4 mr-2" />
+                Complete replacement only
+              </div>
+            </div>
           </div>
         </div>
       </Card>
@@ -562,8 +635,8 @@ export default function BackupManagementPage() {
             <Upload className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Upload & Restore Backup</h2>
-            <p className="text-gray-600">Upload a backup file and optionally restore it immediately</p>
+            <h2 className="text-xl font-bold text-gray-900">Upload & Merge Backup</h2>
+            <p className="text-gray-600">Upload backup files for safe merging or full restoration</p>
           </div>
         </div>
 
@@ -631,16 +704,19 @@ export default function BackupManagementPage() {
         </div>
       </Card>
 
-      {/* Incremental Merge */}
-      <Card className="p-6 mb-8">
+      {/* Smart Merge (Recommended) */}
+      <Card className="p-6 mb-8 border-2 border-green-200 bg-green-50/30">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
-            <div className="h-12 w-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center mr-4">
+            <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4">
               <RefreshCw className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Incremental Merge</h2>
-              <p className="text-gray-600">Smart merge that preserves current data and resolves conflicts</p>
+              <div className="flex items-center space-x-2 mb-1">
+                <h2 className="text-xl font-bold text-gray-900">Smart Merge</h2>
+                <Badge className="bg-green-600 text-white text-xs">Recommended</Badge>
+              </div>
+              <p className="text-gray-600">Safe merge that preserves your current data and intelligently resolves conflicts</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -648,8 +724,9 @@ export default function BackupManagementPage() {
               onClick={() => setMergeMode(!mergeMode)}
               variant={mergeMode ? "default" : "outline"}
               size="sm"
+              className={mergeMode ? "bg-green-600 hover:bg-green-700" : "border-green-600 text-green-600 hover:bg-green-50"}
             >
-              {mergeMode ? 'Exit Merge Mode' : 'Enable Merge Mode'}
+              {mergeMode ? 'Exit Smart Mode' : 'Enable Smart Mode'}
             </Button>
           </div>
         </div>
