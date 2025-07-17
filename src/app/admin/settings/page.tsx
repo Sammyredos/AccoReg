@@ -138,6 +138,7 @@ export default function SettingsPage() {
   const [isInitialized, setIsInitialized] = useState(false) // Track if tab has been initialized from URL
   const [importingData, setImportingData] = useState(false)
   const [viewingLogs, setViewingLogs] = useState(false)
+  const [fixingDatabase, setFixingDatabase] = useState(false)
   const [systemLogs, setSystemLogs] = useState<Array<{ id: string; message: string; timestamp: string; level: string }>>([])
   const [showLogsModal, setShowLogsModal] = useState(false)
   const [errorModal, setErrorModal] = useState<{
@@ -1078,6 +1079,45 @@ export default function SettingsPage() {
       error('Logs Failed', err instanceof Error ? err.message : 'Failed to load system logs')
     } finally {
       setViewingLogs(false)
+    }
+  }
+
+  const handleFixDatabase = async () => {
+    setFixingDatabase(true)
+    try {
+      const response = await fetch('/api/admin/system/database-patches', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'apply-all' })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        success('Database Fixed', `Applied ${data.summary?.success || 0} patches successfully`)
+
+        // Show detailed results if available
+        if (data.results && data.results.length > 0) {
+          const successPatches = data.results.filter((r: any) => r.status === 'success' || r.status === 'already_applied')
+          const errorPatches = data.results.filter((r: any) => r.status === 'error')
+
+          let message = `✅ ${successPatches.length} patches applied successfully`
+          if (errorPatches.length > 0) {
+            message += `\n❌ ${errorPatches.length} patches failed`
+          }
+
+          console.log('Database patch results:', data.results)
+        }
+      } else {
+        error('Database Fix Failed', data.message || 'Failed to apply database patches')
+      }
+    } catch (err) {
+      console.error('Database fix error:', err)
+      error('Database Fix Failed', err instanceof Error ? err.message : 'Failed to fix database')
+    } finally {
+      setFixingDatabase(false)
     }
   }
 
@@ -2130,6 +2170,43 @@ export default function SettingsPage() {
                 <>
                   <Eye className="h-4 w-4 mr-2" />
                   View Logs
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Fix Database */}
+          <div className="p-4 border border-red-200 rounded-lg hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                <div className="h-10 w-10 bg-gradient-to-r from-red-500 to-orange-600 rounded-lg flex items-center justify-center mr-3">
+                  <Database className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-apercu-bold text-sm text-gray-900">Fix Database</h4>
+                  <p className="font-apercu-bold text-xs text-gray-500">Apply database patches</p>
+                </div>
+              </div>
+            </div>
+            <p className="font-apercu-bold text-xs text-gray-600 mb-3">
+              Apply database patches and fixes to ensure optimal performance and data integrity.
+            </p>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="w-full"
+              onClick={handleFixDatabase}
+              disabled={fixingDatabase}
+            >
+              {fixingDatabase ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Fixing...
+                </>
+              ) : (
+                <>
+                  <Database className="h-4 w-4 mr-2" />
+                  Fix Database
                 </>
               )}
             </Button>

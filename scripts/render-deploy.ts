@@ -158,23 +158,34 @@ class RenderDeployer {
 
   private async createBackup() {
     try {
-      if (process.env.DATABASE_URL?.includes('file:')) {
-        const fs = require('fs')
-        const path = require('path')
-        
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        const dbPath = process.env.DATABASE_URL.replace('file:', '')
-        const backupDir = path.join(process.cwd(), 'backups')
-        
-        if (!fs.existsSync(backupDir)) {
-          fs.mkdirSync(backupDir, { recursive: true })
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const fs = require('fs')
+      const path = require('path')
+
+      const backupDir = path.join(process.cwd(), 'backups')
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true })
+      }
+
+      // For PostgreSQL, use pg_dump
+      if (process.env.DATABASE_URL?.includes('postgresql://')) {
+        try {
+          const backupFile = path.join(backupDir, `backup-${timestamp}.sql`)
+          execSync(`pg_dump "${process.env.DATABASE_URL}" > "${backupFile}"`, { stdio: 'inherit' })
+          console.log(`📦 PostgreSQL backup created: backup-${timestamp}.sql`)
+        } catch (pgError) {
+          console.warn('⚠️ PostgreSQL backup failed, continuing without backup')
         }
-        
+      }
+
+      // For SQLite, copy the database file
+      if (process.env.DATABASE_URL?.includes('file:')) {
+        const dbPath = process.env.DATABASE_URL.replace('file:', '')
         const backupFile = path.join(backupDir, `backup-${timestamp}.db`)
-        
+
         if (fs.existsSync(dbPath)) {
           fs.copyFileSync(dbPath, backupFile)
-          console.log(`📦 Backup created: backup-${timestamp}.db`)
+          console.log(`📦 SQLite backup created: backup-${timestamp}.db`)
         }
       }
     } catch (error) {

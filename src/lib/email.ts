@@ -128,13 +128,8 @@ export async function sendEmail(options: EmailOptions, retryCount = 0): Promise<
       }
     }
 
-    // Send email with timeout protection
-    const result = await Promise.race([
-      transporter.sendMail(mailOptions),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Email send timeout')), 30000) // 30 second timeout
-      )
-    ])
+    // Send email
+    const result = await transporter.sendMail(mailOptions)
 
     // Close transporter if not using pool
     if (!emailConfig.pool) {

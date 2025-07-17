@@ -205,28 +205,34 @@ class AutoDatabaseUpdater {
   private async createBackup(): Promise<boolean> {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const backupFile = path.join(this.backupDir, `backup-${timestamp}.db`)
-      
+
+      // For PostgreSQL, use pg_dump (if available)
+      if (process.env.DATABASE_URL?.includes('postgresql://')) {
+        try {
+          const backupFile = path.join(this.backupDir, `backup-${timestamp}.sql`)
+          execSync(`pg_dump "${process.env.DATABASE_URL}" > "${backupFile}"`, { stdio: 'inherit' })
+          console.log(`📦 PostgreSQL backup created: backup-${timestamp}.sql`)
+          return true
+        } catch (pgError) {
+          console.warn('⚠️ PostgreSQL backup failed, continuing without backup:', pgError)
+          return false
+        }
+      }
+
       // For SQLite, copy the database file
       if (process.env.DATABASE_URL?.includes('file:')) {
         const dbPath = process.env.DATABASE_URL.replace('file:', '')
+        const backupFile = path.join(this.backupDir, `backup-${timestamp}.db`)
         if (fs.existsSync(dbPath)) {
           fs.copyFileSync(dbPath, backupFile)
-          console.log(`📦 Backup created: ${backupFile}`)
+          console.log(`📦 SQLite backup created: backup-${timestamp}.db`)
           return true
         }
       }
-      
-      // For PostgreSQL, use pg_dump (if available)
-      if (process.env.DATABASE_URL?.includes('postgresql://')) {
-        execSync(`pg_dump "${process.env.DATABASE_URL}" > "${backupFile}.sql"`, { stdio: 'inherit' })
-        console.log(`📦 PostgreSQL backup created: ${backupFile}.sql`)
-        return true
-      }
-      
+
       console.warn('⚠️ Backup not supported for this database type')
       return false
-      
+
     } catch (error) {
       console.error('❌ Backup creation failed:', error)
       return false

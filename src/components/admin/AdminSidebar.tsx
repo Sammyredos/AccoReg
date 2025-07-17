@@ -28,8 +28,7 @@ import {
   MessageSquare,
   Home,
   UserCheck,
-  Heart,
-  Wrench
+  Heart
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -123,13 +122,6 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     icon: Settings,
     badge: null,
     requiredRoles: ['Super Admin', 'Admin'], // Only Super Admin and Admin
-  },
-  {
-    name: 'System Tools',
-    href: '/admin/system-tools',
-    icon: Wrench,
-    badge: null,
-    requiredRoles: ['Super Admin'], // Only Super Admin
   },
 ]
 
