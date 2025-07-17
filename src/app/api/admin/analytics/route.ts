@@ -95,19 +95,34 @@ export async function GET(request: NextRequest) {
         }
       }),
       
-      // All registrations for age calculation
-      prisma.registration.findMany({
-        select: {
-          age: true,
-          dateOfBirth: true
+      // All registrations for age calculation (handle missing age column)
+      (async () => {
+        try {
+          return await prisma.registration.findMany({
+            select: {
+              age: true,
+              dateOfBirth: true
+            }
+          })
+        } catch (error: any) {
+          // If age column doesn't exist, fall back to dateOfBirth only
+          if (error.code === 'P2022' && error.message.includes('age')) {
+            console.log('Age column not found, calculating from dateOfBirth only')
+            return await prisma.registration.findMany({
+              select: {
+                dateOfBirth: true
+              }
+            })
+          }
+          throw error
         }
-      })
+      })()
     ])
 
     // Calculate average age
     let averageAge = 0
     if (allRegistrations.length > 0) {
-      const totalAge = allRegistrations.reduce((sum, reg) => {
+      const totalAge = allRegistrations.reduce((sum, reg: any) => {
         // Use age field if available, otherwise calculate from dateOfBirth
         if (reg.age && reg.age > 0) {
           return sum + reg.age
@@ -123,21 +138,32 @@ export async function GET(request: NextRequest) {
         }
         return sum
       }, 0)
-      averageAge = totalAge / allRegistrations.length
+      averageAge = allRegistrations.length > 0 ? totalAge / allRegistrations.length : 0
     }
 
-    // Get branch statistics
-    const branchStats = await prisma.registration.groupBy({
-      by: ['branch'],
-      _count: {
-        branch: true
-      },
-      orderBy: {
+    // Get branch statistics (handle missing branch column)
+    let branchStats: any[] = []
+    try {
+      branchStats = await prisma.registration.groupBy({
+        by: ['branch'],
         _count: {
-          branch: 'desc'
+          branch: true
+        },
+        orderBy: {
+          _count: {
+            branch: 'desc'
+          }
         }
+      })
+    } catch (error: any) {
+      // If branch column doesn't exist, return empty stats
+      if (error.code === 'P2022' && error.message.includes('branch')) {
+        console.log('Branch column not found, skipping branch statistics')
+        branchStats = []
+      } else {
+        throw error
       }
-    })
+    }
 
     // Get recent registrations (last 7 days) for trend analysis
     const last7Days = new Date()
@@ -205,8 +231,36 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(analytics)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Analytics API error:', error)
+
+    // If it's a missing column error, provide fallback data
+    if (error.code === 'P2022') {
+      console.log('Database schema incomplete, providing fallback analytics')
+      return NextResponse.json({
+        totalRegistrations: 0,
+        registrationsToday: 0,
+        registrationsThisWeek: 0,
+        registrationsThisMonth: 0,
+        verifiedCount: 0,
+        unverifiedCount: 0,
+        maleCount: 0,
+        femaleCount: 0,
+        stats: {
+          averageAge: 0,
+          verificationRate: 0,
+          genderDistribution: {
+            male: 0,
+            female: 0,
+            malePercentage: 0,
+            femalePercentage: 0
+          },
+          branchDistribution: [],
+          dailyTrend: []
+        }
+      })
+    }
+
     return NextResponse.json(
       { error: 'Failed to fetch analytics data' },
       { status: 500 }

@@ -26,7 +26,11 @@ services:
       echo "✅ Database migrations deployed" &&
       echo "� Running production-specific migrations..." &&
       (npx tsx scripts/production-migration.ts && echo "✅ Production migrations completed" || echo "⚠️ Production migrations completed with warnings") &&
-      echo "�👑 Setting up Super Admin account..." &&
+      echo "� Creating children registrations table..." &&
+      (npx tsx scripts/create-children-table.ts && echo "✅ Children table created" || echo "⚠️ Children table creation completed with warnings") &&
+      echo "� Fixing missing age column..." &&
+      (npx tsx scripts/fix-missing-age-column.ts && echo "✅ Age column fixed" || echo "⚠️ Age column fix completed with warnings") &&
+      echo "���👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
       (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&

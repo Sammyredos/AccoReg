@@ -23,12 +23,20 @@ export async function GET(request: NextRequest) {
 
     // If ID is provided, return single registration
     if (id) {
-      const registration = await prisma.childrenRegistration.findUnique({
-        where: { id }
-      })
+      try {
+        const registration = await prisma.childrenRegistration.findUnique({
+          where: { id }
+        })
 
-      if (!registration) {
-        return NextResponse.json({ error: 'Registration not found' }, { status: 404 })
+        if (!registration) {
+          return NextResponse.json({ error: 'Registration not found' }, { status: 404 })
+        }
+      } catch (error: any) {
+        // Handle missing table error
+        if (error.code === 'P2021' && error.message.includes('does not exist')) {
+          return NextResponse.json({ error: 'Children registrations table not found' }, { status: 404 })
+        }
+        throw error
       }
 
       // Calculate age
@@ -74,12 +82,16 @@ export async function GET(request: NextRequest) {
       where.gender = gender
     }
 
-    // Get total count
-    const total = await prisma.childrenRegistration.count({ where })
+    // Get total count with error handling
+    let total = 0
+    let registrations: any[] = []
 
-    // Get registrations
-    const registrations = await prisma.childrenRegistration.findMany({
-      where,
+    try {
+      total = await prisma.childrenRegistration.count({ where })
+
+      // Get registrations
+      registrations = await prisma.childrenRegistration.findMany({
+        where,
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit,
@@ -97,6 +109,22 @@ export async function GET(request: NextRequest) {
         updatedAt: true
       }
     })
+    } catch (error: any) {
+      // Handle missing table error
+      if (error.code === 'P2021' && error.message.includes('does not exist')) {
+        console.log('Children registrations table does not exist, returning empty results')
+        return NextResponse.json({
+          registrations: [],
+          pagination: {
+            page: 1,
+            limit: limit,
+            total: 0,
+            totalPages: 0
+          }
+        })
+      }
+      throw error
+    }
 
     // Calculate age for each registration
     const registrationsWithAge = registrations.map(reg => {

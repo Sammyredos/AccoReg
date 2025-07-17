@@ -56,42 +56,98 @@ async function runProductionMigration() {
       } catch (indexError) {
         console.log('⚠️ Branch index may already exist')
       }
-    }
 
-    // Check if branch field exists in children_registrations table
+    // Check if age field exists in registrations table
+    console.log('\n🔍 Checking age field in registrations table...')
     try {
-      const testChildrenQuery = await prisma.$queryRaw`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'children_registrations' 
-        AND column_name = 'branch'
+      const ageColumn = await prisma.$queryRaw`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'registrations'
+        AND column_name = 'age'
       `
-      
-      if (Array.isArray(testChildrenQuery) && testChildrenQuery.length > 0) {
-        console.log('✅ Branch field already exists in children_registrations table')
+
+      if (Array.isArray(ageColumn) && ageColumn.length > 0) {
+        console.log('✅ Age field already exists in registrations table')
       } else {
-        throw new Error('Branch field not found in children table')
+        throw new Error('Age field not found')
       }
     } catch (error) {
-      console.log('⚠️ Branch field missing in children table, adding now...')
-      
-      // Add branch field to children_registrations table
+      console.log('⚠️ Age field missing, adding now...')
+
+      // Add age field to registrations table
       await prisma.$executeRaw`
-        ALTER TABLE "children_registrations" 
-        ADD COLUMN IF NOT EXISTS "branch" TEXT NOT NULL DEFAULT 'Not Specified'
+        ALTER TABLE "registrations"
+        ADD COLUMN IF NOT EXISTS "age" INTEGER NOT NULL DEFAULT 0
       `
-      console.log('✅ Added branch field to children_registrations table')
-      
-      // Add index for performance
-      try {
-        await prisma.$executeRaw`
-          CREATE INDEX IF NOT EXISTS "children_registrations_branch_idx" 
-          ON "children_registrations"("branch")
+      console.log('✅ Added age field to registrations table')
+
+      // Update existing records with calculated age (PostgreSQL syntax)
+      await prisma.$executeRaw`
+        UPDATE "registrations" SET "age" =
+          CASE
+            WHEN EXTRACT(MONTH FROM CURRENT_DATE) > EXTRACT(MONTH FROM "dateOfBirth")
+                 OR (EXTRACT(MONTH FROM CURRENT_DATE) = EXTRACT(MONTH FROM "dateOfBirth")
+                     AND EXTRACT(DAY FROM CURRENT_DATE) >= EXTRACT(DAY FROM "dateOfBirth"))
+            THEN EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM "dateOfBirth")
+            ELSE EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM "dateOfBirth") - 1
+          END
+        WHERE "age" = 0
+      `
+      console.log('✅ Updated existing records with calculated ages')
+    }
+    }
+
+    // Check if children_registrations table exists
+    try {
+      const childrenTableExists = await prisma.$queryRaw`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'children_registrations'
+      `
+
+      if (Array.isArray(childrenTableExists) && childrenTableExists.length > 0) {
+        console.log('✅ Children registrations table exists')
+
+        // Check if branch field exists
+        const testChildrenQuery = await prisma.$queryRaw`
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_name = 'children_registrations'
+          AND column_name = 'branch'
         `
-        console.log('✅ Added branch index to children_registrations table')
-      } catch (indexError) {
-        console.log('⚠️ Branch index may already exist in children table')
+
+        if (Array.isArray(testChildrenQuery) && testChildrenQuery.length > 0) {
+          console.log('✅ Branch field already exists in children_registrations table')
+        } else {
+          console.log('⚠️ Branch field missing in children table, adding now...')
+
+          // Add branch field to children_registrations table
+          await prisma.$executeRaw`
+            ALTER TABLE "children_registrations"
+            ADD COLUMN IF NOT EXISTS "branch" TEXT NOT NULL DEFAULT 'Not Specified'
+          `
+          console.log('✅ Added branch field to children_registrations table')
+
+          // Add index for performance
+          try {
+            await prisma.$executeRaw`
+              CREATE INDEX IF NOT EXISTS "children_registrations_branch_idx"
+              ON "children_registrations"("branch")
+            `
+            console.log('✅ Added branch index to children_registrations table')
+          } catch (indexError) {
+            console.log('⚠️ Branch index may already exist in children table')
+          }
+        }
+      } else {
+        console.log('⚠️ Children registrations table does not exist')
+        console.log('   This is normal - table will be created when first child registers')
+        console.log('   Or run the create-children-table script to create it now')
       }
+    } catch (error) {
+      console.log('⚠️ Children table check completed with warnings:', error.message)
     }
 
     // Update existing records without branch data
