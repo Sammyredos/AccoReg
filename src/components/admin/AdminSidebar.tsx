@@ -30,7 +30,8 @@ import {
   Mail,
   MessageSquare,
   Home,
-  UserCheck
+  UserCheck,
+  Database
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -116,6 +117,13 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     icon: UserPlus,
     badge: null,
     requiredRoles: ['Super Admin', 'Admin', 'Manager'], // Super Admin, Admin, and Manager
+  },
+  {
+    name: t('nav.backup'),
+    href: '/admin/backup',
+    icon: Database,
+    badge: null,
+    requiredRoles: ['Super Admin', 'Admin'], // Only Super Admin and Admin
   },
   {
     name: t('nav.settings'),

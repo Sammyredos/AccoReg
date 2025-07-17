@@ -130,7 +130,7 @@ const coreTranslations: Record<Language, Record<string, string>> = {
     'nav.reports': 'Reports',
     'nav.notifications': 'Notifications',
     'nav.userManagement': 'User Management',
-
+    'nav.backup': 'Backup Management',
     'nav.settings': 'Settings',
 
     // Dashboard specific
@@ -315,7 +315,7 @@ const coreTranslations: Record<Language, Record<string, string>> = {
     'nav.reports': 'Rapports',
     'nav.notifications': 'Notifications',
     'nav.userManagement': 'Gestion des utilisateurs',
-
+    'nav.backup': 'Gestion des sauvegardes',
     'nav.settings': 'Paramètres',
 
     // Dashboard specific
@@ -402,7 +402,7 @@ const coreTranslations: Record<Language, Record<string, string>> = {
     'nav.reports': 'Informes',
     'nav.notifications': 'Notificaciones',
     'nav.userManagement': 'Gestión de usuarios',
-
+    'nav.backup': 'Gestión de copias de seguridad',
     'nav.settings': 'Configuración',
     'settings.language': 'Idioma',
     'settings.branding': 'Marca del sistema',
@@ -496,7 +496,7 @@ const coreTranslations: Record<Language, Record<string, string>> = {
     'nav.reports': 'Rahotanni',
     'nav.notifications': 'Sanarwa',
     'nav.userManagement': 'Sarrafa masu amfani',
-
+    'nav.backup': 'Sarrafa ajiyar bayanai',
     'nav.settings': 'Saiti',
     'settings.language': 'Harshe',
     'settings.branding': 'Alamar tsarin',
@@ -555,7 +555,7 @@ const coreTranslations: Record<Language, Record<string, string>> = {
     'nav.reports': 'Akụkọ',
     'nav.notifications': 'Ọkwa',
     'nav.userManagement': 'Njikwa ndị ọrụ',
-
+    'nav.backup': 'Njikwa nchekwa data',
     'nav.settings': 'Ntọala',
     'settings.language': 'Asụsụ',
     'settings.branding': 'Akara sistemu',
@@ -614,7 +614,7 @@ const coreTranslations: Record<Language, Record<string, string>> = {
     'nav.reports': 'Awọn ijabọ',
     'nav.notifications': 'Awọn iwifun',
     'nav.userManagement': 'Iṣakoso awọn olumulo',
-
+    'nav.backup': 'Iṣakoso ifipamọ data',
     'nav.settings': 'Eto',
     'settings.language': 'Ede',
     'settings.branding': 'Ami eto',
