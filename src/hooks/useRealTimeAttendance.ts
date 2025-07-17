@@ -191,11 +191,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       }
 
       eventSource.onerror = (error) => {
-        // Only log errors in development
-        if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Real-time attendance connection error:', error)
-          console.log(`🔍 EventSource readyState: ${eventSource.readyState} (0=CONNECTING, 1=OPEN, 2=CLOSED)`)
-        }
+        console.error('❌ Real-time attendance connection error:', error)
 
         // Check the readyState to determine the type of error
         const readyState = eventSource.readyState
@@ -206,6 +202,8 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
         } else if (readyState === EventSource.CLOSED) {
           errorMessage = 'Connection closed by server'
         }
+
+        console.log(`🔍 EventSource readyState: ${readyState} (0=CONNECTING, 1=OPEN, 2=CLOSED)`)
 
         setIsConnected(false)
         setConnectionError(errorMessage)

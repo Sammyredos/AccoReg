@@ -36,13 +36,7 @@
     "db:studio:dev": "prisma studio --schema=prisma/schema.dev.prisma",
     "clean": "rimraf .next tsconfig.tsbuildinfo",
     "clean:cache": "rimraf .next/cache",
-    "fresh": "npm run clean && npm run dev",
-    "build:production": "NODE_ENV=production npm run build",
-    "start:production": "NODE_ENV=production npm start",
-    "deploy:check": "npm run type-check && npm run lint && npm run build:production",
-    "test:production": "tsx scripts/production-health-check.ts",
-    "deploy:prepare": "bash scripts/production-deploy.sh",
-    "postbuild": "npm run db:generate"
+    "fresh": "npm run clean && npm run dev"
   },
   "dependencies": {
     "@prisma/client": "^6.11.0",

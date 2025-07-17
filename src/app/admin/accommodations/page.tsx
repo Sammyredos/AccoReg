@@ -419,11 +419,11 @@ function AccommodationsPageContent() {
     // Add email results if available
     if (result.emailResults) {
       // Handle both old structure (direct properties) and new structure (summary object)
-      const emailData = (result.emailResults as Record<string, unknown>).summary || result.emailResults
-      const emailsSent = Number((emailData as Record<string, unknown>).successful || (emailData as Record<string, unknown>).emailsSent || 0)
-      const emailsFailed = Number((emailData as Record<string, unknown>).failed || (emailData as Record<string, unknown>).emailsFailed || 0)
-      const totalEmails = Number((emailData as Record<string, unknown>).total || (emailData as Record<string, unknown>).totalEmails || 0)
-      const status = (emailData as Record<string, unknown>).status
+      const emailData = (result.emailResults as any).summary || result.emailResults
+      const emailsSent = (emailData as any).successful || (emailData as any).emailsSent || 0
+      const emailsFailed = (emailData as any).failed || (emailData as any).emailsFailed || 0
+      const totalEmails = (emailData as any).total || (emailData as any).totalEmails || 0
+      const status = (emailData as any).status
 
       if (totalEmails > 0) {
         if (status === 'sending') {

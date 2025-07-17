@@ -5,6 +5,7 @@ import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { StatsCard, StatsGrid } from '@/components/ui/stats-card'
 import { UserCard } from '@/components/ui/user-card'
 import { useToast } from '@/contexts/ToastContext'
@@ -17,8 +18,11 @@ import {
   Calendar,
   Phone,
   Mail,
-
+  MapPin,
+  Shield,
+  AlertCircle,
   Trash2,
+  Eye,
   Download,
   RefreshCw,
   Loader2,
@@ -54,7 +58,7 @@ interface PaginationInfo {
 }
 
 export default function ChildrenRegistrationsPage() {
-  // Removed unused translation hook for production
+  const { t } = useTranslation()
   const { success, error } = useToast()
   const [registrations, setRegistrations] = useState<ChildrenRegistration[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -309,7 +313,16 @@ export default function ChildrenRegistrationsPage() {
     return new Date(dateString).toLocaleDateString()
   }
 
-  // Removed unused calculateAge function for production
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date()
+    const birthDate = new Date(dateOfBirth)
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
 
   // Calculate stats
   const stats = {

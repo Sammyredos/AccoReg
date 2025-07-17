@@ -65,10 +65,9 @@ const validateStep1 = (data: Partial<FormData>, minimumAge: number = 13, skipAge
     errors.push({ field: 'address', message: 'Address is required' })
   }
 
-  // Branch validation - make it optional for backward compatibility initially
-  // TODO: Make this required after migration is confirmed in production
-  if (data.branch && data.branch.trim() === '') {
-    errors.push({ field: 'branch', message: 'Please select a valid branch' })
+  // Branch validation - required field
+  if (!data.branch?.trim()) {
+    errors.push({ field: 'branch', message: 'Please select a branch' })
   }
 
   if (!data.phoneNumber?.trim()) {
