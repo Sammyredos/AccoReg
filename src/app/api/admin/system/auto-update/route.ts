@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // Get current user with role
     const currentUser = await prisma.admin.findUnique({
-      where: { id: payload.userId },
+      where: { id: payload.adminId },
       include: { role: true }
     })
 
