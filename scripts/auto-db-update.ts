@@ -206,7 +206,7 @@ class AutoDatabaseUpdater {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
 
-      // For PostgreSQL, use pg_dump (if available)
+      // For PostgreSQL (production), use pg_dump if available
       if (process.env.DATABASE_URL?.includes('postgresql://')) {
         try {
           const backupFile = path.join(this.backupDir, `backup-${timestamp}.sql`)
@@ -214,12 +214,12 @@ class AutoDatabaseUpdater {
           console.log(`📦 PostgreSQL backup created: backup-${timestamp}.sql`)
           return true
         } catch (pgError) {
-          console.warn('⚠️ PostgreSQL backup failed, continuing without backup:', pgError)
+          console.warn('⚠️ pg_dump not available, skipping backup')
           return false
         }
       }
 
-      // For SQLite, copy the database file
+      // For SQLite (development), copy the database file
       if (process.env.DATABASE_URL?.includes('file:')) {
         const dbPath = process.env.DATABASE_URL.replace('file:', '')
         const backupFile = path.join(this.backupDir, `backup-${timestamp}.db`)
@@ -277,29 +277,46 @@ class AutoDatabaseUpdater {
   private async rollbackDatabase(): Promise<boolean> {
     try {
       // Find the most recent backup
-      const backups = fs.readdirSync(this.backupDir)
+      const sqlBackups = fs.readdirSync(this.backupDir)
+        .filter(file => file.startsWith('backup-') && file.endsWith('.sql'))
+        .sort()
+        .reverse()
+
+      const dbBackups = fs.readdirSync(this.backupDir)
         .filter(file => file.startsWith('backup-') && file.endsWith('.db'))
         .sort()
         .reverse()
-      
-      if (backups.length === 0) {
-        console.error('❌ No backups available for rollback')
-        return false
+
+      // For PostgreSQL (production)
+      if (process.env.DATABASE_URL?.includes('postgresql://') && sqlBackups.length > 0) {
+        try {
+          const latestBackup = path.join(this.backupDir, sqlBackups[0])
+          console.log(`🔄 Attempting PostgreSQL rollback from: ${sqlBackups[0]}`)
+
+          // Drop and recreate database, then restore
+          execSync(`psql "${process.env.DATABASE_URL}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`, { stdio: 'inherit' })
+          execSync(`psql "${process.env.DATABASE_URL}" < "${latestBackup}"`, { stdio: 'inherit' })
+
+          console.log(`✅ PostgreSQL database rolled back successfully`)
+          return true
+        } catch (pgError) {
+          console.error('❌ PostgreSQL rollback failed:', pgError)
+          return false
+        }
       }
-      
-      const latestBackup = path.join(this.backupDir, backups[0])
-      
-      // Restore from backup (SQLite)
-      if (process.env.DATABASE_URL?.includes('file:')) {
+
+      // For SQLite (development)
+      if (process.env.DATABASE_URL?.includes('file:') && dbBackups.length > 0) {
+        const latestBackup = path.join(this.backupDir, dbBackups[0])
         const dbPath = process.env.DATABASE_URL.replace('file:', '')
         fs.copyFileSync(latestBackup, dbPath)
-        console.log(`🔄 Database rolled back from: ${latestBackup}`)
+        console.log(`🔄 SQLite database rolled back from: ${dbBackups[0]}`)
         return true
       }
-      
-      console.warn('⚠️ Rollback not implemented for this database type')
+
+      console.error('❌ No suitable backups available for rollback')
       return false
-      
+
     } catch (error) {
       console.error('❌ Rollback failed:', error)
       return false

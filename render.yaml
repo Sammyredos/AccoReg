@@ -34,11 +34,11 @@ services:
       (npx tsx scripts/update-branding.ts && echo "✅ Branding updated successfully" || echo "⚠️ Branding update skipped") &&
       echo "👥 Setting up roles and permissions..." &&
       (npx tsx scripts/create-staff-role.ts && echo "✅ Roles and permissions configured" || echo "⚠️ Role setup skipped") &&
-      echo "🏗️ Building Next.js application with production optimizations..." &&
+      echo "🏗️ Building Next.js application with PostgreSQL production optimizations..." &&
       NODE_ENV=production npm run build &&
       echo "🧹 Cleaning up development dependencies..." &&
       npm prune --production &&
-      echo "🎉 Mopgomyouth production build completed successfully!" &&
+      echo "🎉 PostgreSQL Production build completed successfully!" &&
       echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
       echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!" &&
       echo "📊 Build size analysis:" &&
@@ -172,6 +172,20 @@ services:
       - key: BACKUP_BEFORE_UPDATE
         value: "true"
 
+      # PostgreSQL Production Settings
+      - key: DATABASE_URL
+        fromDatabase:
+          name: youth-registration-database
+          property: connectionString
+      - key: POSTGRES_PRISMA_URL
+        fromDatabase:
+          name: youth-registration-database
+          property: connectionString
+      - key: POSTGRES_URL_NON_POOLING
+        fromDatabase:
+          name: youth-registration-database
+          property: connectionString
+
       # QR Code & Attendance Features
       - key: QR_AUTO_CLOSE_ENABLED
         value: "true"
@@ -192,8 +206,7 @@ services:
 
 databases:
   - name: youth-registration-database
-    plan: starter
+    plan: free
     databaseName: youth_registration
     user: youth_user
     region: oregon
-    postgresMajorVersion: 15

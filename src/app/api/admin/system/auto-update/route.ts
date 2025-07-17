@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // Get current user with role
     const currentUser = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
+      where: { id: payload.userId },
       include: { role: true }
     })
 
@@ -247,49 +247,55 @@ async function performHealthCheck() {
 async function backupDatabase() {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    
-    // For SQLite databases
-    if (process.env.DATABASE_URL?.includes('file:')) {
-      const fs = require('fs')
-      const path = require('path')
-      
-      const dbPath = process.env.DATABASE_URL.replace('file:', '')
-      const backupDir = path.join(process.cwd(), 'backups')
-      
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true })
-      }
-      
-      const backupFile = path.join(backupDir, `backup-${timestamp}.db`)
-      
-      if (fs.existsSync(dbPath)) {
-        fs.copyFileSync(dbPath, backupFile)
-        
+    const fs = require('fs')
+    const path = require('path')
+
+    const backupDir = path.join(process.cwd(), 'backups')
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true })
+    }
+
+    // For PostgreSQL databases (production)
+    if (process.env.DATABASE_URL?.includes('postgresql://')) {
+      try {
+        const backupFile = path.join(backupDir, `backup-${timestamp}.sql`)
+        execSync(`pg_dump "${process.env.DATABASE_URL}" > "${backupFile}"`, { stdio: 'inherit' })
+
         return NextResponse.json({
           success: true,
-          message: 'Database backup created successfully',
+          message: 'PostgreSQL backup created successfully',
+          backupFile: `backup-${timestamp}.sql`
+        })
+      } catch (pgError) {
+        return NextResponse.json({
+          success: false,
+          message: 'PostgreSQL backup failed - pg_dump not available',
+          error: pgError instanceof Error ? pgError.message : 'Unknown error'
+        }, { status: 500 })
+      }
+    }
+
+    // For SQLite databases (development)
+    if (process.env.DATABASE_URL?.includes('file:')) {
+      const dbPath = process.env.DATABASE_URL.replace('file:', '')
+      const backupFile = path.join(backupDir, `backup-${timestamp}.db`)
+
+      if (fs.existsSync(dbPath)) {
+        fs.copyFileSync(dbPath, backupFile)
+
+        return NextResponse.json({
+          success: true,
+          message: 'SQLite backup created successfully',
           backupFile: `backup-${timestamp}.db`
         })
       } else {
         return NextResponse.json({
           success: false,
-          message: 'Database file not found'
+          message: 'SQLite database file not found'
         }, { status: 404 })
       }
     }
-    
-    // For PostgreSQL databases
-    if (process.env.DATABASE_URL?.includes('postgresql://')) {
-      const backupFile = `backup-${timestamp}.sql`
-      execSync(`pg_dump "${process.env.DATABASE_URL}" > "backups/${backupFile}"`, { stdio: 'inherit' })
-      
-      return NextResponse.json({
-        success: true,
-        message: 'PostgreSQL backup created successfully',
-        backupFile
-      })
-    }
-    
+
     return NextResponse.json({
       success: false,
       message: 'Backup not supported for this database type'
