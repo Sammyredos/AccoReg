@@ -38,6 +38,8 @@
     "manual:fix-production": "npx tsx scripts/manual-production-fix.ts",
     "setup:production": "npx tsx scripts/simple-production-setup.ts",
     "quick:db-fix": "npx tsx scripts/quick-db-fix.ts",
+    "diagnose:register": "npx tsx scripts/diagnose-register-endpoint.ts",
+    "fix:register": "npx tsx scripts/comprehensive-register-fix.ts",
     "db:generate": "prisma generate",
     "db:generate:dev": "prisma generate --schema=prisma/schema.dev.prisma",
     "db:push": "prisma db push",
