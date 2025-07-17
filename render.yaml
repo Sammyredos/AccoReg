@@ -16,6 +16,8 @@ services:
       echo "✅ Dependencies installed successfully" &&
       echo "🧹 Cleaning previous build artifacts..." &&
       rm -rf .next || true &&
+      echo "🔧 Fixing Prisma client configuration..." &&
+      (npx tsx scripts/fix-prisma-client.ts && echo "✅ Prisma client fixed" || echo "⚠️ Prisma client fix completed with warnings") &&
       echo "🔧 Generating optimized Prisma client..." &&
       npx prisma generate &&
       echo "✅ Prisma client generated" &&

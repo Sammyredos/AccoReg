@@ -29,6 +29,8 @@
     "verify:deployment": "npx tsx scripts/verify-deployment.ts",
     "migrate:production": "npx tsx scripts/production-migration.ts",
     "fix:production-forms": "npx tsx scripts/fix-production-forms.ts",
+    "fix:prisma-client": "npx tsx scripts/fix-prisma-client.ts",
+    "check:production-env": "npx tsx scripts/production-environment-check.ts",
     "db:generate": "prisma generate",
     "db:generate:dev": "prisma generate --schema=prisma/schema.dev.prisma",
     "db:push": "prisma db push",
