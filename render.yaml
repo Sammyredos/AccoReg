@@ -13,9 +13,11 @@ services:
       npm ci &&
       echo "🔧 Generating Prisma client..." &&
       npx prisma generate &&
-      echo "🗄️ Setting up database..." &&
-      npx tsx scripts/simple-production-setup.ts &&
-      echo "✅ Database setup completed" &&
+      echo "� Running registration diagnostics..." &&
+      npx tsx scripts/diagnose-register-endpoint.ts &&
+      echo "🔧 Running comprehensive registration fix..." &&
+      npx tsx scripts/comprehensive-register-fix.ts &&
+      echo "✅ Database fixes completed" &&
       echo "� Running production-specific migrations..." &&
       (npx tsx scripts/production-migration.ts && echo "✅ Production migrations completed" || echo "⚠️ Production migrations completed with warnings") &&
       echo "� Creating children registrations table..." &&

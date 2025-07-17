@@ -169,12 +169,11 @@ async function comprehensiveRegisterFix() {
 
         if (columnExists.length === 0) {
           console.log(`➕ Adding missing column: ${column.name} (${column.description})`)
-          
-          await prisma.$executeRaw`
-            ALTER TABLE "registrations" 
-            ADD COLUMN ${column.name} ${column.type} DEFAULT ${column.default}
-          ` as any
-          
+
+          // Build the SQL dynamically to avoid template literal issues
+          const sql = `ALTER TABLE "registrations" ADD COLUMN "${column.name}" ${column.type} DEFAULT ${column.default}`
+          await prisma.$executeRawUnsafe(sql)
+
           console.log(`✅ Added column: ${column.name}`)
         } else {
           console.log(`✅ Column exists: ${column.name}`)
