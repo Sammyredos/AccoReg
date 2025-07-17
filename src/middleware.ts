@@ -1,18 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyTokenEdge, getTokenFromRequest } from '@/lib/auth-edge'
-import { initializeDatabase } from '@/lib/db-init'
 
 export async function middleware(request: NextRequest) {
-  // Initialize database on first request in production
-  if (process.env.NODE_ENV === 'production') {
-    try {
-      await initializeDatabase()
-    } catch (error) {
-      console.error('Database initialization error in middleware:', error)
-    }
-  }
-
   const { pathname } = request.nextUrl
 
   // Skip middleware for API routes

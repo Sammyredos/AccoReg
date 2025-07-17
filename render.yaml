@@ -21,7 +21,9 @@ services:
       echo "✅ Prisma client generated" &&
       echo "🗄️ Running production health check..." &&
       (npx tsx scripts/production-health-check.ts && echo "✅ Production health check passed" || echo "⚠️ Health check completed with warnings") &&
-      echo "🗄️ Deploying database migrations..." &&
+      echo "🗄️ Checking database schema and applying updates..." &&
+      (npx tsx scripts/auto-db-update.ts && echo "✅ Database schema updated automatically") &&
+      echo "🗄️ Deploying any pending migrations..." &&
       npx prisma migrate deploy &&
       echo "✅ Database migrations deployed" &&
       echo "👑 Setting up Super Admin account..." &&
@@ -159,6 +161,16 @@ services:
         value: "60000"
       - key: MAX_SSE_CONNECTIONS
         value: "100"
+
+      # Auto-Update Features
+      - key: AUTO_DB_UPDATE_ENABLED
+        value: "true"
+      - key: DB_UPDATE_CHECK_INTERVAL
+        value: "3600000"
+      - key: AUTO_SCHEMA_SYNC
+        value: "true"
+      - key: BACKUP_BEFORE_UPDATE
+        value: "true"
 
       # QR Code & Attendance Features
       - key: QR_AUTO_CLOSE_ENABLED
