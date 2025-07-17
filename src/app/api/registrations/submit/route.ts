@@ -63,32 +63,14 @@ export async function POST(request: NextRequest) {
       age--
     }
 
-    // Debug the branch value
-    console.log('🔍 Registration API Debug:', {
+    // Ensure branch is properly set (not empty or just whitespace)
+    const branchValue = data.branch?.trim() || 'Not Specified'
+
+    console.log('Registration data:', {
       fullName: data.fullName,
-      originalBranch: data.branch,
-      branchAfterTrim: data.branch?.trim(),
-      branchLength: data.branch?.length,
-      branchType: typeof data.branch
+      branch: data.branch,
+      branchValue: branchValue
     })
-
-    // Validate that branch is not empty (the required field validation should catch this)
-    if (!data.branch || data.branch.trim() === '') {
-      console.log('❌ Branch validation failed - empty branch provided')
-      return NextResponse.json(
-        {
-          error: 'Church branch is required',
-          field: 'branch',
-          message: 'Please select a church branch'
-        },
-        { status: 400 }
-      )
-    }
-
-    // Use the actual branch value (don't default to "Not Specified")
-    const branchValue = data.branch.trim()
-
-    console.log('✅ Using branch value:', branchValue)
 
     // Create registration
     const registration = await prisma.registration.create({

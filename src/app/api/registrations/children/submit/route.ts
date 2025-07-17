@@ -124,31 +124,8 @@ export async function POST(request: NextRequest) {
     // Create the children registration (handle missing table)
     let registration
     try {
-      // Debug and validate branch value
-      console.log('🔍 Children Registration API Debug:', {
-        fullName: data.fullName,
-        originalBranch: data.branch,
-        branchAfterTrim: data.branch?.trim(),
-        branchLength: data.branch?.length,
-        branchType: typeof data.branch
-      })
-
-      // Validate that branch is not empty
-      if (!data.branch || data.branch.trim() === '') {
-        console.log('❌ Children branch validation failed - empty branch provided')
-        return NextResponse.json(
-          {
-            error: 'Church branch is required',
-            field: 'branch',
-            message: 'Please select a church branch'
-          },
-          { status: 400 }
-        )
-      }
-
-      // Use the actual branch value
-      const branchValue = data.branch.trim()
-      console.log('✅ Using children branch value:', branchValue)
+      // Ensure branch is properly set
+      const branchValue = data.branch?.trim() || 'Not Specified'
 
       registration = await prisma.childrenRegistration.create({
         data: {

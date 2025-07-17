@@ -13,9 +13,7 @@ services:
       npm ci &&
       echo "🔧 Generating Prisma client..." &&
       npx prisma generate &&
-      echo "🗄️ Handling database migrations..." &&
-      (npx prisma migrate deploy || (echo "⚠️ Migration failed, marking migrations as applied..." && npx prisma migrate resolve --applied "20250716000001_init" && npx prisma migrate resolve --applied "20250716000002_add_age_field" && npx prisma migrate resolve --applied "20250717000001_add_branch_field" && npx prisma migrate resolve --applied "20250717000002_postgresql_final_setup" && echo "✅ Migrations marked as applied")) &&
-      echo "✅ Database ready" &&
+      echo "✅ Database client ready" &&
       echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
@@ -43,6 +41,10 @@ services:
       echo "🌟 Starting Mopgomyouth Youth Registration System..." &&
       echo "🔧 Environment: Production" &&
       echo "🗄️ Database: PostgreSQL" &&
+      echo "👑 Setting up Super Admin account..." &&
+      (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin ready" || echo "⚠️ Admin setup skipped") &&
+      echo "⚙️ Seeding system settings..." &&
+      (npx tsx scripts/seed-settings.ts && echo "✅ Settings ready" || echo "⚠️ Settings setup skipped") &&
       echo "🌐 Starting server..." &&
       npm start
     envVars:
