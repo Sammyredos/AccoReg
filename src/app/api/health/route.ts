@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { getEnvironmentInfo, validateEnvironment } from '@/lib/environment'
 
 interface HealthCheck {
   status: 'healthy' | 'unhealthy' | 'degraded'

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { PrismaClient } from '@prisma/client'
 import { verifyToken } from '@/lib/auth'
+
+const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,227 +18,200 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Get current user
-    const userType = payload.type || 'admin'
-    let currentUser
-
-    if (userType === 'admin') {
-      currentUser = await prisma.admin.findUnique({
-        where: { id: payload.adminId },
-        include: { role: true }
-      })
-    } else {
-      currentUser = await prisma.user.findUnique({
-        where: { id: payload.adminId },
-        include: { role: true }
-      })
-    }
-
-    if (!currentUser || !currentUser.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
-
-    // Check permissions - Allow Staff to view analytics
-    const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff']
-    if (!allowedRoles.includes(currentUser.role?.name || '')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-
-    // Get analytics data
+    // Get current date boundaries
     const now = new Date()
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startOfWeek = new Date(startOfToday)
+    startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay()) // Start of week (Sunday)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    // Total registrations
-    const totalRegistrations = await prisma.registration.count()
-
-    // Registrations today
-    const registrationsToday = await prisma.registration.count({
-      where: {
-        createdAt: {
-          gte: today
-        }
-      }
-    })
-
-    // Registrations this week
-    const registrationsThisWeek = await prisma.registration.count({
-      where: {
-        createdAt: {
-          gte: sevenDaysAgo
-        }
-      }
-    })
-
-    // Registrations this month
-    const registrationsThisMonth = await prisma.registration.count({
-      where: {
-        createdAt: {
-          gte: thirtyDaysAgo
-        }
-      }
-    })
-
-    // Age demographics
-    const allRegistrations = await prisma.registration.findMany({
-      select: {
-        dateOfBirth: true,
-        gender: true,
-        createdAt: true
-      }
-    })
-
-    // Calculate age groups
-    const ageGroups = {
-      '10-12': 0,
-      '13-15': 0,
-      '16-18': 0,
-      '19+': 0
-    }
-
-    const genderDistribution = {
-      male: 0,
-      female: 0
-    }
-
-    allRegistrations.forEach(reg => {
-      const age = calculateAge(reg.dateOfBirth)
-
-      // Age groups
-      if (age >= 10 && age <= 12) ageGroups['10-12']++
-      else if (age >= 13 && age <= 15) ageGroups['13-15']++
-      else if (age >= 16 && age <= 18) ageGroups['16-18']++
-      else if (age >= 19) ageGroups['19+']++
-
-      // Gender distribution
-      const gender = reg.gender.toLowerCase()
-      if (gender === 'male') genderDistribution.male++
-      else if (gender === 'female') genderDistribution.female++
-      // Only Male and Female are supported
-    })
-
-    // Daily registrations for the last 30 days
-    const dailyRegistrations: Array<{ date: string; count: number }> = []
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-      const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
-
-      const count = await prisma.registration.count({
+    // Get registration statistics
+    const [
+      totalRegistrations,
+      registrationsToday,
+      registrationsThisWeek,
+      registrationsThisMonth,
+      verifiedCount,
+      unverifiedCount,
+      maleCount,
+      femaleCount,
+      allRegistrations
+    ] = await Promise.all([
+      // Total registrations
+      prisma.registration.count(),
+      
+      // Registrations today
+      prisma.registration.count({
         where: {
           createdAt: {
-            gte: startOfDay,
-            lt: endOfDay
+            gte: startOfToday
           }
         }
+      }),
+      
+      // Registrations this week
+      prisma.registration.count({
+        where: {
+          createdAt: {
+            gte: startOfWeek
+          }
+        }
+      }),
+      
+      // Registrations this month
+      prisma.registration.count({
+        where: {
+          createdAt: {
+            gte: startOfMonth
+          }
+        }
+      }),
+      
+      // Verified count
+      prisma.registration.count({
+        where: {
+          isVerified: true
+        }
+      }),
+      
+      // Unverified count
+      prisma.registration.count({
+        where: {
+          isVerified: false
+        }
+      }),
+      
+      // Male count
+      prisma.registration.count({
+        where: {
+          gender: 'Male'
+        }
+      }),
+      
+      // Female count
+      prisma.registration.count({
+        where: {
+          gender: 'Female'
+        }
+      }),
+      
+      // All registrations for age calculation
+      prisma.registration.findMany({
+        select: {
+          age: true,
+          dateOfBirth: true
+        }
       })
+    ])
 
-      dailyRegistrations.push({
+    // Calculate average age
+    let averageAge = 0
+    if (allRegistrations.length > 0) {
+      const totalAge = allRegistrations.reduce((sum, reg) => {
+        // Use age field if available, otherwise calculate from dateOfBirth
+        if (reg.age && reg.age > 0) {
+          return sum + reg.age
+        } else if (reg.dateOfBirth) {
+          const birthDate = new Date(reg.dateOfBirth)
+          const today = new Date()
+          let age = today.getFullYear() - birthDate.getFullYear()
+          const monthDiff = today.getMonth() - birthDate.getMonth()
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--
+          }
+          return sum + age
+        }
+        return sum
+      }, 0)
+      averageAge = totalAge / allRegistrations.length
+    }
+
+    // Get branch statistics
+    const branchStats = await prisma.registration.groupBy({
+      by: ['branch'],
+      _count: {
+        branch: true
+      },
+      orderBy: {
+        _count: {
+          branch: 'desc'
+        }
+      }
+    })
+
+    // Get recent registrations (last 7 days) for trend analysis
+    const last7Days = new Date()
+    last7Days.setDate(last7Days.getDate() - 7)
+    
+    const recentRegistrations = await prisma.registration.findMany({
+      where: {
+        createdAt: {
+          gte: last7Days
+        }
+      },
+      select: {
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    })
+
+    // Group recent registrations by day
+    const dailyStats = []
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      const endOfDay = new Date(startOfDay)
+      endOfDay.setDate(endOfDay.getDate() + 1)
+      
+      const count = recentRegistrations.filter(reg => 
+        reg.createdAt >= startOfDay && reg.createdAt < endOfDay
+      ).length
+      
+      dailyStats.push({
         date: startOfDay.toISOString().split('T')[0],
         count
       })
     }
 
-    // Average age
-    const averageAge = allRegistrations.length > 0
-      ? allRegistrations.reduce((sum, reg) => sum + calculateAge(reg.dateOfBirth), 0) / allRegistrations.length
-      : 0
-
-    // Calculate growth rate (compare this month vs last month)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-
-    const lastMonthCount = await prisma.registration.count({
-      where: {
-        createdAt: {
-          gte: lastMonthStart,
-          lt: thisMonthStart
-        }
-      }
-    })
-
-    const thisMonthCount = await prisma.registration.count({
-      where: {
-        createdAt: {
-          gte: thisMonthStart
-        }
-      }
-    })
-
-    const growthRate = lastMonthCount > 0
-      ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100)
-      : thisMonthCount > 0 ? 100 : 0 // If no last month data but current month has data, show 100% growth
-
-    // Find peak month
-    const monthCounts = await prisma.registration.groupBy({
-      by: ['createdAt'],
-      _count: {
-        id: true
-      }
-    })
-
-    const monthlyData: Record<string, number> = {}
-    monthCounts.forEach(item => {
-      const month = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short' })
-      monthlyData[month] = (monthlyData[month] || 0) + item._count.id
-    })
-
-    const peakMonth = Object.keys(monthlyData).reduce((a, b) =>
-      monthlyData[a] > monthlyData[b] ? a : b, Object.keys(monthlyData)[0] || 'N/A'
-    )
-
-    // Calculate completion rate based on registrations with parental permission
-    const completedRegistrations = await prisma.registration.count({
-      where: {
-        parentalPermissionGranted: true
-      }
-    })
-
-    const completionRate = totalRegistrations > 0
-      ? Math.round((completedRegistrations / totalRegistrations) * 100)
-      : 0
-
-    return NextResponse.json({
+    const analytics = {
       totalRegistrations,
       registrationsToday,
       registrationsThisWeek,
       registrationsThisMonth,
-      demographics: {
-        ageGroups,
-        genderDistribution
-      },
-      trends: {
-        daily: dailyRegistrations,
-        monthly: Object.entries(monthlyData).map(([month, count]) => ({ month, count }))
-      },
+      verifiedCount,
+      unverifiedCount,
+      maleCount,
+      femaleCount,
       stats: {
-        averageAge,
-        growthRate,
-        peakMonth,
-        completionRate,
-        completedRegistrations
+        averageAge: Math.round(averageAge * 10) / 10, // Round to 1 decimal place
+        verificationRate: totalRegistrations > 0 ? Math.round((verifiedCount / totalRegistrations) * 100) : 0,
+        genderDistribution: {
+          male: maleCount,
+          female: femaleCount,
+          malePercentage: totalRegistrations > 0 ? Math.round((maleCount / totalRegistrations) * 100) : 0,
+          femalePercentage: totalRegistrations > 0 ? Math.round((femaleCount / totalRegistrations) * 100) : 0
+        },
+        branchDistribution: branchStats.map(branch => ({
+          branch: branch.branch || 'Not Specified',
+          count: branch._count.branch,
+          percentage: totalRegistrations > 0 ? Math.round((branch._count.branch / totalRegistrations) * 100) : 0
+        })),
+        dailyTrend: dailyStats
       }
-    })
+    }
+
+    return NextResponse.json(analytics)
 
   } catch (error) {
-    console.error('Analytics error:', error)
+    console.error('Analytics API error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch analytics data' },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
-}
-
-function calculateAge(dateOfBirth: Date): number {
-  const today = new Date()
-  const birthDate = new Date(dateOfBirth)
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--
-  }
-
-  return age
 }

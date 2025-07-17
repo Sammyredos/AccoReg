@@ -1,44 +1,200 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { defaultBackup } from '@/lib/backup'
 import { createLogger } from '@/lib/logger'
-import { promises as fs } from 'fs'
-import path from 'path'
 
-// Ensure Node.js globals are available
-declare const process: any
-declare const Buffer: any
+const logger = createLogger('BackupImport')
 
-const logger = createLogger('BackupImportAPI')
+// Helper function to safely import data with conflict resolution
+async function importWithConflictResolution<T extends { id: string }>(
+  tx: any,
+  tableName: string,
+  data: T[],
+  createFn: (item: Omit<T, 'id'>) => Promise<any>,
+  updateFn?: (id: string, item: Partial<T>) => Promise<any>
+) {
+  const stats = { imported: 0, skipped: 0, errors: 0 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  for (const item of data) {
+    try {
+      // Check if record exists
+      const existing = await (tx as any)[tableName].findUnique({
+        where: { id: item.id }
+      })
+
+      if (existing) {
+        if (updateFn) {
+          await updateFn(item.id, item)
+          stats.imported++
+        } else {
+          stats.skipped++
+        }
+      } else {
+        await createFn(item)
+        stats.imported++
+      }
+    } catch (error) {
+      logger.error(`Failed to import ${tableName} record`, { id: item.id, error })
+      stats.errors++
+    }
+  }
+
+  return stats
 }
 
-function validateBackupFile(filename: string, size: number): { valid: boolean; error?: string } {
-  // Check file extension
-  if (!filename.endsWith('.sql') && !filename.endsWith('.sql.gz')) {
-    return { valid: false, error: 'Invalid file type. Only .sql and .sql.gz files are allowed.' }
-  }
+// Import roles
+async function importRoles(tx: any, roles: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'role',
+    roles,
+    async (role) => {
+      const { id, ...roleData } = role
+      return tx.role.create({
+        data: { id, ...roleData }
+      })
+    },
+    async (id, role) => {
+      const { id: _, ...roleData } = role
+      return tx.role.update({
+        where: { id },
+        data: roleData
+      })
+    }
+  )
+}
 
-  // Check file size (max 500MB)
-  const maxSize = 500 * 1024 * 1024 // 500MB
-  if (size > maxSize) {
-    return { valid: false, error: `File too large. Maximum size is ${formatFileSize(maxSize)}.` }
-  }
+// Import admins
+async function importAdmins(tx: any, admins: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'admin',
+    admins,
+    async (admin) => {
+      const { id, role, ...adminData } = admin
+      return tx.admin.create({
+        data: {
+          id,
+          ...adminData,
+          roleId: role?.id || adminData.roleId
+        }
+      })
+    }
+  )
+}
 
-  // Check filename format (should be backup-* or allow custom names)
-  const validPattern = /^[a-zA-Z0-9_-]+\.(sql|sql\.gz)$/
-  if (!validPattern.test(filename)) {
-    return { valid: false, error: 'Invalid filename format. Use only letters, numbers, hyphens, and underscores.' }
-  }
+// Import settings
+async function importSettings(tx: any, settings: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'setting',
+    settings,
+    async (setting) => {
+      const { id, ...settingData } = setting
+      return tx.setting.create({
+        data: { id, ...settingData }
+      })
+    },
+    async (id, setting) => {
+      const { id: _, ...settingData } = setting
+      return tx.setting.update({
+        where: { id },
+        data: settingData
+      })
+    }
+  )
+}
 
-  return { valid: true }
+// Import registrations
+async function importRegistrations(tx: any, registrations: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'registration',
+    registrations,
+    async (registration) => {
+      const { id, roomAllocation, ...regData } = registration
+      return tx.registration.create({
+        data: { id, ...regData }
+      })
+    }
+  )
+}
+
+// Import children registrations
+async function importChildrenRegistrations(tx: any, childrenRegistrations: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'childrenRegistration',
+    childrenRegistrations,
+    async (registration) => {
+      const { id, ...regData } = registration
+      return tx.childrenRegistration.create({
+        data: { id, ...regData }
+      })
+    }
+  )
+}
+
+
+
+// Import rooms
+async function importRooms(tx: any, rooms: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'room',
+    rooms,
+    async (room) => {
+      const { id, allocations, ...roomData } = room
+      return tx.room.create({
+        data: { id, ...roomData }
+      })
+    }
+  )
+}
+
+// Import room allocations
+async function importRoomAllocations(tx: any, roomAllocations: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'roomAllocation',
+    roomAllocations,
+    async (allocation) => {
+      const { id, room, registration, ...allocData } = allocation
+      return tx.roomAllocation.create({
+        data: { id, ...allocData }
+      })
+    }
+  )
+}
+
+// Import users
+async function importUsers(tx: any, users: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'user',
+    users,
+    async (user) => {
+      const { id, ...userData } = user
+      return tx.user.create({
+        data: { id, ...userData }
+      })
+    }
+  )
+}
+
+// Import permissions
+async function importPermissions(tx: any, permissions: any[]) {
+  return importWithConflictResolution(
+    tx,
+    'permission',
+    permissions,
+    async (permission) => {
+      const { id, roles, ...permData } = permission
+      return tx.permission.create({
+        data: { id, ...permData }
+      })
+    }
+  )
 }
 
 export async function POST(request: NextRequest) {
@@ -59,193 +215,163 @@ export async function POST(request: NextRequest) {
       include: { role: true }
     })
 
-    if (!currentUser || !['Super Admin', 'Admin'].includes(currentUser.role?.name || '')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!currentUser || !['Super Admin'].includes(currentUser.role?.name || '')) {
+      return NextResponse.json({ error: 'Only Super Admin can import backups' }, { status: 403 })
     }
 
+    // Parse the uploaded file
     const formData = await request.formData()
-    const file = formData.get('backup') as File
-    const action = formData.get('action') as string || 'upload'
-    const restoreImmediately = formData.get('restoreImmediately') === 'true'
-
+    const file = formData.get('file') as File || formData.get('backup') as File
+    
     if (!file) {
-      return NextResponse.json({
-        error: 'No backup file provided'
-      }, { status: 400 })
+      return NextResponse.json({ error: 'No backup file provided' }, { status: 400 })
     }
 
-    // Validate the uploaded file
-    const validation = validateBackupFile(file.name, file.size)
-    if (!validation.valid) {
-      return NextResponse.json({
-        error: validation.error
-      }, { status: 400 })
+    if (!file.name.endsWith('.json')) {
+      return NextResponse.json({ error: 'Invalid file format. Only JSON files are supported.' }, { status: 400 })
     }
 
-    logger.info('Backup file upload started', {
-      userId: currentUser.id,
-      filename: file.name,
-      size: file.size,
-      action,
-      restoreImmediately
-    })
-
-    // Ensure backup directory exists
-    const backupDir = process.env.BACKUP_DIR || './backups'
-    await fs.mkdir(backupDir, { recursive: true })
-
-    // Generate unique filename to avoid conflicts
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const originalName = file.name
-    const extension = originalName.split('.').slice(-1).join('.')
-    const baseName = originalName.replace(/\.(sql|sql\.gz)$/, '')
-    const uniqueFilename = `imported-${baseName}-${timestamp}.${extension}`
-    const filepath = path.join(backupDir, uniqueFilename)
+    // Read and parse the backup data
+    const fileContent = await file.text()
+    let backupData: any
 
     try {
-      // Save the uploaded file
-      const bytes = await file.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-      await fs.writeFile(filepath, buffer)
-
-      logger.info('Backup file saved successfully', {
-        userId: currentUser.id,
-        originalName,
-        savedAs: uniqueFilename,
-        size: file.size
-      })
-
-      // If restore immediately is requested, perform the restore
-      if (restoreImmediately) {
-        logger.info('Starting immediate restore', {
-          userId: currentUser.id,
-          filename: uniqueFilename
-        })
-
-        const restoreResult = await defaultBackup.restoreBackup(uniqueFilename)
-        
-        if (restoreResult.success) {
-          logger.info('Database restored successfully from uploaded backup', {
-            userId: currentUser.id,
-            filename: uniqueFilename,
-            duration: restoreResult.duration
-          })
-
-          // Optionally clean up the uploaded file after successful restore
-          try {
-            await fs.unlink(filepath)
-            logger.info('Temporary backup file cleaned up', { filename: uniqueFilename })
-          } catch (cleanupError) {
-            logger.warn('Failed to clean up temporary backup file', cleanupError)
-          }
-
-          return NextResponse.json({
-            success: true,
-            message: 'Backup uploaded and database restored successfully',
-            backup: {
-              originalName,
-              size: file.size,
-              sizeFormatted: formatFileSize(file.size),
-              restored: true,
-              duration: restoreResult.duration
-            }
-          })
-        } else {
-          logger.error('Database restore failed after upload', {
-            error: restoreResult.error,
-            userId: currentUser.id,
-            filename: uniqueFilename
-          })
-
-          // Clean up the uploaded file since restore failed
-          try {
-            await fs.unlink(filepath)
-          } catch (cleanupError) {
-            logger.warn('Failed to clean up backup file after restore failure', cleanupError)
-          }
-
-          return NextResponse.json({
-            error: 'Backup uploaded but restore failed',
-            details: restoreResult.error
-          }, { status: 500 })
-        }
-      } else {
-        // Just upload, don't restore
-        const fileStats = await fs.stat(filepath)
-        
-        return NextResponse.json({
-          success: true,
-          message: 'Backup uploaded successfully',
-          backup: {
-            filename: uniqueFilename,
-            originalName,
-            size: fileStats.size,
-            sizeFormatted: formatFileSize(fileStats.size),
-            uploaded: new Date().toISOString(),
-            restored: false
-          }
-        })
-      }
-
-    } catch (fileError) {
-      logger.error('Failed to save uploaded backup file', {
-        error: fileError instanceof Error ? fileError.message : String(fileError),
-        userId: currentUser.id,
-        filename: file.name
-      })
-
-      return NextResponse.json({
-        error: 'Failed to save uploaded backup file'
-      }, { status: 500 })
+      backupData = JSON.parse(fileContent)
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 })
     }
 
-  } catch (error) {
-    logger.error('Backup import operation failed', error)
-    return NextResponse.json({
-      error: 'Backup import operation failed'
-    }, { status: 500 })
-  }
-}
-
-// GET endpoint to check import status or list imported backups
-export async function GET(request: NextRequest) {
-  try {
-    // Verify admin access
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Validate backup structure
+    if (!backupData.metadata || !backupData.data) {
+      return NextResponse.json({ error: 'Invalid backup file structure' }, { status: 400 })
     }
 
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    const currentUser = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
-      include: { role: true }
+    logger.info('Starting database import', {
+      userId: currentUser.id,
+      backupDate: backupData.metadata.exportDate,
+      totalRecords: backupData.metadata.totalRecords
     })
 
-    if (!currentUser || !['Super Admin', 'Admin'].includes(currentUser.role?.name || '')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    // Start transaction for safe import
+    const result = await prisma.$transaction(async (tx) => {
+      const importStats = {
+        imported: 0,
+        skipped: 0,
+        errors: 0,
+        details: {} as Record<string, any>
+      }
 
-    // Return import configuration and limits
+      // Import roles first (dependencies)
+      if (backupData.data.roles?.length > 0) {
+        const roleStats = await importRoles(tx, backupData.data.roles)
+        importStats.details.roles = roleStats
+        importStats.imported += roleStats.imported
+        importStats.skipped += roleStats.skipped
+        importStats.errors += roleStats.errors
+      }
+
+      // Import admins
+      if (backupData.data.admins?.length > 0) {
+        const adminStats = await importAdmins(tx, backupData.data.admins)
+        importStats.details.admins = adminStats
+        importStats.imported += adminStats.imported
+        importStats.skipped += adminStats.skipped
+        importStats.errors += adminStats.errors
+      }
+
+      // Import settings
+      if (backupData.data.settings?.length > 0) {
+        const settingsStats = await importSettings(tx, backupData.data.settings)
+        importStats.details.settings = settingsStats
+        importStats.imported += settingsStats.imported
+        importStats.skipped += settingsStats.skipped
+        importStats.errors += settingsStats.errors
+      }
+
+      // Import registrations
+      if (backupData.data.registrations?.length > 0) {
+        const regStats = await importRegistrations(tx, backupData.data.registrations)
+        importStats.details.registrations = regStats
+        importStats.imported += regStats.imported
+        importStats.skipped += regStats.skipped
+        importStats.errors += regStats.errors
+      }
+
+      // Import users
+      if (backupData.data.users?.length > 0) {
+        const userStats = await importUsers(tx, backupData.data.users)
+        importStats.details.users = userStats
+        importStats.imported += userStats.imported
+        importStats.skipped += userStats.skipped
+        importStats.errors += userStats.errors
+      }
+
+      // Import permissions
+      if (backupData.data.permissions?.length > 0) {
+        const permStats = await importPermissions(tx, backupData.data.permissions)
+        importStats.details.permissions = permStats
+        importStats.imported += permStats.imported
+        importStats.skipped += permStats.skipped
+        importStats.errors += permStats.errors
+      }
+
+      // Import children registrations
+      if (backupData.data.childrenRegistrations?.length > 0) {
+        const childStats = await importChildrenRegistrations(tx, backupData.data.childrenRegistrations)
+        importStats.details.childrenRegistrations = childStats
+        importStats.imported += childStats.imported
+        importStats.skipped += childStats.skipped
+        importStats.errors += childStats.errors
+      }
+
+      // Import rooms
+      if (backupData.data.rooms?.length > 0) {
+        const roomStats = await importRooms(tx, backupData.data.rooms)
+        importStats.details.rooms = roomStats
+        importStats.imported += roomStats.imported
+        importStats.skipped += roomStats.skipped
+        importStats.errors += roomStats.errors
+      }
+
+      // Import room allocations
+      if (backupData.data.roomAllocations?.length > 0) {
+        const allocStats = await importRoomAllocations(tx, backupData.data.roomAllocations)
+        importStats.details.roomAllocations = allocStats
+        importStats.imported += allocStats.imported
+        importStats.skipped += allocStats.skipped
+        importStats.errors += allocStats.errors
+      }
+
+      // Import QR codes
+      if (backupData.data.qrCodes?.length > 0) {
+        const qrStats = await importQRCodes(tx, backupData.data.qrCodes)
+        importStats.details.qrCodes = qrStats
+        importStats.imported += qrStats.imported
+        importStats.skipped += qrStats.skipped
+        importStats.errors += qrStats.errors
+      }
+
+      return importStats
+    })
+
+    logger.info('Database import completed', {
+      userId: currentUser.id,
+      imported: result.imported,
+      skipped: result.skipped,
+      errors: result.errors
+    })
+
     return NextResponse.json({
       success: true,
-      config: {
-        maxFileSize: 500 * 1024 * 1024, // 500MB
-        maxFileSizeFormatted: formatFileSize(500 * 1024 * 1024),
-        allowedExtensions: ['.sql', '.sql.gz'],
-        supportedActions: ['upload', 'upload-and-restore'],
-        backupDirectory: process.env.BACKUP_DIR || './backups'
-      }
+      message: 'Database import completed successfully',
+      stats: result
     })
 
   } catch (error) {
-    logger.error('Failed to get import configuration', error)
+    logger.error('Database import failed', error)
     return NextResponse.json({
-      error: 'Failed to get import configuration'
+      error: 'Failed to import database',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

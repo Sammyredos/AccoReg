@@ -22,16 +22,13 @@ import {
   UserPlus,
   Settings,
   LogOut,
-  BarChart3,
   FileText,
-  Calendar,
   Bell,
-  Shield,
   Mail,
   MessageSquare,
   Home,
   UserCheck,
-  Database
+  Heart
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -59,6 +56,13 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     href: '/admin/registrations',
     icon: Users,
     badge: 'New',
+    requiredRoles: [], // Available to all roles
+  },
+  {
+    name: 'Children',
+    href: '/admin/children',
+    icon: Heart,
+    badge: null,
     requiredRoles: [], // Available to all roles
   },
   {
@@ -90,13 +94,7 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     badge: null,
     requiredRoles: [], // Available to all roles
   },
-  {
-    name: t('nav.analytics'),
-    href: '/admin/analytics',
-    icon: BarChart3,
-    badge: null,
-    requiredRoles: [], // Available to all roles including Staff
-  },
+
   {
     name: t('nav.reports'),
     href: '/admin/reports',
@@ -117,13 +115,6 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     icon: UserPlus,
     badge: null,
     requiredRoles: ['Super Admin', 'Admin', 'Manager'], // Super Admin, Admin, and Manager
-  },
-  {
-    name: t('nav.backup'),
-    href: '/admin/backup',
-    icon: Database,
-    badge: null,
-    requiredRoles: ['Super Admin', 'Admin'], // Only Super Admin and Admin
   },
   {
     name: t('nav.settings'),

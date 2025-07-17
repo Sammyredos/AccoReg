@@ -106,56 +106,8 @@ export class DatabaseBackup {
   }
 
   private async performBackup(filepath: string): Promise<void> {
-    const databaseUrl = this.config.databaseUrl
-
-    // Determine database type
-    if (databaseUrl.startsWith('file:') || databaseUrl.includes('sqlite')) {
-      await this.performSQLiteBackup(filepath)
-    } else if (databaseUrl.startsWith('postgresql:')) {
-      await this.performPostgreSQLBackup(filepath)
-    } else {
-      throw new Error('Unsupported database type. Only SQLite and PostgreSQL are supported.')
-    }
-
-    // Encrypt if enabled
-    if (this.config.encryptionEnabled && this.config.encryptionKey) {
-      await this.encryptFile(filepath)
-    }
-  }
-
-  private async performSQLiteBackup(filepath: string): Promise<void> {
-    const { copyFile } = require('fs/promises')
-    const { createGzip } = require('zlib')
-    const { createReadStream, createWriteStream } = require('fs')
-    const { pipeline } = require('stream/promises')
-
-    // Extract SQLite file path from DATABASE_URL
-    let sqliteFilePath = this.config.databaseUrl
-    if (sqliteFilePath.startsWith('file:')) {
-      sqliteFilePath = sqliteFilePath.replace('file:', '')
-    }
-
-    // Resolve relative paths
-    if (!sqliteFilePath.startsWith('/') && !sqliteFilePath.match(/^[A-Za-z]:/)) {
-      sqliteFilePath = join(process.cwd(), sqliteFilePath)
-    }
-
-    if (this.config.compressionEnabled) {
-      // Compress the SQLite file
-      const readStream = createReadStream(sqliteFilePath)
-      const writeStream = createWriteStream(filepath)
-      const gzipStream = createGzip()
-
-      await pipeline(readStream, gzipStream, writeStream)
-    } else {
-      // Direct copy
-      await copyFile(sqliteFilePath, filepath)
-    }
-  }
-
-  private async performPostgreSQLBackup(filepath: string): Promise<void> {
     const url = new URL(this.config.databaseUrl)
-
+    
     // Build pg_dump command
     const pgDumpCmd = [
       'pg_dump',
@@ -184,6 +136,11 @@ export class DatabaseBackup {
       // Direct output
       const command = `${pgDumpCmd} > "${filepath}"`
       await execAsync(command, { env, maxBuffer: 1024 * 1024 * 100 }) // 100MB buffer
+    }
+
+    // Encrypt if enabled
+    if (this.config.encryptionEnabled && this.config.encryptionKey) {
+      await this.encryptFile(filepath)
     }
   }
 
@@ -260,51 +217,8 @@ export class DatabaseBackup {
   }
 
   private async performRestore(filepath: string): Promise<void> {
-    const databaseUrl = this.config.databaseUrl
-
-    // Determine database type
-    if (databaseUrl.startsWith('file:') || databaseUrl.includes('sqlite')) {
-      await this.performSQLiteRestore(filepath)
-    } else if (databaseUrl.startsWith('postgresql:')) {
-      await this.performPostgreSQLRestore(filepath)
-    } else {
-      throw new Error('Unsupported database type. Only SQLite and PostgreSQL are supported.')
-    }
-  }
-
-  private async performSQLiteRestore(filepath: string): Promise<void> {
-    const { copyFile } = require('fs/promises')
-    const { createGunzip } = require('zlib')
-    const { createReadStream, createWriteStream } = require('fs')
-    const { pipeline } = require('stream/promises')
-
-    // Extract SQLite file path from DATABASE_URL
-    let sqliteFilePath = this.config.databaseUrl
-    if (sqliteFilePath.startsWith('file:')) {
-      sqliteFilePath = sqliteFilePath.replace('file:', '')
-    }
-
-    // Resolve relative paths
-    if (!sqliteFilePath.startsWith('/') && !sqliteFilePath.match(/^[A-Za-z]:/)) {
-      sqliteFilePath = join(process.cwd(), sqliteFilePath)
-    }
-
-    if (filepath.endsWith('.gz')) {
-      // Decompress and restore
-      const readStream = createReadStream(filepath)
-      const writeStream = createWriteStream(sqliteFilePath)
-      const gunzipStream = createGunzip()
-
-      await pipeline(readStream, gunzipStream, writeStream)
-    } else {
-      // Direct copy
-      await copyFile(filepath, sqliteFilePath)
-    }
-  }
-
-  private async performPostgreSQLRestore(filepath: string): Promise<void> {
     const url = new URL(this.config.databaseUrl)
-
+    
     // Build psql command
     const psqlCmd = [
       'psql',

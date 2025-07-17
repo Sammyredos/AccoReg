@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
       'dateOfBirth',
       'gender',
       'address',
+      'branch',
       'phoneNumber',
       'emailAddress',
       'parentGuardianName',
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
         dateOfBirth: dateOfBirth,
         gender: data.gender,
         address: data.address,
+        branch: data.branch,
         phoneNumber: data.phoneNumber,
         emailAddress: data.emailAddress,
         // Use emergency contact info (either manually entered or copied from parent)

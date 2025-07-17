@@ -118,8 +118,8 @@ export async function GET(request: NextRequest) {
 
     const currentUser = authResult.user!
 
-    // Check permissions
-    if (!['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {
+    // Check permissions (include Staff level)
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
       return new Response('Insufficient permissions', { status: 403 })
     }
 

@@ -6,6 +6,180 @@ import { createLogger } from '@/lib/logger'
 
 const logger = createLogger('BackupAPI')
 
+// Comprehensive database export function
+async function handleDownloadBackup(currentUser: any) {
+  try {
+    logger.info('Starting comprehensive database export', { userId: currentUser.id })
+
+    // Export all data from existing tables only
+    const [
+      admins,
+      users,
+      roles,
+      permissions,
+      registrations,
+      childrenRegistrations,
+      rooms,
+      roomAllocations,
+      settings,
+      messages,
+      notifications,
+      systemConfig,
+      smsVerifications
+    ] = await Promise.all([
+      // Admin data
+      prisma.admin.findMany({
+        include: {
+          role: true
+        }
+      }),
+
+      // Users
+      prisma.user.findMany(),
+
+      // Roles
+      prisma.role.findMany({
+        include: {
+          permissions: true
+        }
+      }),
+
+      // Permissions
+      prisma.permission.findMany({
+        include: {
+          roles: true
+        }
+      }),
+
+      // Main registrations
+      prisma.registration.findMany({
+        include: {
+          roomAllocation: {
+            include: {
+              room: true
+            }
+          }
+        }
+      }),
+
+      // Children registrations
+      prisma.childrenRegistration.findMany(),
+
+      // Rooms
+      prisma.room.findMany({
+        include: {
+          allocations: {
+            include: {
+              registration: true
+            }
+          }
+        }
+      }),
+
+      // Room allocations
+      prisma.roomAllocation.findMany({
+        include: {
+          room: true,
+          registration: true
+        }
+      }),
+
+      // Settings
+      prisma.setting.findMany(),
+
+      // Messages (inbox)
+      prisma.message.findMany(),
+
+      // Notifications
+      prisma.notification.findMany(),
+
+      // System config
+      prisma.systemConfig.findMany(),
+
+      // SMS verifications
+      prisma.sMSVerification.findMany()
+    ])
+
+    // Create comprehensive backup object
+    const backupData = {
+      metadata: {
+        exportDate: new Date().toISOString(),
+        exportedBy: currentUser.id,
+        exportedByName: currentUser.fullName,
+        version: '1.0',
+        totalRecords: {
+          admins: admins.length,
+          users: users.length,
+          roles: roles.length,
+          permissions: permissions.length,
+          registrations: registrations.length,
+          childrenRegistrations: childrenRegistrations.length,
+          rooms: rooms.length,
+          roomAllocations: roomAllocations.length,
+          settings: settings.length,
+          messages: messages.length,
+          notifications: notifications.length,
+          systemConfig: systemConfig.length,
+          smsVerifications: smsVerifications.length
+        }
+      },
+      data: {
+        admins: admins.map(admin => ({
+          ...admin,
+          // Remove sensitive data for security
+          password: '[REDACTED]'
+        })),
+        users: users.map(user => ({
+          ...user,
+          // Remove sensitive data for security
+          password: '[REDACTED]'
+        })),
+        roles,
+        permissions,
+        registrations,
+        childrenRegistrations,
+        rooms,
+        roomAllocations,
+        settings,
+        messages,
+        notifications,
+        systemConfig,
+        smsVerifications
+      }
+    }
+
+    // Convert to JSON
+    const jsonData = JSON.stringify(backupData, null, 2)
+    const filename = `accoreg-backup-${new Date().toISOString().split('T')[0]}-${Date.now()}.json`
+
+    logger.info('Database export completed', {
+      userId: currentUser.id,
+      totalRecords: Object.values(backupData.metadata.totalRecords).reduce((a, b) => a + b, 0),
+      fileSize: jsonData.length
+    })
+
+    // Return as downloadable file
+    return new NextResponse(jsonData, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': jsonData.length.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
+
+  } catch (error) {
+    logger.error('Database export failed', error)
+    return NextResponse.json({
+      error: 'Failed to export database',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verify admin access
@@ -28,12 +202,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
+    // Check if this is a download request
+    const url = new URL(request.url)
+    const action = url.searchParams.get('action')
+
+    if (action === 'download') {
+      return await handleDownloadBackup(currentUser)
+    }
+
     // List available backups
     const backups = await defaultBackup.listBackups()
 
-    logger.info('Backup list requested', { 
+    logger.info('Backup list requested', {
       userId: currentUser.id,
-      backupCount: backups.length 
+      backupCount: backups.length
     })
 
     return NextResponse.json({
