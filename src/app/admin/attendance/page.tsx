@@ -27,7 +27,6 @@ import {
   Search,
   CheckCircle,
   Users,
-  RefreshCw,
   Scan,
   Clock,
   ChevronDown,
@@ -809,26 +808,7 @@ function AttendancePageContent() {
                 <span className="sm:hidden text-white">Scan QR</span>
               </Button>
 
-              {/* Manual Refresh Button - especially useful when real-time is disconnected */}
-              <Button
-                onClick={() => {
-                  console.log('🔄 Manual refresh triggered')
-                  loadRegistrations(true)
-                  loadStats()
-                  success('Data refreshed successfully')
-                }}
-                variant="outline"
-                className={`w-full sm:w-auto ${
-                  !isConnected
-                    ? 'border-orange-300 text-orange-700 hover:bg-orange-50'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
-                title={!isConnected ? 'Real-time disconnected - manual refresh recommended' : 'Manually refresh data'}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Refresh</span>
-                <span className="sm:hidden">Sync</span>
-              </Button>
+
 
               {/* Status Indicators - Responsive */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

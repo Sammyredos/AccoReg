@@ -41,7 +41,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [lastScannedId, setLastScannedId] = useState<string | null>(null)
-  const [manualScanMode, setManualScanMode] = useState(true)
+
   const [jsQRLoaded, setJsQRLoaded] = useState(false)
   const [debugInfo, setDebugInfo] = useState<{
     cameraSupported: boolean
@@ -99,7 +99,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const cleanup = () => {
     stopCamera()
     setScanning(false)
-    setManualScanMode(true)
   }
 
   // Stop camera stream
@@ -258,41 +257,63 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       // Enhanced QR data validation and format detection
       let processedData = qrData.trim()
 
+      console.log('🔍 Processing QR data:', {
+        length: processedData.length,
+        startsWithBrace: processedData.startsWith('{'),
+        endsWithBrace: processedData.endsWith('}'),
+        preview: processedData.substring(0, 100)
+      })
+
       // Check if it's JSON format (our standard format)
       if (processedData.startsWith('{') && processedData.endsWith('}')) {
         try {
           const parsed = JSON.parse(processedData)
-          console.log('✅ Valid JSON QR code detected:', parsed.id || 'Unknown ID')
+          console.log('✅ Valid JSON QR code detected:', {
+            id: parsed.id || 'Unknown ID',
+            fullName: parsed.fullName || 'Unknown Name',
+            hasChecksum: !!parsed.checksum
+          })
+
+          // Validate required fields
+          if (!parsed.id) {
+            setError('QR code missing registration ID')
+            return
+          }
         } catch (jsonError) {
           console.warn('⚠️ Invalid JSON in QR code:', jsonError)
-          setError('QR code contains invalid JSON data')
+          setError('QR code contains invalid JSON data. Please ensure you are scanning a valid registration QR code.')
           return
         }
       }
       // Check if it's a simple ID format (fallback)
-      else if (processedData.length > 10 && processedData.length < 100) {
-        console.log('🔍 Possible simple ID format detected')
+      else if (processedData.length > 10 && processedData.length < 100 && !processedData.includes(' ')) {
+        console.log('🔍 Simple ID format detected:', processedData)
       }
       // Check if it's a URL format
       else if (processedData.startsWith('http')) {
         console.log('🔍 URL format detected')
-        setError('URL QR codes are not supported for verification')
+        setError('URL QR codes are not supported. Please scan a registration QR code.')
         return
       }
       else {
-        console.warn('⚠️ Unknown QR code format')
-        setError('Unsupported QR code format. Please use a valid registration QR code.')
+        console.warn('⚠️ Unknown QR code format:', {
+          length: processedData.length,
+          hasSpaces: processedData.includes(' '),
+          preview: processedData.substring(0, 50)
+        })
+        setError('Unsupported QR code format. Please scan a valid registration QR code from this system.')
         return
       }
 
+      console.log('🚀 Calling onScanAction with processed data')
       await onScanAction(processedData)
 
-      setSuccess('Participant has just been verified with QR code!')
+      setSuccess('✅ QR code scanned successfully! Participant verification in progress...')
 
       // Auto-close after success
       setTimeout(() => {
-        handleClose()
-      }, 3000)
+        onCloseAction()
+      }, 2000)
 
     } catch (error: any) {
       console.error('QR processing error:', error)
@@ -374,10 +395,15 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
           }
 
           if (qrCode && qrCode.data) {
-            console.log('📱 File QR detected:', qrCode.data.substring(0, 100) + '...')
+            console.log('📱 File QR detected:', {
+              dataLength: qrCode.data.length,
+              dataPreview: qrCode.data.substring(0, 100) + '...',
+              location: qrCode.location
+            })
             await processDetectedQR(qrCode.data)
           } else {
-            setError('No QR code found in the uploaded image. Please ensure the image is clear and contains a valid QR code.')
+            console.warn('❌ No QR code found in uploaded image')
+            setError('No QR code found in the uploaded image. Please ensure:\n• The image is clear and well-lit\n• The QR code is fully visible\n• The image is not blurry or distorted')
           }
         } catch (error: any) {
           setError(`Failed to scan uploaded image: ${error.message}`)
@@ -657,12 +683,13 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             </ul>
 
             <div className="mt-3 pt-3 border-t border-gray-200">
-              <h4 className="text-xs font-medium text-gray-800 mb-1">Manual Scan Benefits:</h4>
+              <h4 className="text-xs font-medium text-gray-800 mb-1">Troubleshooting QR Scanning:</h4>
               <ul className="text-xs text-gray-500 space-y-1">
-                <li>• Better battery life - no continuous scanning</li>
-                <li>• More accurate - scan when QR code is properly positioned</li>
-                <li>• User controlled - scan exactly when you want</li>
-                <li>• Reduced false positives and scanning errors</li>
+                <li>• Make sure the QR code is from this registration system</li>
+                <li>• Check that the image is clear and not blurry</li>
+                <li>• Ensure good lighting when scanning</li>
+                <li>• Try uploading the QR image if camera scanning fails</li>
+                <li>• QR codes must contain valid registration data</li>
               </ul>
             </div>
           </div>
