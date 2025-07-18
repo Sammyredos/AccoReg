@@ -69,16 +69,19 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const loadJsQR = async () => {
     if (jsQRRef.current) {
       setJsQRLoaded(true)
+      console.log('✅ jsQR already loaded')
       return
     }
 
     try {
+      console.log('🔄 Loading jsQR library...')
       const jsQRModule = await import('jsqr')
       jsQRRef.current = jsQRModule.default
       setJsQRLoaded(true)
       console.log('✅ jsQR library loaded successfully')
     } catch (error) {
       console.error('❌ Failed to load jsQR library:', error)
+      setError('Failed to load QR scanner library. Please refresh and try again.')
       setJsQRLoaded(false)
     }
   }
@@ -114,45 +117,77 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   // Start camera for scanning
   const startCamera = async () => {
     try {
+      console.log('🎥 Starting camera...')
       setError(null)
       setScanning(true)
+
+      // Check if we're in a secure context (HTTPS or localhost)
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        throw new Error('Camera access requires HTTPS or localhost')
+      }
 
       // Check if camera is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera not supported in this browser')
       }
 
-      // Request camera access
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      })
+      console.log('📱 Requesting camera access...')
 
+      // Request camera access with fallback constraints
+      let stream: MediaStream
+      try {
+        // Try with back camera first
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        })
+      } catch (backCameraError) {
+        console.log('⚠️ Back camera failed, trying front camera...')
+        // Fallback to front camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        })
+      }
+
+      console.log('✅ Camera access granted')
       streamRef.current = stream
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
-        
+        console.log('▶️ Video playing')
+
         // Start auto-scanning after video is ready
         setTimeout(() => {
           if (jsQRLoaded) {
+            console.log('🔍 Starting auto-scan...')
             startAutoScan()
+          } else {
+            console.log('⚠️ jsQR not loaded yet, waiting...')
+            setError('QR scanner library not ready. Please wait and try again.')
           }
         }, 1000)
       }
 
     } catch (error: any) {
-      console.error('Camera error:', error)
+      console.error('❌ Camera error:', error)
       setScanning(false)
-      
+
       if (error.name === 'NotAllowedError') {
         setError('Camera access denied. Please allow camera access and try again.')
       } else if (error.name === 'NotFoundError') {
         setError('No camera found. Please connect a camera and try again.')
+      } else if (error.name === 'NotSupportedError') {
+        setError('Camera not supported on this device.')
+      } else if (error.message.includes('HTTPS')) {
+        setError('Camera access requires a secure connection (HTTPS).')
       } else {
         setError(`Camera error: ${error.message}`)
       }
@@ -162,12 +197,14 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   // Start auto-scanning
   const startAutoScan = () => {
     if (!jsQRLoaded || !jsQRRef.current) {
-      console.log('jsQR not loaded, cannot start auto-scan')
+      console.log('❌ jsQR not loaded, cannot start auto-scan')
+      setError('QR scanner not ready. Please wait and try again.')
       return
     }
 
+    console.log('🔍 Starting auto-scan...')
     setAutoScanActive(true)
-    
+
     scanIntervalRef.current = setInterval(() => {
       scanFrame()
     }, 500) // Scan every 500ms for better performance
@@ -378,6 +415,21 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             </div>
           )}
 
+          {/* Debug Info */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <h4 className="text-xs font-medium text-gray-700 mb-2">Debug Info:</h4>
+              <div className="text-xs text-gray-600 space-y-1">
+                <div>jsQR Loaded: {jsQRLoaded ? '✅' : '❌'}</div>
+                <div>Camera Scanning: {scanning ? '✅' : '❌'}</div>
+                <div>Auto-scan Active: {autoScanActive ? '✅' : '❌'}</div>
+                <div>Processing: {processing ? '✅' : '❌'}</div>
+                <div>HTTPS: {location.protocol === 'https:' ? '✅' : '❌'}</div>
+                <div>MediaDevices: {navigator.mediaDevices ? '✅' : '❌'}</div>
+              </div>
+            </div>
+          )}
+
           {/* Scanner Status */}
           {scanning && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -397,7 +449,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
           )}
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             {/* Camera Scan Button */}
             <Button
               onClick={startCamera}
@@ -405,7 +457,18 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
               className="w-full h-12 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
             >
               <Camera className="h-4 w-4 mr-2" />
-              {scanning ? 'Camera Active' : 'Scan with Camera'}
+              {scanning ? 'Camera Active' : 'Start Camera'}
+            </Button>
+
+            {/* Manual Scan Button */}
+            <Button
+              onClick={() => scanFrame()}
+              disabled={!scanning || processing || !jsQRLoaded}
+              variant="outline"
+              className="w-full h-12 border-2 hover:bg-blue-50 border-blue-300"
+            >
+              <Scan className="h-4 w-4 mr-2" />
+              Scan Now
             </Button>
 
             {/* File Upload Button */}
