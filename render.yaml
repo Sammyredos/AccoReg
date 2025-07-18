@@ -7,8 +7,9 @@ services:
     # Optimized for real-time features
     autoDeploy: true
     previewsEnabled: false
-    buildCommand: npm ci && npx prisma generate && npx tsx scripts/create-super-admin.ts && npx tsx scripts/seed-settings.ts && npm run build
-    startCommand: npm start -- -p $PORT
+    healthCheckPath: /api/health
+    buildCommand: NODE_OPTIONS="--max-old-space-size=1024" npm ci && npx prisma generate && npx tsx scripts/create-super-admin.ts && npx tsx scripts/seed-settings.ts && NODE_OPTIONS="--max-old-space-size=1024" npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -16,6 +17,12 @@ services:
         value: 1
       - key: PRISMA_GENERATE_SKIP_AUTOINSTALL
         value: true
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=512"
+      - key: NEXTAUTH_URL
+        value: https://youth-registration-system.onrender.com
+      - key: NEXTAUTH_SECRET
+        value: your-super-secure-nextauth-secret-change-this-in-production
       - key: SKIP_ENV_VALIDATION
         value: false
       - key: REAL_TIME_STATS
@@ -44,6 +51,10 @@ services:
         value: false
       - key: ENABLE_EMAIL_NOTIFICATIONS
         value: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mopgomyouth-db
+          property: connectionString
 
 databases:
   - name: mopgomyouth-db

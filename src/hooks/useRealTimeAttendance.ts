@@ -85,7 +85,14 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
         eventSourceRef.current.close()
       }
 
-      // Check if user is logged in by checking for auth token
+      // Check if we're in browser environment and user is logged in
+      if (typeof window === 'undefined') {
+        console.warn('⚠️ SSR environment detected, skipping real-time connection')
+        setConnectionError('SSR environment')
+        updateStableState('disconnected')
+        return
+      }
+
       const hasAuthToken = document.cookie.includes('auth-token=')
       if (!hasAuthToken) {
         console.warn('⚠️ No auth token found, skipping real-time connection')
@@ -282,6 +289,9 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
 
   // Handle page visibility changes
   useEffect(() => {
+    // Only add event listener in browser environment
+    if (typeof window === 'undefined') return
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Page is hidden - keep connection but reduce activity

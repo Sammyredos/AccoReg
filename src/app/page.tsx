@@ -29,6 +29,9 @@ export default function Home() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
+    // Only add scroll listener in browser environment
+    if (typeof window === 'undefined') return
+
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10)
     }
