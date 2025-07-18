@@ -8,8 +8,8 @@ services:
     autoDeploy: true
     previewsEnabled: false
     healthCheckPath: /api/health
-    buildCommand: NODE_OPTIONS="--max-old-space-size=1024" npm ci && npx prisma generate && npx tsx scripts/create-super-admin.ts && npx tsx scripts/seed-settings.ts && NODE_OPTIONS="--max-old-space-size=1024" npm run build
-    startCommand: npm start
+    buildCommand: NODE_OPTIONS="--max-old-space-size=1024" npm ci && npx prisma generate && npx prisma db push --accept-data-loss && npx tsx scripts/fix-admin-login.ts && NODE_OPTIONS="--max-old-space-size=1024" npm run build
+    startCommand: npm run start:optimized
     envVars:
       - key: NODE_ENV
         value: production
@@ -42,7 +42,7 @@ services:
       - key: DEFAULT_ADMIN_EMAIL
         value: admin@mopgomglobal.com
       - key: DEFAULT_ADMIN_PASSWORD
-        value: Admin123!
+        value: SuperAdmin123!
       - key: MINIMUM_AGE
         value: 13
       - key: REGISTRATION_OPEN
