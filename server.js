@@ -11,9 +11,31 @@ if (process.env.NODE_ENV === 'production') {
   // Force garbage collection more frequently in production
   if (global.gc) {
     setInterval(() => {
-      global.gc()
-    }, 30000) // Every 30 seconds
+      const memUsage = process.memoryUsage()
+      const memUsagePercent = Math.round((memUsage.rss / (512 * 1024 * 1024)) * 100)
+
+      // Only force GC if memory usage is high
+      if (memUsagePercent > 70) {
+        console.log('🧹 Forcing garbage collection - Memory usage:', memUsagePercent + '%')
+        global.gc()
+      }
+    }, 15000) // Every 15 seconds for more aggressive cleanup
   }
+
+  // Monitor memory usage and log warnings
+  setInterval(() => {
+    const memUsage = process.memoryUsage()
+    const memUsagePercent = Math.round((memUsage.rss / (512 * 1024 * 1024)) * 100)
+
+    if (memUsagePercent > 85) {
+      console.warn('⚠️ High memory usage detected:', {
+        percentage: memUsagePercent + '%',
+        rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
+        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
+        external: Math.round(memUsage.external / 1024 / 1024) + 'MB'
+      })
+    }
+  }, 60000) // Every minute
 }
 
 // Create Next.js app with memory optimizations

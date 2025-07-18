@@ -17,30 +17,41 @@ const connections = new Map<ReadableStreamDefaultController, {
   lastHeartbeat: number
 }>()
 
-// Clean up stale connections every 2 minutes
-setInterval(() => {
-  const now = Date.now()
-  const staleThreshold = 60000 // 1 minute without heartbeat
-  const staleConnections: ReadableStreamDefaultController[] = []
+// Clean up stale connections - use timeout instead of interval to prevent memory leaks
+let cleanupTimeout: NodeJS.Timeout | null = null
 
-  connections.forEach((metadata, controller) => {
-    if (now - metadata.lastHeartbeat > staleThreshold) {
-      staleConnections.push(controller)
-    }
-  })
+const scheduleCleanup = () => {
+  if (cleanupTimeout) clearTimeout(cleanupTimeout)
 
-  if (staleConnections.length > 0) {
-    logger.info(`Cleaning up ${staleConnections.length} stale connections`)
-    staleConnections.forEach(controller => {
-      try {
-        controller.close()
-      } catch (error) {
-        // Ignore errors when closing stale connections
+  cleanupTimeout = setTimeout(() => {
+    const now = Date.now()
+    const staleThreshold = 60000 // 1 minute without heartbeat
+    const staleConnections: ReadableStreamDefaultController[] = []
+
+    connections.forEach((metadata, controller) => {
+      if (now - metadata.lastHeartbeat > staleThreshold) {
+        staleConnections.push(controller)
       }
-      connections.delete(controller)
     })
-  }
-}, 120000) // Every 2 minutes
+
+    if (staleConnections.length > 0) {
+      logger.info(`Cleaning up ${staleConnections.length} stale connections`)
+      staleConnections.forEach(controller => {
+        try {
+          controller.close()
+        } catch (error) {
+          // Ignore errors when closing stale connections
+        }
+        connections.delete(controller)
+      })
+    }
+
+    // Schedule next cleanup only if there are active connections
+    if (connections.size > 0) {
+      scheduleCleanup()
+    }
+  }, 120000) // Every 2 minutes
+}
 
 // Event types
 export interface AttendanceEvent {
@@ -123,9 +134,18 @@ export async function GET(request: NextRequest) {
       return new Response('Insufficient permissions', { status: 403 })
     }
 
-    logger.info('New SSE connection established', { 
+    // Prevent memory overload - limit concurrent connections
+    if (connections.size >= 50) {
+      logger.warn('Connection limit reached, rejecting new connection', {
+        currentConnections: connections.size,
+        userId: currentUser.id
+      })
+      return new Response('Too many active connections', { status: 503 })
+    }
+
+    logger.info('New SSE connection established', {
       userId: currentUser.id,
-      role: currentUser.role?.name 
+      role: currentUser.role?.name
     })
 
     // Create readable stream for SSE
@@ -139,6 +159,11 @@ export async function GET(request: NextRequest) {
           createdAt: now,
           lastHeartbeat: now
         })
+
+        // Start cleanup scheduler when first connection is added
+        if (connections.size === 1) {
+          scheduleCleanup()
+        }
 
         logger.info('New SSE connection established', {
           userId: currentUser.id,

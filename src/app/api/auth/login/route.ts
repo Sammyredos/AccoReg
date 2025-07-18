@@ -5,6 +5,23 @@ import { getSessionTimeout } from '@/lib/settings'
 
 export async function POST(request: NextRequest) {
   try {
+    // Monitor memory usage for login requests
+    const memUsage = process.memoryUsage()
+    const memUsagePercent = Math.round((memUsage.rss / (512 * 1024 * 1024)) * 100) // Assuming 512MB limit
+
+    if (memUsagePercent > 90) {
+      console.warn('High memory usage during login:', {
+        memUsagePercent,
+        rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
+        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
+      })
+
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc()
+      }
+    }
+
     const { email, password } = await request.json()
 
     // Get session timeout from settings
