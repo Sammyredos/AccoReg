@@ -539,6 +539,25 @@ function AttendancePageContent() {
         body: JSON.stringify({ qrCode: qrData })
       })
 
+      if (!checkResponse.ok) {
+        const errorText = await checkResponse.text()
+        console.error('QR toggle check failed:', {
+          status: checkResponse.status,
+          statusText: checkResponse.statusText,
+          error: errorText
+        })
+
+        if (checkResponse.status === 404) {
+          error('QR scanning service not available. Please try again later.')
+        } else if (checkResponse.status === 400) {
+          error('Invalid QR code format. Please scan a valid registration QR code.')
+        } else {
+          error('Failed to process QR code. Please try again.')
+        }
+        setLastQRScanId(null)
+        return
+      }
+
       const checkData = await checkResponse.json()
 
       if (checkData.action === 'verify_ready') {
@@ -599,7 +618,18 @@ function AttendancePageContent() {
 
     } catch (qrError) {
       console.error('Error scanning QR code:', qrError)
-      error('Failed to scan QR code')
+
+      // Provide more specific error messages
+      if (qrError instanceof SyntaxError) {
+        error('Invalid QR code format. Please scan a valid registration QR code.')
+      } else if (qrError.message?.includes('fetch')) {
+        error('Network error. Please check your connection and try again.')
+      } else if (qrError.message?.includes('404')) {
+        error('QR scanning service not found. Please contact support.')
+      } else {
+        error('Failed to scan QR code. Please try again or contact support.')
+      }
+
       setLastQRScanId(null) // Clear tracking on error
     }
   }

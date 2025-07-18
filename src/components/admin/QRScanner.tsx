@@ -318,14 +318,23 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     } catch (error: any) {
       console.error('QR processing error:', error)
 
-      // Enhanced error messages
+      // Enhanced error messages based on error type
       let errorMessage = 'Failed to process QR code'
-      if (error.message?.includes('not found')) {
+
+      if (error instanceof SyntaxError) {
+        errorMessage = 'Invalid QR code format. Please scan a valid registration QR code.'
+      } else if (error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your connection and try again.'
+      } else if (error.message?.includes('404')) {
+        errorMessage = 'QR scanning service not available. Please try again later.'
+      } else if (error.message?.includes('not found')) {
         errorMessage = 'Registration not found. Please check the QR code.'
       } else if (error.message?.includes('already verified')) {
         errorMessage = 'This participant has already been verified.'
       } else if (error.message?.includes('invalid')) {
         errorMessage = 'Invalid QR code. Please try scanning again.'
+      } else if (error.message?.includes('Unexpected token')) {
+        errorMessage = 'Server error. Please try again or contact support.'
       } else if (error.message) {
         errorMessage = error.message
       }
