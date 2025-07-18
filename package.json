@@ -13,7 +13,7 @@
     "postinstall": "prisma generate",
     "start": "node server.js",
     "start:production": "cross-env NODE_ENV=production next start",
-    "start:optimized": "cross-env NODE_ENV=production NODE_OPTIONS=\"--max-old-space-size=512 --optimize-for-size\" node server.js",
+    "start:optimized": "cross-env NODE_ENV=production NODE_OPTIONS=\"--max-old-space-size=512\" node server.js",
     "init:production": "cross-env NODE_OPTIONS=\"--max-old-space-size=256\" npx tsx scripts/production-init.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
