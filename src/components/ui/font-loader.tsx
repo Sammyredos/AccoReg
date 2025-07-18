@@ -13,7 +13,7 @@ interface FontLoaderProps {
 export function FontLoader({
   children,
   showLoadingScreen = true,
-  timeout = 3000
+  timeout = 1000 // Reduced from 3000ms to 1000ms for faster loading
 }: FontLoaderProps) {
   const [fontsLoaded, setFontsLoaded] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
@@ -40,7 +40,7 @@ export function FontLoader({
         try {
           const response = await fetch('/api/admin/settings', {
             cache: 'no-store',
-            signal: AbortSignal.timeout(2000) // 2 second timeout
+            signal: AbortSignal.timeout(800) // Reduced to 800ms timeout
           })
           if (response.ok) {
             const data = await response.json()
@@ -73,6 +73,17 @@ export function FontLoader({
       try {
         console.log('🔤 Starting Apercu Pro font loading...')
         setLoadingProgress(10)
+
+        // Emergency bypass for low memory situations
+        if (typeof window !== 'undefined' && 'memory' in performance) {
+          const memInfo = (performance as any).memory
+          if (memInfo && memInfo.usedJSHeapSize > memInfo.totalJSHeapSize * 0.8) {
+            console.warn('⚠️ High memory usage detected, skipping font loading')
+            setLoadingProgress(100)
+            setFontsLoaded(true)
+            return
+          }
+        }
 
         // Check if FontFace API is supported
         if ('fonts' in document) {

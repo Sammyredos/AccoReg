@@ -81,7 +81,7 @@ export default function RootLayout({
         }} />
       </head>
       <body className="font-apercu antialiased text-gray-900 bg-white" suppressHydrationWarning={true}>
-        <FontLoader>
+        <FontLoader timeout={500} showLoadingScreen={process.env.NODE_ENV !== 'production'}>
           <LanguageProvider>
             <ProgressBar color="#4f46e5" height={3} />
             <TitleManager />
