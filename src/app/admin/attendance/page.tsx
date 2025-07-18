@@ -179,14 +179,13 @@ function AttendancePageContent() {
       // Immediate trigger for stats
       triggerStatsUpdate()
 
-      // Delayed refresh for data consistency
+      // Skip delayed refresh to prevent overriding immediate update
+      // The real-time event already provides the most current data
       setTimeout(() => {
-        loadRegistrations(true) // Force refresh from server
-        loadStats()
-        // Additional trigger for accommodation stats
+        loadStats() // Only refresh stats, not registrations
         triggerStatsUpdate()
-        console.log('🔄 Secondary verification update completed')
-      }, 100) // Slightly increased delay for better consistency
+        console.log('🔄 Secondary stats update completed (registrations preserved)')
+      }, 100)
 
       // Show success notification for all verification methods
       if (event.data.fullName) {
@@ -235,14 +234,12 @@ function AttendancePageContent() {
       // Immediate trigger for stats
       triggerStatsUpdate()
 
-      // Delayed refresh for data consistency
+      // Skip delayed registration refresh to prevent overriding immediate update
       setTimeout(() => {
-        loadRegistrations(true) // Force refresh from server
-        loadStats()
-        // Additional trigger for accommodation stats
+        loadStats() // Only refresh stats, not registrations
         triggerStatsUpdate()
-        console.log('🔄 Secondary status change update completed')
-      }, 100) // Slightly increased delay for better consistency
+        console.log('🔄 Secondary stats update completed (registrations preserved)')
+      }, 100)
     }, []),
     onError: useCallback((event) => {
       console.log('🚨 Real-time error received:', event.data)
@@ -453,9 +450,9 @@ function AttendancePageContent() {
         console.time('verification-stats-trigger')
         triggerStatsUpdate()
 
-        // Delayed refresh for data consistency (but don't wait for it)
-        setTimeout(async () => {
-          await Promise.all([loadStats(), loadRegistrations()])
+        // Delayed stats refresh only (preserve immediate UI update)
+        setTimeout(() => {
+          loadStats() // Only refresh stats, not registrations
           triggerStatsUpdate()
           console.log('🔄 Secondary stats update triggered for verification')
           console.timeEnd('verification-stats-trigger')
@@ -508,9 +505,9 @@ function AttendancePageContent() {
         console.time('unverification-stats-trigger')
         triggerStatsUpdate()
 
-        // Delayed refresh for data consistency (but don't wait for it)
-        setTimeout(async () => {
-          await Promise.all([loadStats(), loadRegistrations()])
+        // Delayed stats refresh only (preserve immediate UI update)
+        setTimeout(() => {
+          loadStats() // Only refresh stats, not registrations
           triggerStatsUpdate()
           console.log('🔄 Secondary stats update triggered for unverification')
           console.timeEnd('unverification-stats-trigger')
@@ -624,9 +621,9 @@ function AttendancePageContent() {
           // Trigger stats update immediately
           triggerStatsUpdate()
 
-          // Delayed refresh for data consistency
-          setTimeout(async () => {
-            await Promise.all([loadStats(), loadRegistrations()])
+          // Delayed stats refresh only (preserve immediate UI update)
+          setTimeout(() => {
+            loadStats() // Only refresh stats, not registrations
             triggerStatsUpdate()
             console.log('🔄 Secondary stats update triggered for QR verification')
           }, 200)
