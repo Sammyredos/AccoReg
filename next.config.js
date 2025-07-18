@@ -57,6 +57,19 @@ const nextConfig = {
   // Performance optimizations
   poweredByHeader: false,
   compress: true,
+
+  // Memory optimization for production
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-select'],
+    serverComponentsExternalPackages: ['prisma', '@prisma/client'],
+  },
+
+  // Reduce bundle size
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{member}}',
+    },
+  },
   
   // Environment variables
   env: {

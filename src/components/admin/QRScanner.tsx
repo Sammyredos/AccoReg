@@ -41,7 +41,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [lastScannedId, setLastScannedId] = useState<string | null>(null)
-  const [autoScanActive, setAutoScanActive] = useState(false)
+  const [manualScanMode, setManualScanMode] = useState(true)
   const [jsQRLoaded, setJsQRLoaded] = useState(false)
   const [debugInfo, setDebugInfo] = useState<{
     cameraSupported: boolean
@@ -61,7 +61,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const scanIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const jsQRRef = useRef<any>(null)
 
@@ -99,9 +98,8 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   // Cleanup function
   const cleanup = () => {
     stopCamera()
-    stopAutoScan()
     setScanning(false)
-    setAutoScanActive(false)
+    setManualScanMode(true)
   }
 
   // Stop camera stream
@@ -113,15 +111,6 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
-  }
-
-  // Stop auto-scanning
-  const stopAutoScan = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-    }
-    setAutoScanActive(false)
   }
 
   // Start camera for scanning
@@ -155,12 +144,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
         setDebugInfo(prev => ({ ...prev, videoReady: true }))
 
-        // Start auto-scanning after video is ready
-        setTimeout(() => {
-          if (jsQRLoaded) {
-            startAutoScan()
-          }
-        }, 1000)
+        console.log('📹 Camera ready for manual scanning')
       }
 
     } catch (error: any) {
@@ -177,18 +161,20 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     }
   }
 
-  // Start auto-scanning
-  const startAutoScan = () => {
+  // Manual scan function - triggered by button click
+  const performManualScan = async () => {
     if (!jsQRLoaded || !jsQRRef.current) {
-      console.log('jsQR not loaded, cannot start auto-scan')
+      setError('QR scanner not ready. Please wait for the scanner to load.')
       return
     }
 
-    setAutoScanActive(true)
-    
-    scanIntervalRef.current = setInterval(() => {
-      scanFrame()
-    }, 500) // Scan every 500ms for better performance
+    if (!videoRef.current || !canvasRef.current) {
+      setError('Camera not ready. Please ensure camera is active.')
+      return
+    }
+
+    console.log('🔍 Manual scan triggered')
+    await scanFrame()
   }
 
   // Scan current video frame
@@ -246,7 +232,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         console.log('🔍 QR Data Type:', typeof qrCode.data)
         console.log('📍 QR Location:', qrCode.location)
 
-        stopAutoScan()
+        console.log('✅ QR code detected via manual scan')
         await processDetectedQR(qrCode.data)
       }
 
@@ -505,12 +491,10 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center space-x-2 mb-2">
                 <Camera className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-800">Camera Active</span>
-                {autoScanActive && (
-                  <Badge variant="secondary" className="text-xs">
-                    Auto-scanning
-                  </Badge>
-                )}
+                <span className="text-sm font-medium text-yellow-800">Camera Active - Ready for Manual Scan</span>
+                <Badge variant="secondary" className="text-xs">
+                  Manual Mode
+                </Badge>
               </div>
               <p className="text-xs text-yellow-700">
                 Position QR code in front of camera. Scanner will automatically detect codes.
@@ -546,8 +530,20 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
           {/* Camera Controls */}
           {scanning && (
-            <div className="mb-6 space-y-2">
-              <div className="flex flex-col sm:flex-row gap-2">
+            <div className="mb-6 space-y-3">
+              {/* Primary Manual Scan Button */}
+              <Button
+                onClick={performManualScan}
+                disabled={processing || !jsQRLoaded}
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium py-3"
+                size="lg"
+              >
+                <Scan className="h-5 w-5 mr-2" />
+                {processing ? 'Scanning...' : 'Scan Now'}
+              </Button>
+
+              {/* Secondary Controls */}
+              <div className="flex gap-2">
                 <Button
                   onClick={stopCamera}
                   variant="outline"
@@ -555,36 +551,16 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                 >
                   Stop Camera
                 </Button>
-                {jsQRLoaded && !autoScanActive && (
-                  <Button
-                    onClick={startAutoScan}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Scan className="h-4 w-4 mr-2" />
-                    Start Auto-Scan
-                  </Button>
-                )}
-                {autoScanActive && (
-                  <Button
-                    onClick={stopAutoScan}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Stop Auto-Scan
-                  </Button>
-                )}
+                <Button
+                  onClick={performManualScan}
+                  variant="outline"
+                  disabled={processing || !jsQRLoaded}
+                  className="flex-1"
+                >
+                  <Scan className="h-4 w-4 mr-2" />
+                  Quick Scan
+                </Button>
               </div>
-
-              {/* Manual Scan Button */}
-              <Button
-                onClick={scanFrame}
-                disabled={processing || !jsQRLoaded}
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
-              >
-                <Scan className="h-4 w-4 mr-2" />
-                {processing ? 'Scanning...' : 'Scan Now'}
-              </Button>
             </div>
           )}
 
@@ -598,13 +574,12 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
                   playsInline
                   muted
                 />
-                {autoScanActive && (
-                  <div className="absolute inset-0 border-2 border-green-400 rounded-lg">
-                    <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs">
-                      Scanning...
-                    </div>
+                {/* Manual scan mode indicator */}
+                <div className="absolute inset-0 border-2 border-blue-400 rounded-lg">
+                  <div className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 rounded text-xs">
+                    Ready - Click "Scan Now"
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -671,23 +646,23 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
           {/* Instructions */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">How to use:</h3>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">How to use Manual QR Scanner:</h3>
             <ul className="text-xs text-gray-600 space-y-1">
-              <li>• Click "Scan with Camera" to use your device camera</li>
-              <li>• Click "Upload QR Image" to scan from a saved image</li>
-              <li>• Use "Scan Now" button for manual scanning</li>
-              <li>• Position QR code clearly in view for best results</li>
-              <li>• Ensure good lighting and steady camera for better detection</li>
-              <li>• QR codes should be registration QR codes from this system</li>
+              <li>• Click "Scan with Camera" to activate your device camera</li>
+              <li>• Position the QR code clearly within the camera view</li>
+              <li>• Click the large "Scan Now" button to capture and scan</li>
+              <li>• Use "Upload QR Image" to scan from a saved image file</li>
+              <li>• Ensure good lighting and hold camera steady</li>
+              <li>• Only registration QR codes from this system will work</li>
             </ul>
 
             <div className="mt-3 pt-3 border-t border-gray-200">
-              <h4 className="text-xs font-medium text-gray-800 mb-1">Troubleshooting:</h4>
+              <h4 className="text-xs font-medium text-gray-800 mb-1">Manual Scan Benefits:</h4>
               <ul className="text-xs text-gray-500 space-y-1">
-                <li>• If scanning fails, try uploading an image instead</li>
-                <li>• Ensure QR code is not damaged or blurry</li>
-                <li>• Check browser console for detailed error messages</li>
-                <li>• Use test QR codes above to verify scanner functionality</li>
+                <li>• Better battery life - no continuous scanning</li>
+                <li>• More accurate - scan when QR code is properly positioned</li>
+                <li>• User controlled - scan exactly when you want</li>
+                <li>• Reduced false positives and scanning errors</li>
               </ul>
             </div>
           </div>
