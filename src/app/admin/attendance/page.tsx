@@ -165,23 +165,33 @@ function AttendancePageContent() {
 
       // Force immediate data refresh for cross-device sync
       console.log('🔄 Real-time verification event received, triggering updates')
+      console.log('📊 Event data:', event.data)
 
-      // Immediate trigger
+      // Immediate UI update - update the specific registration in state
+      setRegistrations(prevRegistrations =>
+        prevRegistrations.map(reg =>
+          reg.id === event.data.registrationId
+            ? { ...reg, isVerified: true, verifiedAt: new Date().toISOString() }
+            : reg
+        )
+      )
+
+      // Immediate trigger for stats
       triggerStatsUpdate()
 
       // Delayed refresh for data consistency
       setTimeout(() => {
-        loadRegistrations(true) // Force refresh
+        loadRegistrations(true) // Force refresh from server
         loadStats()
         // Additional trigger for accommodation stats
         triggerStatsUpdate()
         console.log('🔄 Secondary verification update completed')
-      }, 50) // Reduced delay for faster response
+      }, 100) // Slightly increased delay for better consistency
 
-      // Show success notification ONLY for QR scans (not manual verifications)
-      // Manual verifications have their own success toast in the button handler
-      if (event.data.fullName && event.data.method === 'qr') {
-        success(`✅ ${event.data.fullName} verified via QR scan`)
+      // Show success notification for all verification methods
+      if (event.data.fullName) {
+        const method = event.data.method === 'qr' ? 'QR scan' : 'manual verification'
+        success(`✅ ${event.data.fullName} verified via ${method}`)
       }
 
       // QR scanner stays open after successful scan - user must manually close it
@@ -205,20 +215,34 @@ function AttendancePageContent() {
     }, [success]), // Removed state dependencies since we're using refs
     onStatusChange: useCallback((event) => {
       console.log('📊 Real-time status change received:', event.data)
-      // Force refresh data on any status changes
       console.log('🔄 Real-time status change event received, triggering updates')
 
-      // Immediate trigger
+      // Immediate UI update for status changes
+      if (event.data.registrationId) {
+        setRegistrations(prevRegistrations =>
+          prevRegistrations.map(reg =>
+            reg.id === event.data.registrationId
+              ? {
+                  ...reg,
+                  isVerified: event.data.status === 'present',
+                  verifiedAt: event.data.status === 'present' ? new Date().toISOString() : null
+                }
+              : reg
+          )
+        )
+      }
+
+      // Immediate trigger for stats
       triggerStatsUpdate()
 
       // Delayed refresh for data consistency
       setTimeout(() => {
-        loadRegistrations(true) // Force refresh
+        loadRegistrations(true) // Force refresh from server
         loadStats()
         // Additional trigger for accommodation stats
         triggerStatsUpdate()
         console.log('🔄 Secondary status change update completed')
-      }, 50) // Reduced delay for faster response
+      }, 100) // Slightly increased delay for better consistency
     }, []),
     onError: useCallback((event) => {
       console.log('🚨 Real-time error received:', event.data)
@@ -415,20 +439,27 @@ function AttendancePageContent() {
       const data = await response.json()
 
       if (response.ok) {
-        // Refresh data with current filter state
-        await Promise.all([loadStats(), loadRegistrations()])
+        // Immediate UI update
+        setRegistrations(prevRegistrations =>
+          prevRegistrations.map(reg =>
+            reg.id === confirmTarget.id
+              ? { ...reg, isVerified: true, verifiedAt: new Date().toISOString() }
+              : reg
+          )
+        )
 
         // Trigger accommodation stats update for real-time button visibility
         console.log('🚀 Triggering stats update for verification at', new Date().toISOString())
         console.time('verification-stats-trigger')
         triggerStatsUpdate()
 
-        // Additional trigger with delay to ensure accommodations page updates
-        setTimeout(() => {
+        // Delayed refresh for data consistency (but don't wait for it)
+        setTimeout(async () => {
+          await Promise.all([loadStats(), loadRegistrations()])
           triggerStatsUpdate()
           console.log('🔄 Secondary stats update triggered for verification')
           console.timeEnd('verification-stats-trigger')
-        }, 100)
+        }, 200)
 
         success(`${capitalizeName(data.registration.fullName)} has been verified successfully!`)
         setShowConfirmModal(false)
@@ -463,20 +494,27 @@ function AttendancePageContent() {
       const data = await response.json()
 
       if (response.ok) {
-        // Refresh data
-        await Promise.all([loadStats(), loadRegistrations()])
+        // Immediate UI update
+        setRegistrations(prevRegistrations =>
+          prevRegistrations.map(reg =>
+            reg.id === confirmTarget.id
+              ? { ...reg, isVerified: false, verifiedAt: null }
+              : reg
+          )
+        )
 
         // Trigger accommodation stats update for real-time button visibility
         console.log('🚀 Triggering stats update for unverification at', new Date().toISOString())
         console.time('unverification-stats-trigger')
         triggerStatsUpdate()
 
-        // Additional trigger with delay to ensure accommodations page updates
-        setTimeout(() => {
+        // Delayed refresh for data consistency (but don't wait for it)
+        setTimeout(async () => {
+          await Promise.all([loadStats(), loadRegistrations()])
           triggerStatsUpdate()
           console.log('🔄 Secondary stats update triggered for unverification')
           console.timeEnd('unverification-stats-trigger')
-        }, 100)
+        }, 200)
 
         success(data.message)
         setShowConfirmModal(false)
@@ -574,13 +612,27 @@ function AttendancePageContent() {
         const verifyData = await verifyResponse.json()
 
         if (verifyResponse.ok) {
-          // Refresh data and trigger updates
-          await Promise.all([loadStats(), loadRegistrations()])
+          // Immediate UI update
+          setRegistrations(prevRegistrations =>
+            prevRegistrations.map(reg =>
+              reg.id === verifyData.registration.id
+                ? { ...reg, isVerified: true, verifiedAt: new Date().toISOString() }
+                : reg
+            )
+          )
+
+          // Trigger stats update immediately
           triggerStatsUpdate()
-          setTimeout(() => {
+
+          // Delayed refresh for data consistency
+          setTimeout(async () => {
+            await Promise.all([loadStats(), loadRegistrations()])
             triggerStatsUpdate()
             console.log('🔄 Secondary stats update triggered for QR verification')
-          }, 100)
+          }, 200)
+
+          success(`✅ ${capitalizeName(verifyData.registration.fullName)} has been verified with QR code!`)
+          setLastQRScanId(verifyData.registration.id) // Track for duplicate prevention
         } else {
           error(`QR Verification failed: ${verifyData.error}`)
           setLastQRScanId(null)

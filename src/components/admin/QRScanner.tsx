@@ -126,12 +126,13 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         throw new Error('Camera not supported in this browser')
       }
 
-      // Request camera access
+      // Request camera access with optimized settings for speed
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 640, max: 1280 },  // Lower initial resolution for faster startup
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 15, max: 30 }  // Lower frame rate for better performance
         }
       })
 
@@ -160,7 +161,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     }
   }
 
-  // Manual scan function - triggered by button click
+  // Manual scan function - triggered by button click (optimized for speed)
   const performManualScan = async () => {
     if (!jsQRLoaded || !jsQRRef.current) {
       setError('QR scanner not ready. Please wait for the scanner to load.')
@@ -172,8 +173,13 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       return
     }
 
-    console.log('🔍 Manual scan triggered')
-    await scanFrame()
+    console.log('🔍 Fast manual scan triggered')
+    setProcessing(true) // Show immediate feedback
+    try {
+      await scanFrame()
+    } finally {
+      setProcessing(false)
+    }
   }
 
   // Scan current video frame
@@ -195,11 +201,12 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
         scanAttempts: prev.scanAttempts + 1
       }))
 
-      // Set canvas size to match video
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
+      // Optimize canvas size for faster processing
+      const scale = Math.min(640 / video.videoWidth, 480 / video.videoHeight, 1)
+      canvas.width = video.videoWidth * scale
+      canvas.height = video.videoHeight * scale
 
-      // Draw video frame to canvas
+      // Draw scaled video frame for faster processing
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
       // Get image data
@@ -207,20 +214,18 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
       if (!imageData || imageData.data.length === 0) return
 
-      // Scan for QR code with multiple attempts
+      // Fast scan with optimized options (prioritize speed)
       const scanOptions = [
-        { inversionAttempts: 'attemptBoth' as const },
-        { inversionAttempts: 'onlyInvert' as const },
-        { inversionAttempts: 'dontInvert' as const }
+        { inversionAttempts: 'attemptBoth' as const }, // Most likely to work
+        { inversionAttempts: 'dontInvert' as const }   // Quick fallback
       ]
 
       let qrCode: QRCodeResult | null = null
       for (const options of scanOptions) {
-        try {
-          qrCode = jsQRRef.current(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
-          if (qrCode && qrCode.data) break
-        } catch (scanError) {
-          // Continue to next option
+        qrCode = jsQRRef.current(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
+        if (qrCode && qrCode.data) {
+          console.log('✅ QR found quickly with options:', options)
+          break
         }
       }
 
@@ -310,10 +315,10 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
       setSuccess('✅ QR code scanned successfully! Participant verification in progress...')
 
-      // Auto-close after success
+      // Auto-close after success (faster response)
       setTimeout(() => {
         onCloseAction()
-      }, 2000)
+      }, 800)
 
     } catch (error: any) {
       console.error('QR processing error:', error)
@@ -383,23 +388,18 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             dataLength: imageData.data.length
           })
 
-          // Try multiple scan options for better detection
+          // Fast scan with optimized options (reduced attempts for speed)
           const scanOptions = [
-            { inversionAttempts: 'attemptBoth' as const },
-            { inversionAttempts: 'onlyInvert' as const },
-            { inversionAttempts: 'dontInvert' as const }
+            { inversionAttempts: 'attemptBoth' as const }, // Most likely to work
+            { inversionAttempts: 'dontInvert' as const }   // Fallback for normal images
           ]
 
           let qrCode: QRCodeResult | null = null
           for (const options of scanOptions) {
-            try {
-              qrCode = jsQRRef.current(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
-              if (qrCode && qrCode.data) {
-                console.log('✅ QR found with options:', options)
-                break
-              }
-            } catch (scanError) {
-              console.log('⚠️ Scan attempt failed with options:', options, scanError)
+            qrCode = jsQRRef.current(imageData.data, imageData.width, imageData.height, options) as QRCodeResult | null
+            if (qrCode && qrCode.data) {
+              console.log('✅ QR found quickly with options:', options)
+              break
             }
           }
 
@@ -557,7 +557,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
               className="w-full h-12 border-2 border-dashed border-gray-300 hover:border-green-500 hover:bg-green-50"
             >
               <Upload className="h-4 w-4 mr-2" />
-              Upload QR Image
+              {processing ? 'Processing...' : 'Upload QR Image'}
             </Button>
           </div>
 
