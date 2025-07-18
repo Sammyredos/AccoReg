@@ -45,36 +45,20 @@ export function ReactiveSystemName({ onNameUpdate }: ReactiveSystemNameProps) {
           onNameUpdate?.(cachedName)
         }
 
-        // Always fetch fresh data in background with timeout
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
-
-        const response = await fetch('/api/admin/settings', {
-          signal: controller.signal
-        })
-        clearTimeout(timeoutId)
-
+        // Always fetch fresh data in background
+        const response = await fetch('/api/admin/settings')
         if (response.ok) {
           const data = await response.json()
           const brandingSettings = data.settings?.branding || []
           const systemNameSetting = brandingSettings.find((s: any) => s.key === 'systemName')
           const newSystemName = systemNameSetting?.value || 'Mopgomglobal'
-
+          
           setSystemName(newSystemName)
           updateGlobalSystemName(newSystemName)
           onNameUpdate?.(newSystemName)
         }
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('Failed to load system name:', error)
-        }
-        // Use fallback name if loading fails
-        if (!globalSystemNameLoaded) {
-          const fallbackName = 'Mopgomglobal'
-          setSystemName(fallbackName)
-          updateGlobalSystemName(fallbackName)
-          onNameUpdate?.(fallbackName)
-        }
+        console.error('Failed to load system name:', error)
         // Set as loaded even on error to prevent infinite loading
         globalSystemNameLoaded = true
       } finally {

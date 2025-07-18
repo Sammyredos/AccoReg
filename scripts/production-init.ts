@@ -18,46 +18,33 @@ async function initializeProduction() {
     await prisma.$connect()
     console.log('✅ Database connected successfully')
     
-    // Create super admin if not exists (using Admin table, not User table)
+    // Create super admin if not exists
     console.log('👑 Setting up Super Admin account...')
     try {
-      const existingAdmin = await prisma.admin.findFirst({
-        where: { email: process.env.DEFAULT_ADMIN_EMAIL || 'admin@mopgomglobal.com' }
+      const existingAdmin = await prisma.user.findFirst({
+        where: { role: 'SUPER_ADMIN' }
       })
-
+      
       if (!existingAdmin) {
-        // First ensure Super Admin role exists
-        const superAdminRole = await prisma.role.upsert({
-          where: { name: 'Super Admin' },
-          update: {},
-          create: {
-            name: 'Super Admin',
-            description: 'Full system access',
-            isSystem: true
-          }
-        })
-
         const bcrypt = await import('bcryptjs')
-        const hashedPassword = await bcrypt.hash(process.env.DEFAULT_ADMIN_PASSWORD || 'SuperAdmin123!', 12)
-
-        await prisma.admin.create({
+        const hashedPassword = await bcrypt.hash(process.env.DEFAULT_ADMIN_PASSWORD || 'Admin123!', 12)
+        
+        await prisma.user.create({
           data: {
             email: process.env.DEFAULT_ADMIN_EMAIL || 'admin@mopgomglobal.com',
             password: hashedPassword,
-            name: 'Super Administrator',
-            roleId: superAdminRole.id,
-            isActive: true
+            fullName: 'Super Administrator',
+            role: 'SUPER_ADMIN',
+            isVerified: true,
+            emailVerified: new Date(),
           }
         })
-        console.log('✅ Super Admin account created in Admin table')
-        console.log('📧 Email: admin@mopgomglobal.com')
-        console.log('🔑 Password: SuperAdmin123!')
+        console.log('✅ Super Admin account created')
       } else {
         console.log('ℹ️ Super Admin account already exists')
       }
     } catch (error) {
-      console.log('⚠️ Admin setup failed:', error.message)
-      throw error // Don't skip this error, it's critical
+      console.log('⚠️ Admin setup skipped:', error.message)
     }
     
     // Seed basic settings if not exists

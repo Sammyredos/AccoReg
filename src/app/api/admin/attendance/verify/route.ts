@@ -138,9 +138,7 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
         scannerName: currentUser.fullName || currentUser.email,
         platoonName: registration.platoonAllocation?.platoon?.name,
-        roomName: registration.roomAllocation?.room?.name,
-        method: method, // Include the verification method
-        verifiedBy: currentUser.email
+        roomName: registration.roomAllocation?.room?.name
       }
     })
 

@@ -39,19 +39,11 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Load logo from admin branding with timeout
+  // Load logo from admin branding
   useEffect(() => {
     const loadLogo = async () => {
       try {
-        // Add timeout to prevent hanging
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
-
-        const response = await fetch('/api/admin/settings/logo', {
-          signal: controller.signal
-        })
-        clearTimeout(timeoutId)
-
+        const response = await fetch('/api/admin/settings/logo')
         if (response.ok) {
           const data = await response.json()
           if (data.logoUrl) {
@@ -59,10 +51,7 @@ export default function Home() {
           }
         }
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('Failed to load logo:', error)
-        }
-        // Continue without logo if it fails
+        console.error('Failed to load logo:', error)
       }
     }
 
