@@ -43,6 +43,19 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
   const [lastScannedId, setLastScannedId] = useState<string | null>(null)
   const [autoScanActive, setAutoScanActive] = useState(false)
   const [jsQRLoaded, setJsQRLoaded] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<{
+    cameraSupported: boolean
+    videoReady: boolean
+    canvasReady: boolean
+    lastScanAttempt: string | null
+    scanAttempts: number
+  }>({
+    cameraSupported: false,
+    videoReady: false,
+    canvasReady: false,
+    lastScanAttempt: null,
+    scanAttempts: 0
+  })
   
   // Refs for DOM elements and streams
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -118,13 +131,16 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       setScanning(true)
 
       // Check if camera is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const cameraSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+      setDebugInfo(prev => ({ ...prev, cameraSupported }))
+
+      if (!cameraSupported) {
         throw new Error('Camera not supported in this browser')
       }
 
       // Request camera access
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
@@ -132,11 +148,13 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       })
 
       streamRef.current = stream
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
-        
+
+        setDebugInfo(prev => ({ ...prev, videoReady: true }))
+
         // Start auto-scanning after video is ready
         setTimeout(() => {
           if (jsQRLoaded) {
@@ -148,7 +166,7 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     } catch (error: any) {
       console.error('Camera error:', error)
       setScanning(false)
-      
+
       if (error.name === 'NotAllowedError') {
         setError('Camera access denied. Please allow camera access and try again.')
       } else if (error.name === 'NotFoundError') {
@@ -184,6 +202,14 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
     if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) return
 
     try {
+      // Update debug info
+      setDebugInfo(prev => ({
+        ...prev,
+        canvasReady: true,
+        lastScanAttempt: new Date().toLocaleTimeString(),
+        scanAttempts: prev.scanAttempts + 1
+      }))
+
       // Set canvas size to match video
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
@@ -235,15 +261,15 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
       setLastScannedId(qrData)
 
       console.log('🔄 Processing QR code:', qrData.substring(0, 50) + '...')
-      
+
       await onScanAction(qrData)
-      
-      setSuccess('QR code scanned successfully!')
-      
+
+      setSuccess('Participant has just been verified with QR code!')
+
       // Auto-close after success (optional)
       setTimeout(() => {
         handleClose()
-      }, 2000)
+      }, 3000) // Increased to 3 seconds to read the name
 
     } catch (error: any) {
       console.error('QR processing error:', error)
@@ -424,33 +450,45 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
 
           {/* Camera Controls */}
           {scanning && (
-            <div className="mb-6 flex flex-col sm:flex-row gap-2">
+            <div className="mb-6 space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  onClick={stopCamera}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Stop Camera
+                </Button>
+                {jsQRLoaded && !autoScanActive && (
+                  <Button
+                    onClick={startAutoScan}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Scan className="h-4 w-4 mr-2" />
+                    Start Auto-Scan
+                  </Button>
+                )}
+                {autoScanActive && (
+                  <Button
+                    onClick={stopAutoScan}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Stop Auto-Scan
+                  </Button>
+                )}
+              </div>
+
+              {/* Manual Scan Button */}
               <Button
-                onClick={stopCamera}
-                variant="outline"
-                className="flex-1"
+                onClick={scanFrame}
+                disabled={processing || !jsQRLoaded}
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
               >
-                Stop Camera
+                <Scan className="h-4 w-4 mr-2" />
+                {processing ? 'Scanning...' : 'Scan Now'}
               </Button>
-              {jsQRLoaded && !autoScanActive && (
-                <Button
-                  onClick={startAutoScan}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Scan className="h-4 w-4 mr-2" />
-                  Start Auto-Scan
-                </Button>
-              )}
-              {autoScanActive && (
-                <Button
-                  onClick={stopAutoScan}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Stop Auto-Scan
-                </Button>
-              )}
             </div>
           )}
 
@@ -499,12 +537,30 @@ export function QRScanner({ isOpen, onCloseAction, onScanAction }: QRScannerProp
             </div>
           )}
 
+          {/* Debug Information Panel */}
+          {scanning && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h3 className="text-sm font-medium text-blue-900 mb-2">Scanner Status:</h3>
+              <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
+                <div>Camera: {debugInfo.cameraSupported ? '✅ Supported' : '❌ Not Supported'}</div>
+                <div>Video: {debugInfo.videoReady ? '✅ Ready' : '⏳ Loading'}</div>
+                <div>Canvas: {debugInfo.canvasReady ? '✅ Ready' : '⏳ Waiting'}</div>
+                <div>jsQR: {jsQRLoaded ? '✅ Loaded' : '⏳ Loading'}</div>
+                <div className="col-span-2">Scan Attempts: {debugInfo.scanAttempts}</div>
+                {debugInfo.lastScanAttempt && (
+                  <div className="col-span-2">Last Scan: {debugInfo.lastScanAttempt}</div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Instructions */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-medium text-gray-900 mb-2">How to use:</h3>
             <ul className="text-xs text-gray-600 space-y-1">
               <li>• Click "Scan with Camera" to use your device camera</li>
               <li>• Click "Upload QR Image" to scan from a saved image</li>
+              <li>• Use "Scan Now" button for manual scanning</li>
               <li>• Position QR code clearly in view for best results</li>
               <li>• Scanner will automatically detect and process QR codes</li>
             </ul>
