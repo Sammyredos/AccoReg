@@ -360,6 +360,56 @@ async function seedSettings() {
         type: 'select',
         options: ['immediate', 'hourly', 'daily', 'weekly'],
         description: 'How often to send notifications'
+      },
+      {
+        key: 'registration.enabled',
+        value: 'true',
+        description: 'Enable/disable new registrations'
+      },
+      {
+        key: 'registration.minimum_age',
+        value: '16',
+        description: 'Minimum age for registration'
+      },
+      {
+        key: 'registration.maximum_age',
+        value: '35',
+        description: 'Maximum age for registration'
+      },
+      {
+        key: 'registration.closure_date',
+        value: '2024-12-31',
+        description: 'Registration closure date'
+      },
+      {
+        key: 'email.enabled',
+        value: 'true',
+        description: 'Enable email notifications'
+      },
+      {
+        key: 'sms.enabled',
+        value: 'false',
+        description: 'Enable SMS notifications'
+      },
+      {
+        key: 'accommodations.enabled',
+        value: 'true',
+        description: 'Enable accommodation management'
+      },
+      {
+        key: 'accommodation_max_age_gap',
+        value: '5',
+        description: 'Maximum age gap allowed between youngest and oldest person in the same room'
+      },
+      {
+        key: 'backup.enabled',
+        value: 'true',
+        description: 'Enable automatic backups'
+      },
+      {
+        key: 'backup.encryption',
+        value: 'false',
+        description: 'Enable backup encryption'
       }
     ]
 

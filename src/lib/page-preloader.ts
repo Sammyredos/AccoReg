@@ -112,15 +112,13 @@ class PagePreloader {
   }
 
   private async registerServiceWorker() {
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+    if ('serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.register('/sw.js')
         console.log('🚀 Service Worker registered:', registration.scope)
       } catch (error) {
         console.warn('Service Worker registration failed:', error)
       }
-    } else {
-      console.log('🔧 Service Worker registration skipped (development mode)')
     }
   }
 
