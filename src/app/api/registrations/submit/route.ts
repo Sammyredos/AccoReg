@@ -63,14 +63,42 @@ export async function POST(request: NextRequest) {
       age--
     }
 
-    // Ensure branch is properly set (not empty or just whitespace)
-    const branchValue = data.branch?.trim() || 'Not Specified'
-
-    console.log('Registration data:', {
+    console.log('Registration data received:', {
       fullName: data.fullName,
       branch: data.branch,
-      branchValue: branchValue
+      branchLength: data.branch?.length,
+      branchTrimmed: data.branch?.trim()
     })
+
+    // Final duplicate check before creating registration
+    const normalizedEmail = data.emailAddress.toLowerCase().trim()
+    const normalizedPhone = data.phoneNumber.trim()
+    const normalizedName = data.fullName.toLowerCase().trim()
+
+    const existingRegistration = await prisma.registration.findFirst({
+      where: {
+        OR: [
+          { emailAddress: normalizedEmail },
+          { phoneNumber: normalizedPhone },
+          { fullName: normalizedName }
+        ]
+      }
+    })
+
+    if (existingRegistration) {
+      const duplicateField =
+        existingRegistration.emailAddress === normalizedEmail ? 'emailAddress' :
+        existingRegistration.phoneNumber === normalizedPhone ? 'phoneNumber' : 'fullName'
+
+      return NextResponse.json(
+        {
+          error: 'Duplicate registration',
+          field: duplicateField,
+          message: `This ${duplicateField === 'fullName' ? 'name' : duplicateField === 'emailAddress' ? 'email' : 'phone number'} is already registered`
+        },
+        { status: 400 }
+      )
+    }
 
     // Create registration
     const registration = await prisma.registration.create({
@@ -80,7 +108,7 @@ export async function POST(request: NextRequest) {
         age: age,
         gender: data.gender,
         address: data.address,
-        branch: branchValue,
+        branch: data.branch,
         phoneNumber: data.phoneNumber,
         emailAddress: data.emailAddress,
         // Use emergency contact info (either manually entered or copied from parent)

@@ -5,6 +5,12 @@ export async function POST(request: NextRequest) {
   try {
     const { emailAddress, phoneNumber, fullName } = await request.json()
 
+    console.log('Duplicate check called for:', {
+      fullName,
+      emailAddress,
+      phoneNumber
+    })
+
     if (!emailAddress || !phoneNumber || !fullName) {
       return NextResponse.json(
         { error: 'Full name, email address and phone number are required' },
