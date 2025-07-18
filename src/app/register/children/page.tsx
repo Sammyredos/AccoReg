@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
@@ -31,7 +31,8 @@ interface RegistrationSettings {
   minimumAge: number
 }
 
-export default function ChildrenRegistrationPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function ChildrenRegistrationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
@@ -1270,5 +1271,26 @@ export default function ChildrenRegistrationPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+// Loading component for Suspense fallback
+function ChildrenRegistrationLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading registration form...</p>
+      </div>
+    </div>
+  )
+}
+
+// Main component with Suspense boundary
+export default function ChildrenRegistrationPage() {
+  return (
+    <Suspense fallback={<ChildrenRegistrationLoading />}>
+      <ChildrenRegistrationContent />
+    </Suspense>
   )
 }
