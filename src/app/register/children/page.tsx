@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Check, Users, Heart, Shield, Baby, Calendar } from 'lucide-react'
+import { ArrowLeft, Check, Users, Heart, Shield, Baby, Calendar, Search, AlertTriangle } from 'lucide-react'
 
 interface FormData {
   fullName: string
@@ -29,6 +29,16 @@ interface FormErrors {
 
 interface RegistrationSettings {
   minimumAge: number
+}
+
+interface SimilarChild {
+  id: string
+  fullName: string
+  parentGuardianEmail: string
+  parentGuardianPhone: string
+  age: number
+  gender: string
+  registrationDate: string
 }
 
 // Helper function to get initial form data
@@ -60,6 +70,12 @@ export default function ChildrenRegistrationPage() {
   const [userAge, setUserAge] = useState<number | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [stepTransitioning, setStepTransitioning] = useState(false)
+
+  // Real-time search state
+  const [searchResults, setSearchResults] = useState<SimilarChild[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Load registration settings (same API as main registration form)
@@ -167,8 +183,62 @@ export default function ChildrenRegistrationPage() {
     setStepTransitioning(false)
     setShowAgeModal(false)
     setUserAge(null)
+    setSearchResults([])
+    setShowSearchResults(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Real-time search for similar children
+  const searchSimilarChildren = async (name: string) => {
+    if (!name || name.length < 2) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch('/api/registrations/children/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ searchTerm: name }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.results || [])
+        setShowSearchResults(data.results && data.results.length > 0)
+      }
+    } catch (error) {
+      console.error('Error searching for similar children:', error)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (formData.fullName) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchSimilarChildren(formData.fullName)
+      }, 300) // 300ms debounce delay
+    } else {
+      setSearchResults([])
+      setShowSearchResults(false)
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [formData.fullName])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -837,23 +907,67 @@ export default function ChildrenRegistrationPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     {/* Full Name */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative">
                       <label htmlFor="fullName" className="block text-sm font-apercu-medium text-gray-700">
                         Child's Full Name *
                       </label>
-                      <input
-                        type="text"
-                        name="fullName"
-                        id="fullName"
-                        value={formData.fullName}
-                        onChange={handleChange}
-                        className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
-                          getFieldError('fullName')
-                            ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
-                            : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
-                        }`}
-                        placeholder="Enter child's full name"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          name="fullName"
+                          id="fullName"
+                          value={formData.fullName}
+                          onChange={handleChange}
+                          className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 border rounded-lg shadow-sm font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 ${
+                            getFieldError('fullName')
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50'
+                              : 'border-gray-300 hover:border-indigo-300 bg-white hover:shadow-md'
+                          }`}
+                          placeholder="Enter child's full name"
+                        />
+                        {isSearching && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <Search className="h-4 w-4 text-gray-400 animate-pulse" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Search Results */}
+                      {showSearchResults && searchResults.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <div className="p-3 border-b border-gray-100 bg-yellow-50">
+                            <div className="flex items-center text-yellow-800">
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              <span className="text-sm font-apercu-medium">Similar registrations found</span>
+                            </div>
+                          </div>
+                          {searchResults.map((child) => (
+                            <div key={child.id} className="p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <p className="font-apercu-medium text-gray-900 text-sm">{child.fullName}</p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    {child.gender}, Age {child.age} • Parent: {child.parentGuardianEmail}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Registered: {new Date(child.registrationDate).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setShowSearchResults(false)}
+                              className="text-xs text-gray-500 hover:text-gray-700 font-apercu-regular"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {getFieldError('fullName') && (
                         <p className="text-red-600 text-xs sm:text-sm font-apercu-regular">{getFieldError('fullName')}</p>
                       )}
