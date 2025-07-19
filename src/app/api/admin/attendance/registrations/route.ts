@@ -40,16 +40,19 @@ export async function GET(request: NextRequest) {
     const where: any = {
       gender: {
         in: ['Male', 'Female'] // Only Male and Female
-      }
+      },
+      // RESTRICTION: Only show verified and unallocated participants on attendance page
+      isVerified: true,
+      roomAllocation: null
     }
 
-    // Add verification filter
+    // Add verification filter (but override with restriction above)
     if (verified === 'true') {
       where.isVerified = true
     } else if (verified === 'false') {
       where.isVerified = false
     }
-    // If verified is null or 'all', don't filter by verification status (show all)
+    // Note: Even if 'false' is requested, we still enforce isVerified: true for attendance page
 
     if (gender && ['Male', 'Female'].includes(gender)) {
       where.gender = gender

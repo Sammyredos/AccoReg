@@ -60,6 +60,9 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const whereClause = searchConditions.length > 0 ? { AND: searchConditions } : {}
 
+    // NOTE: Accommodations search has NO RESTRICTIONS - can access all participants
+    // regardless of verification or allocation status for room management purposes
+
     // Search registrations
     const registrations = await prisma.registration.findMany({
       where: whereClause,

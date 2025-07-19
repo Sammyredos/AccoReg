@@ -55,7 +55,11 @@ export async function GET(request: NextRequest) {
     const skip = limit ? (page - 1) * limit : 0
 
     // Build where clause for search and status
-    const where: any = {}
+    const where: any = {
+      // RESTRICTION: Only show verified and unallocated participants on registrations page
+      isVerified: true,
+      roomAllocation: null
+    }
 
     // Add search conditions (PostgreSQL compatible)
     if (search) {

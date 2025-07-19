@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
     const where: any = {
       gender: {
         in: ['Male', 'Female'] // Only Male and Female
-      }
+      },
+      // RESTRICTION: Only show unallocated participants on attendance page
+      roomAllocation: null
     }
 
     // Add verification filter

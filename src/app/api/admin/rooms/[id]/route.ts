@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
+import { broadcastAttendanceEvent } from '../../attendance/events/route'
 
 const prisma = new PrismaClient()
 
@@ -167,6 +168,25 @@ export async function PUT(
       }
     })
 
+    // Broadcast real-time room update event for stats update (especially for capacity changes)
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId: 'room_stats_update',
+        fullName: `Room Updated: ${updatedRoom.name}`,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        roomName: updatedRoom.name
+      }
+    })
+
+    console.log('🏠 Real-time room update event broadcasted:', {
+      roomName: updatedRoom.name,
+      capacity: updatedRoom.capacity,
+      gender: updatedRoom.gender,
+      updatedBy: currentUser.email
+    })
+
     return NextResponse.json({
       success: true,
       room: updatedRoom,
@@ -225,6 +245,25 @@ export async function DELETE(
     // Delete room
     await prisma.room.delete({
       where: { id: roomId }
+    })
+
+    // Broadcast real-time room deletion event for stats update
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId: 'room_stats_update',
+        fullName: `Room Deleted: ${room.name}`,
+        status: 'absent',
+        timestamp: new Date().toISOString(),
+        roomName: room.name
+      }
+    })
+
+    console.log('🏠 Real-time room deletion event broadcasted:', {
+      roomName: room.name,
+      capacity: room.capacity,
+      gender: room.gender,
+      deletedBy: currentUser.email
     })
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
+import { broadcastAttendanceEvent } from '../attendance/events/route'
 
 const prisma = new PrismaClient()
 
@@ -127,6 +128,25 @@ export async function POST(request: NextRequest) {
         capacity: data.capacity,
         description: data.description || null
       }
+    })
+
+    // Broadcast real-time room creation event for stats update
+    broadcastAttendanceEvent({
+      type: 'status_change',
+      data: {
+        registrationId: 'room_stats_update',
+        fullName: `Room Created: ${room.name}`,
+        status: 'present',
+        timestamp: new Date().toISOString(),
+        roomName: room.name
+      }
+    })
+
+    console.log('🏠 Real-time room creation event broadcasted:', {
+      roomName: room.name,
+      capacity: room.capacity,
+      gender: room.gender,
+      createdBy: currentUser.email
     })
 
     return NextResponse.json({
