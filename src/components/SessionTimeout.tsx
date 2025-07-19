@@ -38,30 +38,19 @@ export function SessionTimeout({ }: SessionTimeoutProps) {
     }
 
     try {
-      console.log('🚪 Force logout - calling API...')
+      // Call logout API (don't wait for response)
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
 
-      // Call logout API
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      })
-
-      console.log('📡 Force logout response:', response.status)
-
-      // Clear all local storage and session storage immediately
+      // Clear all local storage and cookies immediately
       localStorage.clear()
       sessionStorage.clear()
 
-      // Force immediate redirect
-      console.log('🚀 Force logout - executing redirect...')
-      window.location.replace('/admin/login')
-
+      // Force redirect immediately - no delays
+      window.location.href = '/admin/login'
     } catch (error) {
       console.error('Force logout error:', error)
-      // Even if API fails, clear storage and force redirect
-      localStorage.clear()
-      sessionStorage.clear()
-      window.location.replace('/admin/login')
+      // Even if API fails, force redirect
+      window.location.href = '/admin/login'
     }
   }, [isLoggingOut])
 

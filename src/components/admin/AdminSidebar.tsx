@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useBranding } from '@/contexts/BrandingContext'
 import { useUser } from '@/contexts/UserContext'
@@ -12,8 +12,8 @@ import { useMessages } from '@/contexts/MessageContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { useProgress } from '@/hooks/useProgress'
 import { SidebarLogo } from '@/components/ui/UniversalLogo'
-import { redirectAfterLogout } from '@/lib/redirect-utils'
 
 
 import {
@@ -129,6 +129,15 @@ export function AdminSidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const { t, isHydrated } = useSafeTranslation()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { startProgress, completeProgress } = useProgress()
+
+  // Complete progress when page loads
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      completeProgress()
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [pathname, completeProgress])
 
   const { branding, isLoading } = useBranding()
   const { currentUser, loading: isLoadingUser } = useUser()
@@ -154,8 +163,9 @@ export function AdminSidebar({ className }: SidebarProps) {
   }
 
   const handleNavigation = (href: string) => {
-    // Navigation handling without progress bar
-    console.log('Navigating to:', href)
+    if (pathname !== href) {
+      startProgress()
+    }
   }
 
   const handleLogout = async () => {
@@ -163,23 +173,11 @@ export function AdminSidebar({ className }: SidebarProps) {
 
     try {
       setIsLoggingOut(true)
-      console.log('🚪 Starting logout process...')
-
-      // Call logout API
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      })
-
-      console.log('📡 Logout response status:', response.status)
-
-      // Use the reliable redirect utility
-      redirectAfterLogout('/admin/login')
-
+      await fetch('/api/auth/logout', { method: 'POST' })
+      window.location.href = '/admin/login'
     } catch (error) {
       console.error('Logout failed:', error)
-      // Force redirect even on error
-      redirectAfterLogout('/admin/login')
+      setIsLoggingOut(false) // Reset on error
     }
   }
 

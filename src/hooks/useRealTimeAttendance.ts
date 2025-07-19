@@ -48,10 +48,6 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
   const [stableConnectionState, setStableConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('connecting')
   const stateStabilizationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Polling fallback for production environments where EventSource might fail
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const [usePollingFallback, setUsePollingFallback] = useState(false)
-
   // Throttled event count to prevent rapid UI updates
   const [displayEventCount, setDisplayEventCount] = useState(0)
   const eventCountUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -82,44 +78,6 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
     }, 500) // 500ms throttle for event count updates
   }, [])
 
-  // Polling fallback for production environments
-  const startPollingFallback = useCallback(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-    }
-
-    console.log('🔄 Starting polling fallback for real-time updates...')
-    setUsePollingFallback(true)
-
-    // Poll every 5 seconds for updates
-    pollingIntervalRef.current = setInterval(async () => {
-      try {
-        const response = await fetch('/api/admin/attendance/poll', {
-          credentials: 'include'
-        })
-
-        if (response.ok) {
-          const events = await response.json()
-          if (events && events.length > 0) {
-            events.forEach((event: AttendanceEvent) => {
-              handleEvent(event)
-            })
-          }
-        }
-      } catch (error) {
-        console.warn('Polling fallback error:', error)
-      }
-    }, 5000)
-  }, [])
-
-  const stopPollingFallback = useCallback(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-      pollingIntervalRef.current = null
-    }
-    setUsePollingFallback(false)
-  }, [])
-
   const connect = useCallback(() => {
     try {
       // Close existing connection
@@ -127,14 +85,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
         eventSourceRef.current.close()
       }
 
-      // Check if we're in browser environment and user is logged in
-      if (typeof window === 'undefined') {
-        console.warn('⚠️ SSR environment detected, skipping real-time connection')
-        setConnectionError('SSR environment')
-        updateStableState('disconnected')
-        return
-      }
-
+      // Check if user is logged in by checking for auth token
       const hasAuthToken = document.cookie.includes('auth-token=')
       if (!hasAuthToken) {
         console.warn('⚠️ No auth token found, skipping real-time connection')
@@ -145,7 +96,6 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
 
       console.log('🔄 Connecting to real-time attendance updates...')
 
-      // Enhanced EventSource for production compatibility
       const eventSource = new EventSource('/api/admin/attendance/events')
       eventSourceRef.current = eventSource
 
@@ -261,15 +211,8 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
 
         eventSource.close()
 
-        // In production, try polling fallback if EventSource fails repeatedly
-        if (process.env.NODE_ENV === 'production' && !usePollingFallback) {
-          console.log('🔄 EventSource failed in production, trying polling fallback...')
-          startPollingFallback()
-          return
-        }
-
         // Auto-reconnect if enabled with immediate retry for better reliability
-        if (autoReconnect && !reconnectTimeoutRef.current && !usePollingFallback) {
+        if (autoReconnect && !reconnectTimeoutRef.current) {
           console.log(`🔄 Reconnecting in ${reconnectInterval}ms...`)
           updateStableState('connecting')
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -310,13 +253,10 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       eventCountUpdateTimeoutRef.current = null
     }
 
-    // Stop polling fallback
-    stopPollingFallback()
-
     setIsConnected(false)
     setConnectionError(null)
     setStableConnectionState('disconnected')
-  }, [stopPollingFallback])
+  }, [])
 
   const reconnect = useCallback(() => {
     console.log('🔄 Manual reconnection requested')
@@ -342,9 +282,6 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
 
   // Handle page visibility changes
   useEffect(() => {
-    // Only add event listener in browser environment
-    if (typeof window === 'undefined') return
-
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Page is hidden - keep connection but reduce activity

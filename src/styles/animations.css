@@ -257,7 +257,19 @@
   transform: rotate(180deg);
 }
 
-/* Progress animations removed */
+/* Progress animations */
+@keyframes progress-bar {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--progress-width);
+  }
+}
+
+.progress-animate {
+  animation: progress-bar 1s ease-out;
+}
 
 /* Toast animations */
 @keyframes toast-in {

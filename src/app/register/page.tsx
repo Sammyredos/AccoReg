@@ -494,14 +494,6 @@ function RegistrationForm() {
 
       // Submit registration
       setLoadingMessage('Submitting registration...')
-
-      console.log('Submitting form data:', {
-        fullName: formData.fullName,
-        branch: formData.branch,
-        branchLength: formData.branch?.length,
-        allFormData: formData
-      })
-
       const response = await fetch('/api/registrations/submit', {
         method: 'POST',
         headers: {

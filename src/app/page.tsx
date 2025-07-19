@@ -29,9 +29,6 @@ export default function Home() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    // Only add scroll listener in browser environment
-    if (typeof window === 'undefined') return
-
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10)
     }
@@ -39,14 +36,11 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Load logo from public branding API
+  // Load logo from admin branding
   useEffect(() => {
     const loadLogo = async () => {
       try {
-        const response = await fetch('/api/system/branding', {
-          cache: 'force-cache'
-        })
-
+        const response = await fetch('/api/admin/settings/logo')
         if (response.ok) {
           const data = await response.json()
           if (data.logoUrl) {
@@ -55,7 +49,6 @@ export default function Home() {
         }
       } catch (error) {
         console.error('Failed to load logo:', error)
-        // Continue without logo if it fails
       }
     }
 

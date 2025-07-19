@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { TitleManager } from "@/components/TitleManager";
 import { FaviconManager } from "@/components/FaviconManager";
+import { ProgressBar } from "@/components/ProgressBar";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { FontLoader } from "@/components/ui/font-loader";
 
@@ -80,8 +81,9 @@ export default function RootLayout({
         }} />
       </head>
       <body className="font-apercu antialiased text-gray-900 bg-white" suppressHydrationWarning={true}>
-        <FontLoader timeout={1000} showLoadingScreen={false}>
+        <FontLoader>
           <LanguageProvider>
+            <ProgressBar color="#4f46e5" height={3} />
             <TitleManager />
             <FaviconManager />
             {children}

@@ -12,33 +12,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      console.log('🚪 AdminLayout logout - calling API...')
-
-      const response = await fetch('/api/auth/logout', {
+      await fetch('/api/auth/logout', {
         method: 'POST',
-        credentials: 'include'
       })
-
-      console.log('📡 AdminLayout logout response:', response.status)
-
-      // Clear local storage
-      if (typeof window !== 'undefined') {
-        localStorage.clear()
-        sessionStorage.clear()
-      }
-
-      // Force immediate redirect
-      console.log('🚀 AdminLayout logout - executing redirect...')
-      window.location.replace('/admin/login')
-
+      router.push('/admin/login')
     } catch (error) {
       console.error('Logout error:', error)
-      // Force redirect even on error
-      if (typeof window !== 'undefined') {
-        localStorage.clear()
-        sessionStorage.clear()
-      }
-      window.location.replace('/admin/login')
     }
   }
 

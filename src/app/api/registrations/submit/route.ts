@@ -63,42 +63,32 @@ export async function POST(request: NextRequest) {
       age--
     }
 
-    console.log('Registration data received:', {
+    // Debug the branch value
+    console.log('🔍 Registration API Debug:', {
       fullName: data.fullName,
-      branch: data.branch,
+      originalBranch: data.branch,
+      branchAfterTrim: data.branch?.trim(),
       branchLength: data.branch?.length,
-      branchTrimmed: data.branch?.trim()
+      branchType: typeof data.branch
     })
 
-    // Final duplicate check before creating registration
-    const normalizedEmail = data.emailAddress.toLowerCase().trim()
-    const normalizedPhone = data.phoneNumber.trim()
-    const normalizedName = data.fullName.toLowerCase().trim()
-
-    const existingRegistration = await prisma.registration.findFirst({
-      where: {
-        OR: [
-          { emailAddress: normalizedEmail },
-          { phoneNumber: normalizedPhone },
-          { fullName: normalizedName }
-        ]
-      }
-    })
-
-    if (existingRegistration) {
-      const duplicateField =
-        existingRegistration.emailAddress === normalizedEmail ? 'emailAddress' :
-        existingRegistration.phoneNumber === normalizedPhone ? 'phoneNumber' : 'fullName'
-
+    // Validate that branch is not empty (the required field validation should catch this)
+    if (!data.branch || data.branch.trim() === '') {
+      console.log('❌ Branch validation failed - empty branch provided')
       return NextResponse.json(
         {
-          error: 'Duplicate registration',
-          field: duplicateField,
-          message: `This ${duplicateField === 'fullName' ? 'name' : duplicateField === 'emailAddress' ? 'email' : 'phone number'} is already registered`
+          error: 'Church branch is required',
+          field: 'branch',
+          message: 'Please select a church branch'
         },
         { status: 400 }
       )
     }
+
+    // Use the actual branch value (don't default to "Not Specified")
+    const branchValue = data.branch.trim()
+
+    console.log('✅ Using branch value:', branchValue)
 
     // Create registration
     const registration = await prisma.registration.create({
@@ -108,7 +98,7 @@ export async function POST(request: NextRequest) {
         age: age,
         gender: data.gender,
         address: data.address,
-        branch: data.branch,
+        branch: branchValue,
         phoneNumber: data.phoneNumber,
         emailAddress: data.emailAddress,
         // Use emergency contact info (either manually entered or copied from parent)
@@ -126,13 +116,6 @@ export async function POST(request: NextRequest) {
         parentalPermissionGranted: true, // Always mark as completed/approved
         parentalPermissionDate: new Date() // Set current date as completion date
       }
-    })
-
-    console.log('Registration created:', {
-      id: registration.id,
-      fullName: registration.fullName,
-      branch: registration.branch,
-      savedSuccessfully: true
     })
 
     // Return success response immediately after saving to database

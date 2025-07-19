@@ -12,22 +12,20 @@ export async function POST(request: NextRequest) {
     response.cookies.set('auth-token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for better browser compatibility
+      sameSite: 'strict',
       maxAge: 0, // Expire immediately
       expires: new Date(0), // Set to past date for extra security
-      path: '/', // Ensure it clears from all paths
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Match login domain
+      path: '/' // Ensure it clears from all paths
     })
 
     // Also clear any other potential auth cookies
     response.cookies.set('session', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Changed from 'strict' to 'lax'
+      sameSite: 'strict',
       maxAge: 0,
       expires: new Date(0),
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+      path: '/'
     })
 
     return response
@@ -44,11 +42,10 @@ export async function POST(request: NextRequest) {
     response.cookies.set('auth-token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Changed from 'strict' to 'lax'
+      sameSite: 'strict',
       maxAge: 0,
       expires: new Date(0),
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+      path: '/'
     })
 
     return response

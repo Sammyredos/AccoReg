@@ -8,12 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Eye, EyeOff, Lock, Mail, Users, Shield, ArrowRight } from 'lucide-react'
 // import { HydrationSafeDiv } from '@/components/ui/hydration-safe' // Commented out as unused
+import { useProgress } from '@/hooks/useProgress'
 import { LoginLogo } from '@/components/ui/UniversalLogo'
 import { useReactiveSystemName } from '@/components/ui/reactive-system-name'
 import { pagePreloader } from '@/lib/page-preloader'
 import '@/styles/login-animations.css'
-import { useRouter } from 'next/navigation'
-import { redirectAfterLogin } from '@/lib/redirect-utils'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -21,23 +20,15 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const { startProgress, completeProgress } = useProgress()
   const systemName = useReactiveSystemName()
-  const router = useRouter()
+  // Removed router as it's not used (using window.location.replace instead)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    e.stopPropagation()
-
-    // Prevent multiple submissions
-    if (loading) {
-      console.log('⚠️ Login already in progress, ignoring submission')
-      return
-    }
-
     setLoading(true)
     setError('')
-
-    console.log('🔐 Starting login process for:', email)
+    startProgress()
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -46,47 +37,30 @@ export default function AdminLogin() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
-        credentials: 'include' // Ensure cookies are included
       })
 
-      console.log('📡 Login response status:', response.status)
       const data = await response.json()
-      console.log('📋 Login response data:', { success: data.success, hasUser: !!data.user })
 
-      if (response.ok && data.success) {
-        console.log('✅ Login successful - redirecting immediately')
-
-        // Clear any existing error
-        setError('')
-
-        // IMMEDIATE redirect - no waiting, no delays
-        console.log('🚀 Executing immediate redirect to dashboard...')
+      if (response.ok) {
+        // Immediate redirect for faster login experience
         window.location.replace('/admin/dashboard')
 
-        // Backup redirect in case the first one fails
+        // Start preloading in background after redirect
         setTimeout(() => {
-          if (window.location.pathname === '/admin/login') {
-            console.log('🔄 Backup redirect triggered')
-            window.location.href = '/admin/dashboard'
-          }
+          Promise.all([
+            pagePreloader.preloadAllPages(),
+            pagePreloader.preloadCriticalAPIs()
+          ]).catch(console.warn)
         }, 100)
-
       } else {
-        console.log('❌ Login failed:', data.error || 'Unknown error')
         setError(data.error || 'Login failed')
-        setLoading(false)
+        completeProgress()
       }
-    } catch (error) {
-      console.error('❌ Login network error:', error)
+    } catch {
       setError('Network error. Please try again.')
+      completeProgress()
     } finally {
-      // Only set loading to false if we're still on the login page
-      // (i.e., if the redirect didn't happen)
-      setTimeout(() => {
-        if (window.location.pathname === '/admin/login') {
-          setLoading(false)
-        }
-      }, 100)
+      setLoading(false)
     }
   }
 

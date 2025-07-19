@@ -24,6 +24,7 @@ import { PersonPreviewModal } from '@/components/admin/PersonPreviewModal'
 import { PaginationControls } from '@/components/admin/PaginationControls'
 import { GenderTabs, GenderTabContent } from '@/components/ui/gender-tabs'
 import { ManualAllocationModal } from '@/components/admin/ManualAllocationModal'
+import { AccommodationSettingsModal } from '@/components/admin/AccommodationSettingsModal'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 import { AccommodationUpdatesProvider, useAccommodationUpdates, useAccommodationRefresh } from '@/contexts/AccommodationUpdatesContext'
@@ -33,6 +34,7 @@ import {
   Plus,
   Shuffle,
   UserPlus,
+  Settings,
   Search,
   Filter,
   X,
@@ -104,6 +106,7 @@ function AccommodationsPageContent() {
   const [roomUpdateTrigger, setRoomUpdateTrigger] = useState<Record<string, number>>({})
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [showManualAllocationModal, setShowManualAllocationModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [activeGenderTab, setActiveGenderTab] = useState<'Male' | 'Female'>('Male')
   const [showEmptyAllModal, setShowEmptyAllModal] = useState(false)
   const [emptyingAllRooms, setEmptyingAllRooms] = useState(false)
@@ -465,7 +468,14 @@ function AccommodationsPageContent() {
     showToast('Manual allocation successful', 'success')
   }
 
-  // Settings functionality removed
+  const handleSettingsOpen = () => {
+    setShowSettingsModal(true)
+  }
+
+  const handleSettingsSaved = () => {
+    setShowSettingsModal(false)
+    showToast('Settings saved successfully', 'success')
+  }
 
   const handleEmptyAllRooms = (gender: 'Male' | 'Female') => {
     // Check if there are any allocated participants in the specified gender
@@ -836,7 +846,16 @@ function AccommodationsPageContent() {
               </Button>
             )}
 
-            {/* Settings button removed */}
+            {(permissions.canAutoAllocate || permissions.canEditRooms) && (
+              <Button
+                onClick={handleSettingsOpen}
+                variant="outline"
+                className="font-apercu-medium border-gray-200 text-gray-700 hover:bg-gray-50 h-12 sm:h-10"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+            )}
           </div>
         )}
 
@@ -1556,7 +1575,11 @@ function AccommodationsPageContent() {
           onSuccess={handleManualAllocationSuccess}
         />
 
-        {/* Settings modal removed */}
+        <AccommodationSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          onSaved={handleSettingsSaved}
+        />
 
         {/* Person Preview Modal */}
         <PersonPreviewModal

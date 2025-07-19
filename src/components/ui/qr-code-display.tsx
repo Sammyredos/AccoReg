@@ -22,14 +22,13 @@ export function QRCodeDisplay({ qrData, size = 200, className = '' }: QRCodeDisp
         setError(null)
         
         const imageUrl = await QRCode.toDataURL(qrData, {
-          errorCorrectionLevel: 'H', // High error correction for better scanning
-          margin: 3, // Increased margin for better detection
+          errorCorrectionLevel: 'M',
+          margin: 2,
           color: {
-            dark: '#000000', // Pure black for better contrast
+            dark: '#1f2937', // gray-800
             light: '#ffffff'
           },
-          width: size,
-          scale: 8 // Higher scale for crisp rendering
+          width: size
         })
         
         setQrImageUrl(imageUrl)

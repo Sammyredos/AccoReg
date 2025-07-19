@@ -77,7 +77,6 @@ export async function GET(request: NextRequest) {
         emailAddress: true,
         phoneNumber: true,
         address: true,
-        branch: true,
         isVerified: true,
         verifiedAt: true,
         verifiedBy: true,

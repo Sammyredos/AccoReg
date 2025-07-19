@@ -103,16 +103,15 @@ class QRCodeService {
       // Convert to JSON string
       const qrString = JSON.stringify(qrData)
 
-      // Generate QR code as data URL with enhanced settings for better scanning
+      // Generate QR code as data URL
       const qrDataUrl = await QRCode.toDataURL(qrString, {
-        errorCorrectionLevel: 'H', // High error correction for better scanning
-        margin: 2, // Increased margin for better detection
+        errorCorrectionLevel: 'M',
+        margin: 1,
         color: {
           dark: '#000000',
           light: '#FFFFFF'
         },
-        width: 300, // Larger size for better scanning
-        scale: 8 // Higher scale for crisp rendering
+        width: 256
       })
 
       // Update registration with QR code
@@ -142,42 +141,18 @@ class QRCodeService {
   }
 
   /**
-   * Verify and decode QR code data with enhanced format support
+   * Verify and decode QR code data
    */
   async verifyQRCode(qrString: string): Promise<QRVerificationResult> {
     try {
-      logger.info('QR verification attempt', {
-        dataLength: qrString.length,
-        dataPreview: qrString.substring(0, 50) + '...'
-      })
-
-      // Clean and validate input
-      const cleanedData = qrString.trim()
-
-      if (!cleanedData) {
-        return {
-          success: false,
-          error: 'Empty QR code data',
-          isValid: false
-        }
-      }
-
       // Parse QR data
       let qrData: RegistrationQRData
       try {
-        qrData = JSON.parse(cleanedData)
-        logger.info('QR data parsed successfully', { registrationId: qrData.id })
-      } catch (parseError) {
-        logger.warn('QR JSON parse failed', { error: parseError, data: cleanedData.substring(0, 100) })
-
-        // Try to handle as simple registration ID (fallback)
-        if (cleanedData.length > 10 && cleanedData.length < 50 && !cleanedData.includes(' ')) {
-          return await this.verifySimpleRegistrationId(cleanedData)
-        }
-
+        qrData = JSON.parse(qrString)
+      } catch {
         return {
           success: false,
-          error: 'Invalid QR code format - not valid JSON',
+          error: 'Invalid QR code format',
           isValid: false
         }
       }
@@ -275,48 +250,6 @@ class QRCodeService {
     } catch (error) {
       logger.error('Error in bulk QR generation', error)
       return { success: false, generated: 0, errors: 1 }
-    }
-  }
-
-  /**
-   * Fallback verification for simple registration ID format
-   */
-  private async verifySimpleRegistrationId(registrationId: string): Promise<QRVerificationResult> {
-    try {
-      logger.info('Attempting simple registration ID verification', { registrationId })
-
-      // Get registration from database
-      const registration = await prisma.registration.findUnique({
-        where: { id: registrationId }
-      })
-
-      if (!registration) {
-        logger.warn('Registration not found for simple ID', { registrationId })
-        return {
-          success: false,
-          error: 'Registration not found',
-          isValid: false
-        }
-      }
-
-      logger.info('Simple registration ID verified successfully', {
-        registrationId,
-        fullName: registration.fullName
-      })
-
-      return {
-        success: true,
-        registration,
-        isValid: true
-      }
-
-    } catch (error) {
-      logger.error('Error verifying simple registration ID', error)
-      return {
-        success: false,
-        error: 'Failed to verify registration ID',
-        isValid: false
-      }
     }
   }
 }

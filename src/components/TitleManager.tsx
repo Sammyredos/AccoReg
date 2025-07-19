@@ -40,14 +40,18 @@ export function TitleManager() {
       // Load fresh system name in background and update if different
       const loadSystemName = async () => {
         try {
-          const response = await fetch('/api/system/branding', {
-            cache: 'force-cache',
-            next: { revalidate: 300 }
+          const response = await fetch('/api/admin/settings', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
           })
           
           if (response.ok) {
             const data = await response.json()
-            const freshSystemName = data.systemName || 'Mopgomglobal'
+            const brandingSettings = data.settings?.branding || []
+            const systemNameSetting = brandingSettings.find((s: any) => s.key === 'systemName')
+            const freshSystemName = systemNameSetting?.value || 'Mopgomglobal'
             
             // Update localStorage cache
             localStorage.setItem('system-name', freshSystemName)

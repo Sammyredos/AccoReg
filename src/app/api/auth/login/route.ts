@@ -5,23 +5,6 @@ import { getSessionTimeout } from '@/lib/settings'
 
 export async function POST(request: NextRequest) {
   try {
-    // Monitor memory usage for login requests
-    const memUsage = process.memoryUsage()
-    const memUsagePercent = Math.round((memUsage.rss / (512 * 1024 * 1024)) * 100) // Assuming 512MB limit
-
-    if (memUsagePercent > 90) {
-      console.warn('High memory usage during login:', {
-        memUsagePercent,
-        rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
-        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
-      })
-
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc()
-      }
-    }
-
     const { email, password } = await request.json()
 
     // Get session timeout from settings
@@ -93,19 +76,13 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Set HTTP-only cookie with cross-browser compatibility
+      // Set HTTP-only cookie with custom session timeout
       response.cookies.set('auth-token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for better browser compatibility
-        path: '/',
-        maxAge: sessionTimeoutHours * 60 * 60, // Convert hours to seconds
-        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Allow subdomain access in production
+        sameSite: 'strict',
+        maxAge: sessionTimeoutHours * 60 * 60 // Convert hours to seconds
       })
-
-      console.log('✅ Admin login successful - Cookie set for:', admin.email)
-      console.log('🔑 Token length:', token.length)
-      console.log('⏰ Session timeout:', sessionTimeoutHours, 'hours')
 
       return response
     }
@@ -174,20 +151,15 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Set HTTP-only cookie with cross-browser compatibility
+    // Set HTTP-only cookie with custom session timeout
     response.cookies.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for better browser compatibility
-      path: '/',
-      maxAge: sessionTimeoutHours * 60 * 60, // Convert hours to seconds
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Allow subdomain access in production
+      sameSite: 'strict',
+      maxAge: sessionTimeoutHours * 60 * 60 // Convert hours to seconds
     })
 
-    console.log('User login successful - Cookie set for:', user.email)
-    console.log('Token preview:', token.substring(0, 20) + '...')
-    console.log('Session timeout hours:', sessionTimeoutHours)
-
+    console.log('Login successful - Cookie set for user:', user.email)
     return response
   } catch (error) {
     console.error('Login error:', error)

@@ -72,7 +72,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "src/**/*",
-    "prisma/**/*"
+    "prisma/**/*",
+    "scripts/**/*"
   ],
   "exclude": [
     "node_modules",
@@ -80,7 +81,6 @@
     "dist",
     "build",
     "coverage",
-    "scripts",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",

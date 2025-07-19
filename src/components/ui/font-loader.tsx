@@ -13,7 +13,7 @@ interface FontLoaderProps {
 export function FontLoader({
   children,
   showLoadingScreen = true,
-  timeout = 1000 // Reduced from 3000ms to 1000ms for faster loading
+  timeout = 3000
 }: FontLoaderProps) {
   const [fontsLoaded, setFontsLoaded] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
@@ -36,15 +36,17 @@ export function FontLoader({
           return
         }
 
-        // Try to load from public API quickly
+        // Try to load from API quickly
         try {
-          const response = await fetch('/api/system/branding', {
-            cache: 'force-cache',
-            signal: AbortSignal.timeout(2000)
+          const response = await fetch('/api/admin/settings', {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(2000) // 2 second timeout
           })
           if (response.ok) {
             const data = await response.json()
-            const apiSystemName = data.systemName || 'MOPGOM Global'
+            const brandingSettings = data.settings?.branding || []
+            const systemNameSetting = brandingSettings.find((s: any) => s.key === 'systemName')
+            const apiSystemName = systemNameSetting?.value || 'MOPGOM Global'
             setSystemName(apiSystemName)
 
             // Cache for next time
@@ -71,14 +73,6 @@ export function FontLoader({
       try {
         console.log('🔤 Starting Apercu Pro font loading...')
         setLoadingProgress(10)
-
-        // Skip font loading in production to prevent flickering
-        if (process.env.NODE_ENV === 'production') {
-          console.log('⚡ Production mode: Skipping font loading for performance')
-          setLoadingProgress(100)
-          setFontsLoaded(true)
-          return
-        }
 
         // Check if FontFace API is supported
         if ('fonts' in document) {
