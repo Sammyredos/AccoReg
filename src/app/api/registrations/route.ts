@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
         gender: true,
         dateOfBirth: true,
         address: true,
+        branch: true,
         emergencyContactName: true,
         emergencyContactRelationship: true,
         emergencyContactPhone: true,
