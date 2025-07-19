@@ -14,6 +14,7 @@ import { useReactiveSystemName } from '@/components/ui/reactive-system-name'
 import { pagePreloader } from '@/lib/page-preloader'
 import '@/styles/login-animations.css'
 import { useRouter } from 'next/navigation'
+import { redirectAfterLogin } from '@/lib/redirect-utils'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -27,11 +28,19 @@ export default function AdminLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+
+    // Prevent multiple submissions
+    if (loading) {
+      console.log('⚠️ Login already in progress, ignoring submission')
+      return
+    }
+
     setLoading(true)
     setError('')
     startProgress()
 
-    console.log('🔐 Starting login process...')
+    console.log('🔐 Starting login process for:', email)
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -45,23 +54,21 @@ export default function AdminLogin() {
 
       console.log('📡 Login response status:', response.status)
       const data = await response.json()
-      console.log('📋 Login response data:', { success: data.success, hasAdmin: !!data.admin })
+      console.log('📋 Login response data:', { success: data.success, hasUser: !!data.user })
 
       if (response.ok && data.success) {
-        console.log('✅ Login successful, waiting for cookie to be set...')
+        console.log('✅ Login successful - user data received')
 
-        // CRITICAL: Wait for the cookie to be properly set before redirecting
-        // This prevents the middleware from not recognizing the authentication
-        setTimeout(() => {
-          console.log('🚀 Cookie should be set, redirecting now...')
-          completeProgress()
+        // Complete the progress bar
+        completeProgress()
 
-          // Use window.location.href for immediate redirect
-          window.location.href = '/admin/dashboard'
+        // Clear any existing error
+        setError('')
 
-        }, 100) // Wait 100ms for cookie to be set
+        // Use the reliable redirect utility
+        redirectAfterLogin('/admin/dashboard')
 
-        // Start preloading in background
+        // Start preloading in background after redirect
         setTimeout(() => {
           Promise.all([
             pagePreloader.preloadAllPages(),

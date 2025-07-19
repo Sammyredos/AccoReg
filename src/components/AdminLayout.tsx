@@ -21,18 +21,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       console.log('📡 AdminLayout logout response:', response.status)
 
-      // Wait for cookie to be cleared before redirecting
-      setTimeout(() => {
-        console.log('🚀 AdminLayout logout - redirecting to login...')
-        window.location.href = '/admin/login'
-      }, 100) // Wait 100ms for cookie to be cleared
+      // Clear local storage
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+      }
+
+      // Force immediate redirect
+      console.log('🚀 AdminLayout logout - executing redirect...')
+      window.location.replace('/admin/login')
 
     } catch (error) {
       console.error('Logout error:', error)
       // Force redirect even on error
-      setTimeout(() => {
-        window.location.href = '/admin/login'
-      }, 100)
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+      }
+      window.location.replace('/admin/login')
     }
   }
 

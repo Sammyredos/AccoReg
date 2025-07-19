@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useProgress } from '@/hooks/useProgress'
 import { SidebarLogo } from '@/components/ui/UniversalLogo'
+import { redirectAfterLogout } from '@/lib/redirect-utils'
 
 
 import {
@@ -175,6 +176,7 @@ export function AdminSidebar({ className }: SidebarProps) {
       setIsLoggingOut(true)
       console.log('🚪 Starting logout process...')
 
+      // Call logout API
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include'
@@ -182,15 +184,13 @@ export function AdminSidebar({ className }: SidebarProps) {
 
       console.log('📡 Logout response status:', response.status)
 
-      // Wait for cookie to be cleared before redirecting
-      setTimeout(() => {
-        console.log('🚀 Cookie should be cleared, redirecting to login...')
-        window.location.href = '/admin/login'
-      }, 100) // Wait 100ms for cookie to be cleared
+      // Use the reliable redirect utility
+      redirectAfterLogout('/admin/login')
 
     } catch (error) {
       console.error('Logout failed:', error)
-      setIsLoggingOut(false) // Reset on error
+      // Force redirect even on error
+      redirectAfterLogout('/admin/login')
     }
   }
 
