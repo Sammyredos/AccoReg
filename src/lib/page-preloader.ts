@@ -118,6 +118,7 @@ class PagePreloader {
         console.log('🚀 Service Worker registered:', registration.scope)
       } catch (error) {
         console.warn('Service Worker registration failed:', error)
+        // Don't throw error - continue without service worker
       }
     }
   }
