@@ -970,7 +970,7 @@ export default function AdminRegistrations() {
           </Card>
 
           {/* Registration Cards Skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
             {Array.from({ length: 15 }).map((_, i) => (
               <Card key={i} className="p-4 lg:p-6 bg-white">
                 <div className="flex items-start justify-between mb-4">
@@ -1151,7 +1151,7 @@ export default function AdminRegistrations() {
 
       {/* Registrations Grid - Using Attendance UI Card Design */}
       {filteredRegistrations.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
           {filteredRegistrations.map((registration) => (
             <UserCard
               key={registration.id}
@@ -1744,7 +1744,7 @@ export default function AdminRegistrations() {
                         <option value="Gudugba">Gudugba</option>
                         <option value="Great City">Great City</option>
                         <option value="Abeokuta">Abeokuta</option>
-                        <option value="Oseile">Oseile</option>
+                        <option value="Osiele">Osiele</option>
                         <option value="Ayetoro 1">Ayetoro 1</option>
                         <option value="Ayetoro 2">Ayetoro 2</option>
                         <option value="Imeko">Imeko</option>

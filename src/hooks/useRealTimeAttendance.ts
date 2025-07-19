@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 
 export interface AttendanceEvent {
-  type: 'verification' | 'status_change' | 'new_scan' | 'connected' | 'heartbeat' | 'error'
+  type: 'verification' | 'status_change' | 'new_scan' | 'connected' | 'heartbeat' | 'error' | 'room_update' | 'room_created'
   data: {
     registrationId?: string
     fullName?: string
@@ -15,6 +15,12 @@ export interface AttendanceEvent {
     roomName?: string
     message?: string
     error?: string
+    // Room update specific fields
+    roomId?: string
+    capacity?: number
+    occupancy?: number
+    gender?: string
+    isActive?: boolean
   }
 }
 
@@ -22,6 +28,7 @@ export interface UseRealTimeAttendanceOptions {
   onVerification?: (event: AttendanceEvent) => void
   onStatusChange?: (event: AttendanceEvent) => void
   onNewScan?: (event: AttendanceEvent) => void
+  onRoomUpdate?: (event: AttendanceEvent) => void
   onError?: (event: AttendanceEvent) => void
   autoReconnect?: boolean
   reconnectInterval?: number
@@ -33,6 +40,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
     onVerification,
     onStatusChange,
     onNewScan,
+    onRoomUpdate,
     onError,
     autoReconnect = true,
     reconnectInterval = 2000, // Reduced from 5000ms to 2000ms for faster reconnection
@@ -173,6 +181,14 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
               // Silent heartbeat - just update connection status
               break
 
+            case 'room_update':
+            case 'room_created':
+              console.log('🏠 Processing room update event:', attendanceEvent.data.roomName)
+              if (onRoomUpdate) {
+                onRoomUpdate(attendanceEvent)
+              }
+              break
+
             case 'error':
               if (onError) {
                 onError(attendanceEvent)
@@ -228,7 +244,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       setConnectionError('Failed to connect')
       setIsConnected(false)
     }
-  }, [onVerification, onStatusChange, onNewScan, autoReconnect, reconnectInterval, success])
+  }, [onVerification, onStatusChange, onNewScan, onRoomUpdate, autoReconnect, reconnectInterval, success])
 
   const disconnect = useCallback(() => {
     console.log('🔌 Disconnecting from real-time attendance updates')

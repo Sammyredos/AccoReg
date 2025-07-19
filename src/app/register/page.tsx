@@ -1227,7 +1227,7 @@ function RegistrationForm() {
                         <option value="Gudugba">Gudugba</option>
                         <option value="Great City">Great City</option>
                         <option value="Abeokuta">Abeokuta</option>
-                        <option value="Oseile">Oseile</option>
+                        <option value="Osiele">Osiele</option>
                         <option value="Ayetoro 1">Ayetoro 1</option>
                         <option value="Ayetoro 2">Ayetoro 2</option>
                         <option value="Imeko">Imeko</option>

@@ -81,7 +81,7 @@ interface Room {
 
 function AccommodationsPageContent() {
   const { t } = useTranslation()
-  const { triggerStatsUpdate } = useAccommodationUpdates()
+  const { triggerStatsUpdate, triggerRoomUpdate } = useAccommodationUpdates()
   const [stats, setStats] = useState<AccommodationStats | null>(null)
   const [roomsByGender, setRoomsByGender] = useState<Record<string, Room[]>>({})
   const [unallocatedByGender, setUnallocatedByGender] = useState<Record<string, Array<{
@@ -300,6 +300,24 @@ function AccommodationsPageContent() {
           console.timeEnd('accommodations-stats-update')
         }, 300)
       }
+
+      // Force immediate refresh for room updates (creation/editing)
+      if (update.type === 'room_update') {
+        console.log('🏠 Room update detected - triggering fast refresh')
+        console.time('accommodations-room-update')
+
+        // Use general data refresh for room updates
+        fetchAccommodationData()
+
+        // Also refresh specific room if roomId is provided
+        if (update.data.roomId) {
+          refreshSingleRoom(update.data.roomId)
+        }
+
+        setTimeout(() => {
+          console.timeEnd('accommodations-room-update')
+        }, 300)
+      }
     })
 
     return unsubscribe
@@ -353,6 +371,9 @@ function AccommodationsPageContent() {
 
     // Trigger real-time updates for other components
     triggerStatsUpdate()
+    if (isEditing && roomId) {
+      triggerRoomUpdate(roomId)
+    }
     showToast(isEditing ? 'Room Updated Successfully' : 'Room Created Successfully', 'success')
   }
 

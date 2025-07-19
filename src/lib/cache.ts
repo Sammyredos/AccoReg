@@ -74,8 +74,9 @@ export const cache = new SimpleCache()
 // Cache key generators
 export const cacheKeys = {
   accommodations: () => 'accommodations:all',
+  rooms: () => 'rooms:all',
   registrations: (limit?: number) => `registrations:${limit || 'all'}`,
-  notifications: (userId: string, page?: number, limit?: number) => 
+  notifications: (userId: string, page?: number, limit?: number) =>
     `notifications:${userId}:${page || 1}:${limit || 20}`,
   messages: (userId: string) => `messages:${userId}`,
   userProfile: (userId: string) => `user:${userId}`,
@@ -106,6 +107,11 @@ export const invalidateCache = {
   accommodations: () => {
     cache.clearPattern('accommodations')
     cache.clearPattern('registrations')
+    cache.clearPattern('rooms')
+  },
+  rooms: () => {
+    cache.clearPattern('rooms')
+    cache.clearPattern('accommodations')
   },
   registrations: () => {
     cache.clearPattern('registrations')

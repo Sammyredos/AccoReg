@@ -127,7 +127,7 @@ export function AccommodationUpdatesProvider({ children }: { children: React.Rea
     }
   }, [])
 
-  // Listen to real-time attendance events for verification/unverification
+  // Listen to real-time attendance events for verification/unverification and room updates
   useRealTimeAttendance({
     enabled: true, // Keep enabled for accommodation updates
     onVerification: useCallback((event) => {
@@ -175,7 +175,37 @@ export function AccommodationUpdatesProvider({ children }: { children: React.Rea
         triggerStatsUpdate()
         console.log('🔄 Secondary status change update triggered')
       }, 50)
-    }, [triggerStatsUpdate, broadcastUpdate])
+    }, [triggerStatsUpdate, broadcastUpdate]),
+
+    onRoomUpdate: useCallback((event) => {
+      console.log('🏠 Accommodations: Real-time room update received:', event.data.roomName || 'Room update', 'at', new Date().toISOString())
+
+      // Immediate stats and room update
+      triggerStatsUpdate()
+      if (event.data.roomId) {
+        triggerRoomUpdate(event.data.roomId)
+      }
+
+      // Broadcast room update immediately
+      broadcastUpdate({
+        type: 'room_update',
+        data: {
+          roomId: event.data.roomId,
+          roomName: event.data.roomName,
+          capacity: event.data.capacity,
+          occupancy: event.data.occupancy
+        },
+        timestamp: Date.now()
+      })
+
+      // Additional delayed trigger to ensure update
+      setTimeout(() => {
+        triggerStatsUpdate()
+        console.log('🔄 Secondary room update triggered')
+      }, 50)
+    }, [triggerStatsUpdate, triggerRoomUpdate, broadcastUpdate]),
+
+    onRoomUpdate: onRoomUpdate
   })
 
   const value: AccommodationUpdatesContextType = {
