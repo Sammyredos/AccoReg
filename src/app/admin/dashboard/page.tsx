@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { PageTransition, StaggeredContainer } from '@/components/ui/page-transition'
 import { EmptyStates } from '@/components/ui/empty-state'
 import { usePageReady } from '@/hooks/usePageReady'
-import { useProgress } from '@/hooks/useProgress'
 import { useRoutePrefetch } from '@/hooks/useRoutePrefetch'
 import { DashboardContentSkeleton } from '@/components/ui/skeleton'
 import { getCachedStatistics } from '@/lib/statistics'
@@ -115,8 +114,7 @@ export default function AdminDashboard() {
   const [activityLoading, setActivityLoading] = useState(true)
   const [communicationsLoading, setCommunicationsLoading] = useState(true)
 
-  // FAST: Minimal progress tracking
-  const { completeProgress } = useProgress()
+  // Dashboard loading without progress tracking
 
   useEffect(() => {
     // FAST: Simple data loading for speed

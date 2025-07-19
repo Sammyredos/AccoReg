@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useBranding } from '@/contexts/BrandingContext'
 import { useUser } from '@/contexts/UserContext'
@@ -12,7 +12,6 @@ import { useMessages } from '@/contexts/MessageContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { useProgress } from '@/hooks/useProgress'
 import { SidebarLogo } from '@/components/ui/UniversalLogo'
 import { redirectAfterLogout } from '@/lib/redirect-utils'
 
@@ -130,15 +129,6 @@ export function AdminSidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const { t, isHydrated } = useSafeTranslation()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const { startProgress, completeProgress } = useProgress()
-
-  // Complete progress when page loads
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      completeProgress()
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [pathname, completeProgress])
 
   const { branding, isLoading } = useBranding()
   const { currentUser, loading: isLoadingUser } = useUser()
@@ -164,9 +154,8 @@ export function AdminSidebar({ className }: SidebarProps) {
   }
 
   const handleNavigation = (href: string) => {
-    if (pathname !== href) {
-      startProgress()
-    }
+    // Navigation handling without progress bar
+    console.log('Navigating to:', href)
   }
 
   const handleLogout = async () => {

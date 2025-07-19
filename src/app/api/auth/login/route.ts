@@ -93,13 +93,14 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Set HTTP-only cookie with custom session timeout
+      // Set HTTP-only cookie with cross-browser compatibility
       response.cookies.set('auth-token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for better browser compatibility
         path: '/',
-        maxAge: sessionTimeoutHours * 60 * 60 // Convert hours to seconds
+        maxAge: sessionTimeoutHours * 60 * 60, // Convert hours to seconds
+        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Allow subdomain access in production
       })
 
       console.log('✅ Admin login successful - Cookie set for:', admin.email)
@@ -173,13 +174,14 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Set HTTP-only cookie with custom session timeout
+    // Set HTTP-only cookie with cross-browser compatibility
     response.cookies.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for better browser compatibility
       path: '/',
-      maxAge: sessionTimeoutHours * 60 * 60 // Convert hours to seconds
+      maxAge: sessionTimeoutHours * 60 * 60, // Convert hours to seconds
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined // Allow subdomain access in production
     })
 
     console.log('User login successful - Cookie set for:', user.email)

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Eye, EyeOff, Lock, Mail, Users, Shield, ArrowRight } from 'lucide-react'
 // import { HydrationSafeDiv } from '@/components/ui/hydration-safe' // Commented out as unused
-import { useProgress } from '@/hooks/useProgress'
 import { LoginLogo } from '@/components/ui/UniversalLogo'
 import { useReactiveSystemName } from '@/components/ui/reactive-system-name'
 import { pagePreloader } from '@/lib/page-preloader'
@@ -22,7 +21,6 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const { startProgress, completeProgress } = useProgress()
   const systemName = useReactiveSystemName()
   const router = useRouter()
 
@@ -38,7 +36,6 @@ export default function AdminLogin() {
 
     setLoading(true)
     setError('')
-    startProgress()
 
     console.log('🔐 Starting login process for:', email)
 
@@ -57,35 +54,39 @@ export default function AdminLogin() {
       console.log('📋 Login response data:', { success: data.success, hasUser: !!data.user })
 
       if (response.ok && data.success) {
-        console.log('✅ Login successful - user data received')
-
-        // Complete the progress bar
-        completeProgress()
+        console.log('✅ Login successful - redirecting immediately')
 
         // Clear any existing error
         setError('')
 
-        // Use the reliable redirect utility
-        redirectAfterLogin('/admin/dashboard')
+        // IMMEDIATE redirect - no waiting, no delays
+        console.log('🚀 Executing immediate redirect to dashboard...')
+        window.location.replace('/admin/dashboard')
 
-        // Start preloading in background after redirect
+        // Backup redirect in case the first one fails
         setTimeout(() => {
-          Promise.all([
-            pagePreloader.preloadAllPages(),
-            pagePreloader.preloadCriticalAPIs()
-          ]).catch(console.warn)
-        }, 200)
+          if (window.location.pathname === '/admin/login') {
+            console.log('🔄 Backup redirect triggered')
+            window.location.href = '/admin/dashboard'
+          }
+        }, 100)
 
       } else {
         console.log('❌ Login failed:', data.error || 'Unknown error')
         setError(data.error || 'Login failed')
-        completeProgress()
+        setLoading(false)
       }
     } catch (error) {
       console.error('❌ Login network error:', error)
       setError('Network error. Please try again.')
-      completeProgress()
-      setLoading(false)
+    } finally {
+      // Only set loading to false if we're still on the login page
+      // (i.e., if the redirect didn't happen)
+      setTimeout(() => {
+        if (window.location.pathname === '/admin/login') {
+          setLoading(false)
+        }
+      }, 100)
     }
   }
 

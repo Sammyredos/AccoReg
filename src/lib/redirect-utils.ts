@@ -76,12 +76,23 @@ export function forceRedirect(url: string, options: RedirectOptions = {}) {
  * Redirect after successful login
  */
 export function redirectAfterLogin(targetUrl: string = '/admin/dashboard') {
-  console.log('✅ Login successful - executing redirect...')
-  forceRedirect(targetUrl, {
-    fallbackDelay: 50,
-    clearStorage: false,
-    logRedirect: true
-  })
+  console.log('✅ Login successful - executing immediate redirect...')
+
+  // IMMEDIATE redirect - no delays
+  try {
+    // Method 1: Most aggressive - replace immediately
+    window.location.replace(targetUrl)
+  } catch (error) {
+    console.warn('replace failed, trying href:', error)
+    try {
+      // Method 2: Fallback to href
+      window.location.href = targetUrl
+    } catch (error2) {
+      console.warn('href failed, trying assign:', error2)
+      // Method 3: Final fallback
+      window.location.assign(targetUrl)
+    }
+  }
 }
 
 /**
