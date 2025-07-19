@@ -48,11 +48,12 @@ export interface AttendanceEvent {
   data: {
     registrationId: string
     fullName: string
-    status: 'present' | 'absent' | 'late'
+    status: 'present' | 'absent' | 'late' | 'unverified'
     timestamp: string
     scannerName?: string
     platoonName?: string
     roomName?: string
+    message?: string
   }
 }
 

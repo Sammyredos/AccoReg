@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       data: {
         registrationId: registration.id,
         fullName: registration.fullName,
-        status: 'absent',
+        status: 'unverified',
         timestamp: new Date().toISOString(),
         scannerName: currentUser.fullName || currentUser.email,
         platoonName: registration.platoonAllocation?.platoon?.name,
