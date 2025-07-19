@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
-import { broadcastAttendanceEvent } from '@/lib/realtime'
+import { broadcastAttendanceEvent } from '@/app/api/admin/attendance/events/route'
 import { invalidateCache } from '@/lib/cache'
 import { clearStatisticsCache } from '@/lib/statistics'
 
