@@ -23,8 +23,17 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const filter = searchParams.get('filter') || 'all' // 'all', 'allocated', 'unallocated'
 
-    // Build search conditions
-    const searchConditions: any[] = []
+    // Build search conditions - ONLY include verified participants who have been moved to accommodation list
+    const searchConditions: any[] = [
+      {
+        isVerified: true // Only verified participants can be in accommodation list
+      },
+      {
+        gender: {
+          in: ['Male', 'Female'] // Only Male and Female participants can be allocated to rooms
+        }
+      }
+    ]
 
     if (search.trim()) {
       const searchTerm = search.trim()
@@ -44,7 +53,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Add filter conditions
+    // Add allocation filter conditions (within verified participants)
     if (filter === 'allocated') {
       searchConditions.push({
         roomAllocation: {
@@ -57,8 +66,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Build where clause
-    const whereClause = searchConditions.length > 0 ? { AND: searchConditions } : {}
+    // Build where clause - always include verification and gender filters
+    const whereClause = { AND: searchConditions }
 
     // Search registrations
     const registrations = await prisma.registration.findMany({
@@ -103,7 +112,7 @@ export async function GET(request: NextRequest) {
       total: results.length,
       searchTerm: search,
       filter,
-      message: 'Search completed successfully'
+      message: `Found ${results.length} verified participant(s) in accommodation list${filter !== 'all' ? ` (${filter})` : ''}`
     })
 
   } catch (error) {
