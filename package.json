@@ -7,7 +7,7 @@
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
     "build:production": "cross-env NODE_ENV=production SKIP_TYPE_CHECK=true prisma generate && next build",
-    "build:render": "npm install && npm install --save-dev @types/node typescript && prisma generate && prisma migrate deploy && npx tsx scripts/create-super-admin.ts && npm run build",
+    "build:render": "npm install && npm install --save-dev @types/node typescript && prisma generate && prisma db push && npx tsx scripts/create-super-admin.ts && npm run build",
     "deploy:production": "npx tsx scripts/deploy-production.ts",
     "test:production": "npx tsx scripts/test-production-setup.ts",
     "test:email": "npx tsx scripts/test-email-debug.ts",
