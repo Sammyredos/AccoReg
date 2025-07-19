@@ -27,8 +27,8 @@ export function useSystemName() {
         setSystemName(data.systemName || 'Mopgomglobal')
         setLogoUrl(data.logoUrl || null)
 
-        // Update document title immediately (only in browser)
-        if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        // Update document title immediately
+        if (typeof window !== 'undefined') {
           document.title = `${data.systemName || 'Mopgomglobal'} - Admin Panel`
         }
       }
