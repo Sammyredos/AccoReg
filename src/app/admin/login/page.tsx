@@ -13,6 +13,7 @@ import { LoginLogo } from '@/components/ui/UniversalLogo'
 import { useReactiveSystemName } from '@/components/ui/reactive-system-name'
 import { pagePreloader } from '@/lib/page-preloader'
 import '@/styles/login-animations.css'
+import { useRouter } from 'next/navigation'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -22,13 +23,15 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const { startProgress, completeProgress } = useProgress()
   const systemName = useReactiveSystemName()
-  // Removed router as it's not used (using window.location.replace instead)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     startProgress()
+
+    console.log('🔐 Starting login process...')
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -37,29 +40,69 @@ export default function AdminLogin() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        credentials: 'include' // Ensure cookies are included
       })
 
+      console.log('📡 Login response status:', response.status)
       const data = await response.json()
+      console.log('📋 Login response data:', { success: data.success, hasAdmin: !!data.admin })
 
-      if (response.ok) {
-        // Immediate redirect for faster login experience
-        window.location.replace('/admin/dashboard')
+      if (response.ok && data.success) {
+        console.log('✅ Login successful, forcing immediate redirect...')
 
-        // Start preloading in background after redirect
+        // Don't call completeProgress() yet - let the redirect happen first
+        setLoading(false) // Stop the loading state
+
+        // IMMEDIATE redirect - don't wait for anything
+        console.log('🚀 Executing immediate redirect...')
+
+        // Use the most aggressive redirect method first
+        window.location.href = '/admin/dashboard'
+
+        // Backup methods in case the first doesn't work
+        setTimeout(() => {
+          if (window.location.pathname.includes('/admin/login')) {
+            console.log('🔄 Backup redirect 1...')
+            window.location.replace('/admin/dashboard')
+          }
+        }, 50)
+
+        setTimeout(() => {
+          if (window.location.pathname.includes('/admin/login')) {
+            console.log('🔄 Backup redirect 2...')
+            router.replace('/admin/dashboard')
+          }
+        }, 100)
+
+        setTimeout(() => {
+          if (window.location.pathname.includes('/admin/login')) {
+            console.log('🚨 Final redirect attempt...')
+            window.location.assign('/admin/dashboard')
+          }
+        }, 200)
+
+        // Complete progress after redirect attempts
+        setTimeout(() => {
+          completeProgress()
+        }, 300)
+
+        // Start preloading in background
         setTimeout(() => {
           Promise.all([
             pagePreloader.preloadAllPages(),
             pagePreloader.preloadCriticalAPIs()
           ]).catch(console.warn)
-        }, 100)
+        }, 500)
+
       } else {
+        console.log('❌ Login failed:', data.error || 'Unknown error')
         setError(data.error || 'Login failed')
         completeProgress()
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Login network error:', error)
       setError('Network error. Please try again.')
       completeProgress()
-    } finally {
       setLoading(false)
     }
   }

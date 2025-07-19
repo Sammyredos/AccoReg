@@ -98,8 +98,13 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
+        path: '/',
         maxAge: sessionTimeoutHours * 60 * 60 // Convert hours to seconds
       })
+
+      console.log('✅ Admin login successful - Cookie set for:', admin.email)
+      console.log('🔑 Token length:', token.length)
+      console.log('⏰ Session timeout:', sessionTimeoutHours, 'hours')
 
       return response
     }
