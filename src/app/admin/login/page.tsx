@@ -31,13 +31,20 @@ export default function AdminLogin() {
     startProgress()
 
     try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       const data = await response.json()
 
@@ -56,8 +63,18 @@ export default function AdminLogin() {
         setError(data.error || 'Login failed')
         completeProgress()
       }
-    } catch {
-      setError('Network error. Please try again.')
+    } catch (error) {
+      console.error('Login network error:', error)
+
+      // Provide more specific error messages
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        setError('Unable to connect to server. Please check your internet connection and try again.')
+      } else if (error.name === 'AbortError') {
+        setError('Request timed out. Please try again.')
+      } else {
+        setError('Network error. Please check your connection and try again.')
+      }
+
       completeProgress()
     } finally {
       setLoading(false)
