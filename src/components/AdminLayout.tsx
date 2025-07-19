@@ -12,12 +12,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      console.log('🚪 AdminLayout logout - calling API...')
+
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
+        credentials: 'include'
       })
-      router.push('/admin/login')
+
+      console.log('📡 AdminLayout logout response:', response.status)
+
+      // Wait for cookie to be cleared before redirecting
+      setTimeout(() => {
+        console.log('🚀 AdminLayout logout - redirecting to login...')
+        window.location.href = '/admin/login'
+      }, 100) // Wait 100ms for cookie to be cleared
+
     } catch (error) {
       console.error('Logout error:', error)
+      // Force redirect even on error
+      setTimeout(() => {
+        window.location.href = '/admin/login'
+      }, 100)
     }
   }
 

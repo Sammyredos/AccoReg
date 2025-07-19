@@ -48,43 +48,18 @@ export default function AdminLogin() {
       console.log('📋 Login response data:', { success: data.success, hasAdmin: !!data.admin })
 
       if (response.ok && data.success) {
-        console.log('✅ Login successful, forcing immediate redirect...')
+        console.log('✅ Login successful, waiting for cookie to be set...')
 
-        // Don't call completeProgress() yet - let the redirect happen first
-        setLoading(false) // Stop the loading state
-
-        // IMMEDIATE redirect - don't wait for anything
-        console.log('🚀 Executing immediate redirect...')
-
-        // Use the most aggressive redirect method first
-        window.location.href = '/admin/dashboard'
-
-        // Backup methods in case the first doesn't work
+        // CRITICAL: Wait for the cookie to be properly set before redirecting
+        // This prevents the middleware from not recognizing the authentication
         setTimeout(() => {
-          if (window.location.pathname.includes('/admin/login')) {
-            console.log('🔄 Backup redirect 1...')
-            window.location.replace('/admin/dashboard')
-          }
-        }, 50)
-
-        setTimeout(() => {
-          if (window.location.pathname.includes('/admin/login')) {
-            console.log('🔄 Backup redirect 2...')
-            router.replace('/admin/dashboard')
-          }
-        }, 100)
-
-        setTimeout(() => {
-          if (window.location.pathname.includes('/admin/login')) {
-            console.log('🚨 Final redirect attempt...')
-            window.location.assign('/admin/dashboard')
-          }
-        }, 200)
-
-        // Complete progress after redirect attempts
-        setTimeout(() => {
+          console.log('🚀 Cookie should be set, redirecting now...')
           completeProgress()
-        }, 300)
+
+          // Use window.location.href for immediate redirect
+          window.location.href = '/admin/dashboard'
+
+        }, 100) // Wait 100ms for cookie to be set
 
         // Start preloading in background
         setTimeout(() => {
@@ -92,7 +67,7 @@ export default function AdminLogin() {
             pagePreloader.preloadAllPages(),
             pagePreloader.preloadCriticalAPIs()
           ]).catch(console.warn)
-        }, 500)
+        }, 200)
 
       } else {
         console.log('❌ Login failed:', data.error || 'Unknown error')

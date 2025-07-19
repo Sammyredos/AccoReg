@@ -173,8 +173,21 @@ export function AdminSidebar({ className }: SidebarProps) {
 
     try {
       setIsLoggingOut(true)
-      await fetch('/api/auth/logout', { method: 'POST' })
-      window.location.href = '/admin/login'
+      console.log('🚪 Starting logout process...')
+
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+
+      console.log('📡 Logout response status:', response.status)
+
+      // Wait for cookie to be cleared before redirecting
+      setTimeout(() => {
+        console.log('🚀 Cookie should be cleared, redirecting to login...')
+        window.location.href = '/admin/login'
+      }, 100) // Wait 100ms for cookie to be cleared
+
     } catch (error) {
       console.error('Logout failed:', error)
       setIsLoggingOut(false) // Reset on error
