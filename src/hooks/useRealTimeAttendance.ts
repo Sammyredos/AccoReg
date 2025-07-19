@@ -4,23 +4,17 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 
 export interface AttendanceEvent {
-  type: 'verification' | 'status_change' | 'new_scan' | 'connected' | 'heartbeat' | 'error' | 'room_update' | 'room_created'
+  type: 'verification' | 'status_change' | 'new_scan' | 'connected' | 'heartbeat' | 'error'
   data: {
     registrationId?: string
     fullName?: string
-    status?: 'present' | 'absent' | 'late' | 'unverified'
+    status?: 'present' | 'absent' | 'late'
     timestamp: string
     scannerName?: string
     platoonName?: string
     roomName?: string
     message?: string
     error?: string
-    // Room update specific fields
-    roomId?: string
-    capacity?: number
-    occupancy?: number
-    gender?: string
-    isActive?: boolean
   }
 }
 
@@ -28,7 +22,6 @@ export interface UseRealTimeAttendanceOptions {
   onVerification?: (event: AttendanceEvent) => void
   onStatusChange?: (event: AttendanceEvent) => void
   onNewScan?: (event: AttendanceEvent) => void
-  onRoomUpdate?: (event: AttendanceEvent) => void
   onError?: (event: AttendanceEvent) => void
   autoReconnect?: boolean
   reconnectInterval?: number
@@ -36,14 +29,17 @@ export interface UseRealTimeAttendanceOptions {
 }
 
 export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}) {
+  // Get configuration from environment variables with fallbacks
+  const defaultReconnectInterval = parseInt(process.env.SSE_RECONNECT_INTERVAL || '2000', 10)
+  const connectionTimeout = parseInt(process.env.SSE_CONNECTION_TIMEOUT || '10000', 10)
+
   const {
     onVerification,
     onStatusChange,
     onNewScan,
-    onRoomUpdate,
     onError,
     autoReconnect = true,
-    reconnectInterval = 2000, // Reduced from 5000ms to 2000ms for faster reconnection
+    reconnectInterval = defaultReconnectInterval,
     enabled = true // Default to enabled
   } = options
 
@@ -108,18 +104,18 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       eventSourceRef.current = eventSource
 
       // Set a timeout to detect if connection fails to establish
-      const connectionTimeout = setTimeout(() => {
+      const connectionTimeoutId = setTimeout(() => {
         if (eventSource.readyState === EventSource.CONNECTING) {
           console.warn('⚠️ Connection timeout - SSE endpoint may not be available')
           eventSource.close()
           setConnectionError('Connection timeout')
           updateStableState('disconnected')
         }
-      }, 10000) // 10 second timeout
+      }, connectionTimeout)
 
       eventSource.onopen = () => {
         console.log('✅ Real-time attendance connection established at', new Date().toISOString())
-        clearTimeout(connectionTimeout) // Clear the connection timeout
+        clearTimeout(connectionTimeoutId) // Clear the connection timeout
         setIsConnected(true)
         setConnectionError(null)
         updateStableState('connected')
@@ -181,14 +177,6 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
               // Silent heartbeat - just update connection status
               break
 
-            case 'room_update':
-            case 'room_created':
-              console.log('🏠 Processing room update event:', attendanceEvent.data.roomName)
-              if (onRoomUpdate) {
-                onRoomUpdate(attendanceEvent)
-              }
-              break
-
             case 'error':
               if (onError) {
                 onError(attendanceEvent)
@@ -244,7 +232,7 @@ export function useRealTimeAttendance(options: UseRealTimeAttendanceOptions = {}
       setConnectionError('Failed to connect')
       setIsConnected(false)
     }
-  }, [onVerification, onStatusChange, onNewScan, onRoomUpdate, autoReconnect, reconnectInterval, success])
+  }, [onVerification, onStatusChange, onNewScan, autoReconnect, reconnectInterval, connectionTimeout, success])
 
   const disconnect = useCallback(() => {
     console.log('🔌 Disconnecting from real-time attendance updates')

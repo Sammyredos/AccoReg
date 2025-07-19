@@ -163,21 +163,6 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error) {
     console.error('Login error:', error)
-    console.error('Error details:', {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack
-    })
-
-    // Check for specific database connection errors
-    if (error?.message?.includes('connect') || error?.message?.includes('ECONNREFUSED')) {
-      console.error('Database connection error detected')
-      return NextResponse.json(
-        { error: 'Database connection failed. Please try again later.' },
-        { status: 503 }
-      )
-    }
-
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

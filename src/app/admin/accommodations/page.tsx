@@ -81,7 +81,7 @@ interface Room {
 
 function AccommodationsPageContent() {
   const { t } = useTranslation()
-  const { triggerStatsUpdate, triggerRoomUpdate } = useAccommodationUpdates()
+  const { triggerStatsUpdate } = useAccommodationUpdates()
   const [stats, setStats] = useState<AccommodationStats | null>(null)
   const [roomsByGender, setRoomsByGender] = useState<Record<string, Room[]>>({})
   const [unallocatedByGender, setUnallocatedByGender] = useState<Record<string, Array<{
@@ -108,9 +108,7 @@ function AccommodationsPageContent() {
   const [showManualAllocationModal, setShowManualAllocationModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [activeGenderTab, setActiveGenderTab] = useState<'Male' | 'Female'>('Male')
-  const [showEmptyAllModal, setShowEmptyAllModal] = useState(false)
-  const [emptyingAllRooms, setEmptyingAllRooms] = useState(false)
-  const [emptyAllGender, setEmptyAllGender] = useState<'Male' | 'Female'>('Male')
+
 
 
   // Room search and filter states - separate for each gender tab
@@ -141,7 +139,7 @@ function AccommodationsPageContent() {
       canCreateRooms: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
       canViewPersonDetails: ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(userRole),
       canRemoveAllocations: ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(userRole),
-      canEmptyAllRooms: ['Super Admin', 'Admin', 'Manager'].includes(userRole), // Staff cannot empty all rooms
+
       isViewerOnly: isRole('Viewer')
     }
   }, [currentUser?.role?.name, isRole])
@@ -300,24 +298,6 @@ function AccommodationsPageContent() {
           console.timeEnd('accommodations-stats-update')
         }, 300)
       }
-
-      // Force immediate refresh for room updates (creation/editing)
-      if (update.type === 'room_update') {
-        console.log('🏠 Room update detected - triggering fast refresh')
-        console.time('accommodations-room-update')
-
-        // Use general data refresh for room updates
-        fetchAccommodationData()
-
-        // Also refresh specific room if roomId is provided
-        if (update.data.roomId) {
-          refreshSingleRoom(update.data.roomId)
-        }
-
-        setTimeout(() => {
-          console.timeEnd('accommodations-room-update')
-        }, 300)
-      }
     })
 
     return unsubscribe
@@ -371,9 +351,6 @@ function AccommodationsPageContent() {
 
     // Trigger real-time updates for other components
     triggerStatsUpdate()
-    if (isEditing && roomId) {
-      triggerRoomUpdate(roomId)
-    }
     showToast(isEditing ? 'Room Updated Successfully' : 'Room Created Successfully', 'success')
   }
 
@@ -498,77 +475,7 @@ function AccommodationsPageContent() {
     showToast('Settings saved successfully', 'success')
   }
 
-  const handleEmptyAllRooms = (gender: 'Male' | 'Female') => {
-    // Check if there are any allocated participants in the specified gender
-    const genderRooms = roomsByGender[gender] || []
-    const totalOccupancy = genderRooms.reduce((total, room) => total + room.occupancy, 0)
 
-    if (totalOccupancy === 0) {
-      showToast(`All ${gender.toLowerCase()} rooms are already empty`, 'info')
-      return
-    }
-
-    setEmptyAllGender(gender)
-    setShowEmptyAllModal(true)
-  }
-
-  const handleConfirmEmptyAllRooms = async () => {
-    try {
-      setEmptyingAllRooms(true)
-      setUnallocatedLoading(true)
-
-      const response = await fetch('/api/admin/accommodations/empty-all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          gender: emptyAllGender
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        // Only show specific error messages, not generic ones
-        if (response.status === 403) {
-          showToast('You do not have permission to empty all rooms', 'error')
-        } else if (response.status === 400) {
-          showToast(errorData.error || 'Invalid request', 'error')
-        } else {
-          console.error('Empty all rooms error:', errorData)
-          // Don't show generic error toast during normal operation
-        }
-        return
-      }
-
-      const result = await response.json()
-
-      // Show success message
-      showToast(
-        `Successfully emptied all ${emptyAllGender.toLowerCase()} rooms. ${result.removedAllocations} participants returned to unallocated list.`,
-        'success'
-      )
-
-      // Trigger real-time updates
-      triggerStatsUpdate()
-
-      // Refresh data in background (don't await)
-      fetchAccommodationData().finally(() => setUnallocatedLoading(false))
-      setRefreshTrigger(prev => prev + 1)
-
-    } catch (error) {
-      console.error('Error emptying all rooms:', error)
-      // Only show error toast for network/connection issues, not server errors
-      if (error instanceof Error && (error.name === 'TypeError' || error.message.includes('fetch'))) {
-        showToast('Connection error. Please check your internet connection.', 'error')
-      }
-      setUnallocatedLoading(false)
-    } finally {
-      // Always close modal and reset state
-      setEmptyingAllRooms(false)
-      setShowEmptyAllModal(false)
-    }
-  }
 
 
 
@@ -778,21 +685,7 @@ function AccommodationsPageContent() {
     setFemaleUnallocatedPagination(prev => ({ ...prev, currentPage: 1 }))
   }, [femaleRoomSearchTerm, femaleRoomFilter])
 
-  // Computed values for empty all button state
-  const emptyAllButtonState = useMemo(() => {
-    const maleRooms = roomsByGender.Male || []
-    const femaleRooms = roomsByGender.Female || []
 
-    const maleOccupancy = maleRooms.reduce((total, room) => total + room.occupancy, 0)
-    const femaleOccupancy = femaleRooms.reduce((total, room) => total + room.occupancy, 0)
-
-    return {
-      maleDisabled: maleOccupancy === 0,
-      femaleDisabled: femaleOccupancy === 0,
-      maleOccupancy,
-      femaleOccupancy
-    }
-  }, [roomsByGender])
 
   // Remove loading screen - page shows immediately with progressive data loading
 
@@ -973,20 +866,7 @@ function AccommodationsPageContent() {
                         </Button>
                       )}
 
-                      {/* Empty All Male Rooms Button - Always visible, enabled only when participants allocated */}
-                      {permissions.canEmptyAllRooms && (
-                        <Button
-                          onClick={() => handleEmptyAllRooms('Male')}
-                          size="sm"
-                          className="font-apercu-medium bg-red-600 text-white hover:bg-red-700 border-red-600 hover:border-red-700 transition-colors text-xs disabled:bg-gray-400 disabled:border-gray-400 disabled:cursor-not-allowed"
-                          disabled={emptyingAllRooms || isLoading || emptyAllButtonState.maleDisabled}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1 text-white" />
-                          <span className="text-white">
-                            {emptyAllButtonState.maleDisabled ? 'All Empty' : 'Empty All'}
-                          </span>
-                        </Button>
-                      )}
+
 
                     </div>
                   </div>
@@ -1283,20 +1163,7 @@ function AccommodationsPageContent() {
                         </Button>
                       )}
 
-                      {/* Empty All Female Rooms Button - Always visible, enabled only when participants allocated */}
-                      {permissions.canEmptyAllRooms && (
-                        <Button
-                          onClick={() => handleEmptyAllRooms('Female')}
-                          size="sm"
-                          className="font-apercu-medium bg-red-600 text-white hover:bg-red-700 border-red-600 hover:border-red-700 transition-colors text-xs disabled:bg-gray-400 disabled:border-gray-400 disabled:cursor-not-allowed"
-                          disabled={emptyingAllRooms || isLoading || emptyAllButtonState.femaleDisabled}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1 text-white" />
-                          <span className="text-white">
-                            {emptyAllButtonState.femaleDisabled ? 'All Empty' : 'Empty All'}
-                          </span>
-                        </Button>
-                      )}
+
 
                     </div>
                   </div>
@@ -1611,18 +1478,7 @@ function AccommodationsPageContent() {
           canRemoveAllocations={permissions.canRemoveAllocations}
         />
 
-        {/* Empty All Rooms Warning Modal */}
-        <ConfirmationModal
-          isOpen={showEmptyAllModal}
-          onClose={() => setShowEmptyAllModal(false)}
-          onConfirm={handleConfirmEmptyAllRooms}
-          title={`Empty All ${emptyAllGender} Rooms?`}
-          description={`Are you sure that you want to empty all ${emptyAllGender.toLowerCase()} rooms? This will remove ALL participants from ALL ${emptyAllGender.toLowerCase()} rooms and return them to the unallocated list. This action cannot be undone.`}
-          confirmText="Yes, Empty All Rooms"
-          cancelText="Cancel"
-          variant="danger"
-          loading={emptyingAllRooms}
-        />
+
 
         {/* Error Modal */}
         <ErrorModal

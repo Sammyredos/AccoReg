@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
-import { broadcastAttendanceEvent } from '@/app/api/admin/attendance/events/route'
-import { invalidateCache } from '@/lib/cache'
-import { clearStatisticsCache } from '@/lib/statistics'
 
 const prisma = new PrismaClient()
 
@@ -130,29 +127,6 @@ export async function POST(request: NextRequest) {
         capacity: data.capacity,
         description: data.description || null
       }
-    })
-
-    // Broadcast real-time room creation event
-    broadcastAttendanceEvent({
-      type: 'room_created',
-      data: {
-        roomId: room.id,
-        roomName: room.name,
-        capacity: room.capacity,
-        gender: room.gender,
-        timestamp: new Date().toISOString()
-      }
-    })
-
-    // Invalidate relevant caches
-    invalidateCache.accommodations()
-    invalidateCache.rooms()
-    clearStatisticsCache()
-
-    console.log('🏠 Real-time room creation event broadcasted:', {
-      roomId: room.id,
-      roomName: room.name,
-      createdBy: currentUser.email
     })
 
     return NextResponse.json({

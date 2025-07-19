@@ -48,12 +48,11 @@ export interface AttendanceEvent {
   data: {
     registrationId: string
     fullName: string
-    status: 'present' | 'absent' | 'late' | 'unverified'
+    status: 'present' | 'absent' | 'late'
     timestamp: string
     scannerName?: string
     platoonName?: string
     roomName?: string
-    message?: string
   }
 }
 
@@ -157,7 +156,8 @@ export async function GET(request: NextRequest) {
 
         controller.enqueue(new TextEncoder().encode(welcomeEvent))
 
-        // Send heartbeat every 15 seconds (reduced from 30 for better reliability)
+        // Send heartbeat with configurable interval
+        const heartbeatInterval = parseInt(process.env.SSE_HEARTBEAT_INTERVAL || '15000', 10)
         const heartbeat = setInterval(() => {
           try {
             const heartbeatEvent = `data: ${JSON.stringify({
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
             clearInterval(heartbeat)
             connections.delete(controller)
           }
-        }, 15000) // Reduced to 15 seconds
+        }, heartbeatInterval)
 
         // Cleanup on close
         request.signal.addEventListener('abort', () => {
@@ -199,18 +199,28 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control',
-        'X-Accel-Buffering': 'no' // Disable nginx buffering
-      }
-    })
+    // Enhanced headers for production SSE reliability
+    const headers: Record<string, string> = {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control, Authorization, Content-Type',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Credentials': 'true',
+      'X-Accel-Buffering': 'no', // Disable nginx buffering
+      'X-Content-Type-Options': 'nosniff'
+    }
+
+    // Add production-specific headers
+    if (process.env.NODE_ENV === 'production') {
+      headers['X-Robots-Tag'] = 'noindex, nofollow'
+      headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    }
+
+    return new Response(stream, { headers })
 
   } catch (error) {
     logger.error('Error in attendance events endpoint', error)

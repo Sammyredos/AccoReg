@@ -20,12 +20,14 @@ import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
 import { useUser } from '@/contexts/UserContext'
 
 import {
+  Activity,
   UserCheck,
   UserX,
   QrCode,
   Search,
   CheckCircle,
   Users,
+  RefreshCw,
   Scan,
   Clock,
   ChevronDown,
@@ -151,7 +153,7 @@ function AttendancePageContent() {
   // Real-time attendance updates with stable state and cross-device sync
   // Enable for all authenticated users (including Staff)
   const canUseRealTime = ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser?.role?.name || '')
-  useRealTimeAttendance({
+  const { isConnected, connectionError, isConnecting, lastEvent, eventCount } = useRealTimeAttendance({
     enabled: canUseRealTime,
     onVerification: useCallback((event) => {
       console.log('🔄 Real-time verification received:', event.data)
@@ -164,24 +166,6 @@ function AttendancePageContent() {
 
       // Force immediate data refresh for cross-device sync
       console.log('🔄 Real-time verification event received, triggering updates')
-
-      // Immediate local state update for real-time filter response
-      const registrationId = event.data.registrationId
-      if (registrationId) {
-        setRegistrations(prevRegistrations => {
-          return prevRegistrations.map(reg => {
-            if (reg.id === registrationId) {
-              return {
-                ...reg,
-                isVerified: true,
-                verifiedAt: new Date().toISOString(),
-                verifiedBy: event.data.scannerName || 'System'
-              }
-            }
-            return reg
-          })
-        })
-      }
 
       // Immediate trigger
       triggerStatsUpdate()
@@ -222,25 +206,6 @@ function AttendancePageContent() {
     }, [success]), // Removed state dependencies since we're using refs
     onStatusChange: useCallback((event) => {
       console.log('📊 Real-time status change received:', event.data)
-
-      // Handle unverification events
-      const registrationId = event.data.registrationId
-      if (registrationId && event.data.status === 'unverified') {
-        setRegistrations(prevRegistrations => {
-          return prevRegistrations.map(reg => {
-            if (reg.id === registrationId) {
-              return {
-                ...reg,
-                isVerified: false,
-                verifiedAt: null,
-                verifiedBy: null
-              }
-            }
-            return reg
-          })
-        })
-      }
-
       // Force refresh data on any status changes
       console.log('🔄 Real-time status change event received, triggering updates')
 
@@ -326,15 +291,23 @@ function AttendancePageContent() {
 
     setIsLoadingRegistrations(true)
     try {
-      // Build query parameters - load all data for client-side filtering
+      // Build query parameters - only use verification filter, no search term
       const params = new URLSearchParams()
 
-      // Load all data for client-side filtering (more efficient for real-time updates)
+      // Load all data for client-side filtering (more efficient for real-time search)
       params.append('limit', '1000') // Load more data for client-side filtering
       params.append('page', '1')
 
-      // Don't add verification filter to API - we'll filter client-side for real-time updates
-      // This ensures we have all data available for immediate filter switching
+      // Capture current filter state to prevent race conditions
+      const currentFilter = verificationFilter
+
+      // Add verification filter
+      if (currentFilter === 'verified') {
+        params.append('verified', 'true')
+      } else if (currentFilter === 'unverified') {
+        params.append('verified', 'false')
+      }
+      // For 'all', don't add verified parameter to get all registrations
 
       const response = await fetch(`/api/admin/attendance/registrations?${params}`, {
         headers: { 'Cache-Control': 'max-age=30' } // Cache for 30 seconds
@@ -343,8 +316,10 @@ function AttendancePageContent() {
       if (response.ok) {
         const data = await response.json()
 
-        // Always update registrations since we're loading all data for client-side filtering
-        setRegistrations(data.registrations || [])
+        // Only update state if the filter hasn't changed during the request
+        if (currentFilter === verificationFilter) {
+          setRegistrations(data.registrations || [])
+        }
       }
     } catch (loadError) {
       console.error('Error loading registrations:', loadError)
@@ -441,21 +416,6 @@ function AttendancePageContent() {
       const data = await response.json()
 
       if (response.ok) {
-        // Immediate local state update for real-time filter response
-        setRegistrations(prevRegistrations => {
-          return prevRegistrations.map(reg => {
-            if (reg.id === confirmTarget.id) {
-              return {
-                ...reg,
-                isVerified: true,
-                verifiedAt: new Date().toISOString(),
-                verifiedBy: currentUser?.name || currentUser?.email || 'System'
-              }
-            }
-            return reg
-          })
-        })
-
         // Refresh data with current filter state
         await Promise.all([loadStats(), loadRegistrations()])
 
@@ -504,21 +464,6 @@ function AttendancePageContent() {
       const data = await response.json()
 
       if (response.ok) {
-        // Immediate local state update for real-time filter response
-        setRegistrations(prevRegistrations => {
-          return prevRegistrations.map(reg => {
-            if (reg.id === confirmTarget.id) {
-              return {
-                ...reg,
-                isVerified: false,
-                verifiedAt: null,
-                verifiedBy: null
-              }
-            }
-            return reg
-          })
-        })
-
         // Refresh data
         await Promise.all([loadStats(), loadRegistrations()])
 
@@ -738,7 +683,7 @@ function AttendancePageContent() {
     return () => clearInterval(interval)
   }, [])
 
-  // Client-side filtering for real-time search and verification status
+  // Client-side filtering for real-time search (no API calls needed)
   const filteredRegistrations = registrations.filter((registration: Registration) => {
     // Apply search filter
     if (searchTerm) {
@@ -751,14 +696,7 @@ function AttendancePageContent() {
       if (!matchesSearch) return false
     }
 
-    // Apply verification filter for real-time updates
-    if (verificationFilter === 'verified' && !registration.isVerified) {
-      return false
-    }
-    if (verificationFilter === 'unverified' && registration.isVerified) {
-      return false
-    }
-
+    // Verification filter is already handled by the API
     return true
   })
 
@@ -774,9 +712,23 @@ function AttendancePageContent() {
     setCurrentPage(1)
   }, [searchTerm])
 
+  // Fallback periodic refresh to ensure cross-device sync (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only refresh if real-time connection is not working properly
+      if (!isConnected) {
+        console.log('🔄 Fallback refresh - real-time connection not active')
+        loadRegistrations(true)
+        loadStats()
+      }
+    }, 30000) // 30 seconds
 
+    return () => clearInterval(interval)
+  }, [isConnected])
 
   // QR scanner remains open for multiple scans - no auto-close on verification
+
+  // Removed auto-refresh for better performance
 
 
 
@@ -857,7 +809,26 @@ function AttendancePageContent() {
                 <span className="sm:hidden text-white">Scan QR</span>
               </Button>
 
-
+              {/* Manual Refresh Button - especially useful when real-time is disconnected */}
+              <Button
+                onClick={() => {
+                  console.log('🔄 Manual refresh triggered')
+                  loadRegistrations(true)
+                  loadStats()
+                  success('Data refreshed successfully')
+                }}
+                variant="outline"
+                className={`w-full sm:w-auto ${
+                  !isConnected
+                    ? 'border-orange-300 text-orange-700 hover:bg-orange-50'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+                title={!isConnected ? 'Real-time disconnected - manual refresh recommended' : 'Manually refresh data'}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
 
               {/* Status Indicators - Responsive */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -870,7 +841,54 @@ function AttendancePageContent() {
                   </span>
                 </div>
 
-
+                {/* Real-time connection status - Stable, non-flickering indicator */}
+                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all duration-500 ease-in-out ${
+                  isConnected
+                    ? 'bg-green-50 border-green-200'
+                    : connectionError
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="relative flex items-center">
+                    <Activity className={`h-4 w-4 flex-shrink-0 transition-all duration-500 ease-in-out ${
+                      isConnected
+                        ? 'text-green-600'
+                        : connectionError
+                        ? 'text-red-600'
+                        : 'text-blue-600'
+                    }`} />
+                    {isConnected && (
+                      <div className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-green-400 rounded-full">
+                        <div className="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-75"></div>
+                      </div>
+                    )}
+                    {isConnecting && (
+                      <div className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                    )}
+                  </div>
+                  <span className={`font-apercu-medium text-xs sm:text-sm transition-all duration-500 ease-in-out ${
+                    isConnected
+                      ? 'text-green-700'
+                      : connectionError
+                      ? 'text-red-700'
+                      : 'text-blue-700'
+                  }`}>
+                    <span className="hidden sm:inline">
+                      {isConnected
+                        ? `Real-time: Connected${eventCount > 0 ? ` (${eventCount})` : ''}`
+                        : connectionError
+                        ? 'Real-time: Offline'
+                        : 'Real-time: Connecting...'}
+                    </span>
+                    <span className="sm:hidden">
+                      {isConnected
+                        ? `Live${eventCount > 0 ? ` (${eventCount})` : ''}`
+                        : connectionError
+                        ? 'Offline'
+                        : 'Connecting...'}
+                    </span>
+                  </span>
+                </div>
               </div>
             </div>
 

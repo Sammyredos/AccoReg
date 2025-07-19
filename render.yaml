@@ -11,11 +11,11 @@ services:
       echo "🚀 Starting Mopgomyouth production build process..." &&
       echo "📦 Installing dependencies..." &&
       npm ci &&
-      echo "🔧 Generating Prisma client..." &&
+      echo "🔧 Generating Prisma client for PostgreSQL..." &&
       npx prisma generate &&
-      echo "🗄️ Handling database migrations..." &&
-      (npx prisma migrate deploy || (echo "⚠️ Migration failed, marking migrations as applied..." && npx prisma migrate resolve --applied "20250716000001_init" && npx prisma migrate resolve --applied "20250716000002_add_age_field" && npx prisma migrate resolve --applied "20250717000001_add_branch_field" && npx prisma migrate resolve --applied "20250717000002_postgresql_final_setup" && echo "✅ Migrations marked as applied")) &&
-      echo "✅ Database ready" &&
+      echo "🗄️ Running database migrations..." &&
+      npx prisma migrate deploy &&
+      echo "✅ Database migrations completed" &&
       echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&

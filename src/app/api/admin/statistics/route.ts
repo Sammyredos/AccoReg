@@ -8,7 +8,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { authenticateRequest } from '@/lib/auth-helpers'
-import { clearStatisticsCache } from '@/lib/statistics'
 
 const prisma = new PrismaClient()
 
@@ -111,17 +110,6 @@ export async function GET(request: NextRequest) {
       })
     ])
 
-    // Calculate actual occupied and available rooms
-    const roomsWithAllocations = await prisma.room.findMany({
-      where: { isActive: true },
-      include: {
-        allocations: true
-      }
-    })
-
-    const occupiedRooms = roomsWithAllocations.filter(room => room.allocations.length > 0).length
-    const availableRooms = activeRooms - occupiedRooms
-
     const statistics = {
       registrations: {
         total: totalRegistrations,
@@ -144,8 +132,6 @@ export async function GET(request: NextRequest) {
       rooms: {
         total: totalRooms,
         active: activeRooms,
-        occupied: occupiedRooms,
-        available: availableRooms,
         capacity: {
           total: totalCapacityValue,
           occupied: occupiedSpacesValue,
@@ -158,22 +144,15 @@ export async function GET(request: NextRequest) {
         verifiedRegistrations,
         unverifiedRegistrations,
         totalRooms,
-        occupiedRooms,
-        availableRooms
+        occupiedRooms: occupiedSpacesValue > 0 ? Math.ceil(occupiedSpacesValue / 2) : 0, // Estimate
+        availableRooms: totalRooms - (occupiedSpacesValue > 0 ? Math.ceil(occupiedSpacesValue / 2) : 0)
       }
     }
 
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
       statistics
     })
-
-    // Add cache control headers for real-time updates
-    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
-    response.headers.set('Pragma', 'no-cache')
-    response.headers.set('Expires', '0')
-
-    return response
 
   } catch (error) {
     console.error('Statistics API error:', error)

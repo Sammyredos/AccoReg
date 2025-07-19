@@ -100,9 +100,11 @@ export default function ChildrenRegistrationsPage() {
       setLoading(true)
     }
     try {
-      // Fetch all registrations without search/filter params for client-side filtering
       const params = new URLSearchParams({
-        limit: '1000' // Get all registrations for client-side filtering
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: searchTerm,
+        gender: genderFilter
       })
 
       const response = await fetch(`/api/admin/registrations/children?${params}`, {
@@ -116,13 +118,7 @@ export default function ChildrenRegistrationsPage() {
 
       const data = await response.json()
       setRegistrations(data.registrations)
-      // Set pagination based on all data for client-side filtering
-      setPagination({
-        page: 1,
-        limit: 50,
-        total: data.registrations.length,
-        pages: Math.ceil(data.registrations.length / 50)
-      })
+      setPagination(data.pagination)
     } catch (err) {
       setErrorModal({
         isOpen: true,
@@ -136,13 +132,13 @@ export default function ChildrenRegistrationsPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [error])
+  }, [pagination.page, pagination.limit, searchTerm, genderFilter, error])
 
   useEffect(() => {
     fetchRegistrations()
   }, [fetchRegistrations])
 
-  // Reset to page 1 when search or filter changes (for client-side pagination)
+  // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPagination(prev => ({ ...prev, page: 1 }))
   }, [searchTerm, genderFilter])
@@ -153,41 +149,6 @@ export default function ChildrenRegistrationsPage() {
 
   const handleGenderFilter = (gender: string) => {
     setGenderFilter(gender)
-  }
-
-  // Client-side filtering for real-time search (no API calls needed)
-  const filteredRegistrations = registrations.filter((registration: ChildrenRegistration) => {
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = (
-        registration.fullName.toLowerCase().includes(searchLower) ||
-        registration.parentGuardianName.toLowerCase().includes(searchLower) ||
-        registration.parentGuardianEmail.toLowerCase().includes(searchLower) ||
-        registration.parentGuardianPhone.includes(searchTerm) ||
-        registration.branch.toLowerCase().includes(searchLower)
-      )
-      if (!matchesSearch) return false
-    }
-
-    // Apply gender filter
-    if (genderFilter && genderFilter !== 'all') {
-      if (registration.gender !== genderFilter) return false
-    }
-
-    return true
-  })
-
-  // Client-side pagination
-  const startIndex = (pagination.page - 1) * pagination.limit
-  const endIndex = startIndex + pagination.limit
-  const paginatedRegistrations = filteredRegistrations.slice(startIndex, endIndex)
-
-  // Update pagination info based on filtered results
-  const filteredPagination = {
-    ...pagination,
-    total: filteredRegistrations.length,
-    pages: Math.ceil(filteredRegistrations.length / pagination.limit)
   }
 
   const handleViewDetails = (registration: ChildrenRegistration) => {
@@ -363,13 +324,13 @@ export default function ChildrenRegistrationsPage() {
     return age
   }
 
-  // Calculate stats based on filtered data
+  // Calculate stats
   const stats = {
-    total: filteredRegistrations.length,
-    male: filteredRegistrations.filter(r => r.gender === 'Male').length,
-    female: filteredRegistrations.filter(r => r.gender === 'Female').length,
-    averageAge: filteredRegistrations.length > 0
-      ? Math.round(filteredRegistrations.reduce((sum, r) => sum + r.age, 0) / filteredRegistrations.length)
+    total: pagination.total,
+    male: registrations.filter(r => r.gender === 'Male').length,
+    female: registrations.filter(r => r.gender === 'Female').length,
+    averageAge: registrations.length > 0
+      ? Math.round(registrations.reduce((sum, r) => sum + r.age, 0) / registrations.length)
       : 0
   }
 
@@ -406,7 +367,7 @@ export default function ChildrenRegistrationsPage() {
           </Card>
 
           {/* Registration Cards Skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
             {Array.from({ length: 12 }).map((_, i) => (
               <Card key={i} className="p-4 lg:p-6 bg-white">
                 <div className="flex items-start justify-between mb-4">
@@ -546,7 +507,7 @@ export default function ChildrenRegistrationsPage() {
                   </span>
                 ) : (
                   <>
-                    Showing {paginatedRegistrations.length > 0 ? ((filteredPagination.page - 1) * filteredPagination.limit) + 1 : 0}-{Math.min(filteredPagination.page * filteredPagination.limit, filteredPagination.total)} of {filteredPagination.total} children registrations
+                    Showing {registrations.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} children registrations
                     {searchTerm && (
                       <span className="ml-2">
                         • Filtered by: <span className="font-apercu-medium">&quot;{searchTerm}&quot;</span>
@@ -571,9 +532,9 @@ export default function ChildrenRegistrationsPage() {
         </Card>
 
         {/* Children Registrations Grid - Using UserCard UI */}
-        {paginatedRegistrations.length > 0 ? (
+        {registrations.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
-            {paginatedRegistrations.map((registration) => (
+            {registrations.map((registration) => (
               <UserCard
                 key={registration.id}
                 user={{
@@ -597,15 +558,15 @@ export default function ChildrenRegistrationsPage() {
           <Card className="p-12 text-center mb-8 bg-white">
             <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">
-              {registrations.length === 0 ? 'No Children Registrations Yet' : 'No Matching Children Registrations'}
+              {pagination.total === 0 ? 'No Children Registrations Yet' : 'No Matching Children Registrations'}
             </h3>
             <p className="font-apercu-regular text-gray-600 mb-4">
-              {registrations.length === 0
+              {pagination.total === 0
                 ? 'When children register for your program, they will appear here.'
                 : 'Try adjusting your search or filter criteria to find children registrations.'
               }
             </p>
-            {registrations.length === 0 && (
+            {pagination.total === 0 && (
               <Button
                 className="font-apercu-medium"
                 onClick={() => window.open('/register/children', '_blank')}
@@ -618,11 +579,11 @@ export default function ChildrenRegistrationsPage() {
         )}
 
         {/* Pagination */}
-        {filteredPagination.pages > 1 && (
+        {pagination.pages > 1 && (
           <Card className="p-4 bg-white">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="font-apercu-regular text-xs sm:text-sm text-gray-700 order-2 sm:order-1">
-                Showing {((filteredPagination.page - 1) * filteredPagination.limit) + 1} to {Math.min(filteredPagination.page * filteredPagination.limit, filteredPagination.total)} of {filteredPagination.total} children registrations
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} children registrations
               </div>
 
               <div className="flex items-center space-x-1 order-1 sm:order-2">
@@ -631,7 +592,7 @@ export default function ChildrenRegistrationsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  disabled={filteredPagination.page === 1}
+                  disabled={pagination.page === 1}
                   className="font-apercu-medium px-2 sm:px-3"
                 >
                   <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -647,29 +608,29 @@ export default function ChildrenRegistrationsPage() {
                       const rangeWithDots: (number | string)[] = []
 
                       // Always show first page
-                      if (filteredPagination.pages > 1) {
+                      if (pagination.pages > 1) {
                         rangeWithDots.push(1)
                       }
 
                       // Add ellipsis if needed
-                      if (filteredPagination.page - delta > 2) {
+                      if (pagination.page - delta > 2) {
                         rangeWithDots.push('...')
                       }
 
                       // Add pages around current page
-                      for (let i = Math.max(2, filteredPagination.page - delta); i <= Math.min(filteredPagination.pages - 1, filteredPagination.page + delta); i++) {
+                      for (let i = Math.max(2, pagination.page - delta); i <= Math.min(pagination.pages - 1, pagination.page + delta); i++) {
                         range.push(i)
                       }
                       rangeWithDots.push(...range)
 
                       // Add ellipsis if needed
-                      if (filteredPagination.page + delta < filteredPagination.pages - 1) {
+                      if (pagination.page + delta < pagination.pages - 1) {
                         rangeWithDots.push('...')
                       }
 
                       // Always show last page
-                      if (filteredPagination.pages > 1 && !rangeWithDots.includes(filteredPagination.pages)) {
-                        rangeWithDots.push(filteredPagination.pages)
+                      if (pagination.pages > 1 && !rangeWithDots.includes(pagination.pages)) {
+                        rangeWithDots.push(pagination.pages)
                       }
 
                       return rangeWithDots
@@ -681,11 +642,11 @@ export default function ChildrenRegistrationsPage() {
                           <span className="px-1 sm:px-2 py-1 text-gray-400 font-apercu-regular text-sm">...</span>
                         ) : (
                           <Button
-                            variant={filteredPagination.page === page ? "default" : "outline"}
+                            variant={pagination.page === page ? "default" : "outline"}
                             size="sm"
                             onClick={() => setPagination(prev => ({ ...prev, page: page as number }))}
                             className={`font-apercu-medium min-w-[2rem] sm:min-w-[2.5rem] px-2 sm:px-3 text-sm ${
-                              filteredPagination.page === page
+                              pagination.page === page
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                             }`}
@@ -703,7 +664,7 @@ export default function ChildrenRegistrationsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  disabled={filteredPagination.page === filteredPagination.pages}
+                  disabled={pagination.page === pagination.pages}
                   className="font-apercu-medium px-2 sm:px-3"
                 >
                   <span className="hidden sm:inline mr-1">Next</span>
@@ -999,7 +960,7 @@ export default function ChildrenRegistrationsPage() {
                         <option value="Gudugba">Gudugba</option>
                         <option value="Great City">Great City</option>
                         <option value="Abeokuta">Abeokuta</option>
-                        <option value="Osiele">Osiele</option>
+                        <option value="Oseile">Oseile</option>
                         <option value="Ayetoro 1">Ayetoro 1</option>
                         <option value="Ayetoro 2">Ayetoro 2</option>
                         <option value="Imeko">Imeko</option>
