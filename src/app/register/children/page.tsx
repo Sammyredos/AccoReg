@@ -41,7 +41,8 @@ export default function ChildrenRegistrationPage() {
   const [success, setSuccess] = useState(false)
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ minimumAge: 13 })
   const [systemName, setSystemName] = useState('AccoReg')
-  const [formData, setFormData] = useState<FormData>({
+  // Function to get initial form data
+  const getInitialFormData = (): FormData => ({
     fullName: '',
     dateOfBirth: '',
     gender: '',
@@ -51,12 +52,28 @@ export default function ChildrenRegistrationPage() {
     parentGuardianPhone: '',
     parentGuardianEmail: ''
   })
+
+  const [formData, setFormData] = useState<FormData>(getInitialFormData())
   const [errors, setErrors] = useState<ValidationError[]>([])
   const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [showAgeModal, setShowAgeModal] = useState(false)
   const [userAge, setUserAge] = useState<number | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [stepTransitioning, setStepTransitioning] = useState(false)
+
+  // Function to reset form
+  const resetForm = () => {
+    setFormData(getInitialFormData())
+    setCurrentStep(1)
+    setErrors([])
+    setFormErrors({})
+    setLoading(false)
+    setSuccess(false)
+    setStepTransitioning(false)
+    setShowAgeModal(false)
+    setUserAge(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     // Load registration settings (same API as main registration form)
@@ -96,6 +113,17 @@ export default function ChildrenRegistrationPage() {
       setIsEditMode(true)
       setEditingId(editId)
       loadExistingRegistration(editId)
+    }
+
+    // Handle form reset when "Register Another Child" is clicked
+    const shouldReset = searchParams.get('reset')
+    if (shouldReset === 'true') {
+      resetForm()
+
+      // Clear the reset parameter from URL without page reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete('reset')
+      window.history.replaceState({}, '', url.toString())
     }
   }, [searchParams])
 
@@ -510,7 +538,7 @@ export default function ChildrenRegistrationPage() {
               </CardDescription>
               <div className="space-y-3">
                 <Button
-                  onClick={() => router.push('/register/children')}
+                  onClick={() => router.push('/register/children?reset=true')}
                   className="w-full font-apercu-medium text-sm sm:text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 >
                   Register Another Child
