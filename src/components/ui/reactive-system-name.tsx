@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { systemCache } from '@/lib/system-cache'
 
 interface ReactiveSystemNameProps {
   onNameUpdate?: (systemName: string) => void
@@ -34,31 +35,35 @@ export function ReactiveSystemName({ onNameUpdate }: ReactiveSystemNameProps) {
   const [loading, setLoading] = useState(!globalSystemNameLoaded)
 
   useEffect(() => {
-    // Load initial system name
+    // Load initial system name using cache manager
     const loadSystemName = async () => {
       try {
-        // Check localStorage first for instant loading
-        const cachedName = typeof window !== 'undefined' ? localStorage.getItem('system-name') : null
-        if (cachedName) {
+        // Get cached name immediately
+        const cachedName = systemCache.getCachedSystemName()
+        if (cachedName && cachedName !== 'Mopgomglobal') {
           setSystemName(cachedName)
           globalSystemName = cachedName
           onNameUpdate?.(cachedName)
         }
 
-        // Always fetch fresh data in background
-        const response = await fetch('/api/admin/settings')
-        if (response.ok) {
-          const data = await response.json()
-          const brandingSettings = data.settings?.branding || []
-          const systemNameSetting = brandingSettings.find((s: any) => s.key === 'systemName')
-          const newSystemName = systemNameSetting?.value || 'Mopgomglobal'
-          
+        // Load fresh data in background
+        const systemData = await systemCache.getSystemData()
+        const newSystemName = systemData.systemName
+
+        if (newSystemName !== cachedName) {
           setSystemName(newSystemName)
           updateGlobalSystemName(newSystemName)
           onNameUpdate?.(newSystemName)
         }
       } catch (error) {
         console.error('Failed to load system name:', error)
+        // Use fallback name if loading fails
+        if (!globalSystemNameLoaded) {
+          const fallbackName = 'Mopgomglobal'
+          setSystemName(fallbackName)
+          updateGlobalSystemName(fallbackName)
+          onNameUpdate?.(fallbackName)
+        }
         // Set as loaded even on error to prevent infinite loading
         globalSystemNameLoaded = true
       } finally {

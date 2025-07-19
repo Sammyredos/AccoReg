@@ -2,51 +2,14 @@ services:
   - type: web
     name: Mopgomyouth
     env: node
-    plan: free
+    plan: starter
     region: oregon
     # Optimized for real-time features
     autoDeploy: true
     previewsEnabled: false
-    buildCommand: |
-      echo "🚀 Starting Mopgomyouth production build process..." &&
-      echo "📦 Installing dependencies..." &&
-      npm ci &&
-      echo "🔧 Generating Prisma client..." &&
-      npx prisma generate &&
-      echo "✅ Database client ready" &&
-      echo "👑 Setting up Super Admin account..." &&
-      (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
-      echo "⚙️ Seeding system settings..." &&
-      (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
-      echo "🎨 Updating branding and settings..." &&
-      (npx tsx scripts/update-branding.ts && echo "✅ Branding updated successfully" || echo "⚠️ Branding update skipped") &&
-      echo "👥 Setting up roles and permissions..." &&
-      (npx tsx scripts/create-staff-role.ts && echo "✅ Roles and permissions configured" || echo "⚠️ Role setup skipped") &&
-      echo "🏗️ Building Next.js application with production optimizations..." &&
-      NODE_ENV=production npm run build &&
-      echo "🧹 Cleaning up development dependencies..." &&
-      npm prune --production &&
-      echo "🎉 Mopgomyouth production build completed successfully!" &&
-      echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
-      echo "📊 Build Summary:" &&
-      echo "  ✅ Dependencies installed and optimized" &&
-      echo "  ✅ Database schema deployed" &&
-      echo "  ✅ Admin account configured" &&
-      echo "  ✅ System settings initialized" &&
-      echo "  ✅ Branding and roles configured" &&
-      echo "  ✅ Next.js application built for production" &&
-      echo "  ✅ Production dependencies optimized" &&
-      echo "🚀 Ready for deployment!"
-    startCommand: |
-      echo "🌟 Starting Mopgomyouth Youth Registration System..." &&
-      echo "🔧 Environment: Production" &&
-      echo "🗄️ Database: PostgreSQL" &&
-      echo "👑 Setting up Super Admin account..." &&
-      (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin ready" || echo "⚠️ Admin setup skipped") &&
-      echo "⚙️ Seeding system settings..." &&
-      (npx tsx scripts/seed-settings.ts && echo "✅ Settings ready" || echo "⚠️ Settings setup skipped") &&
-      echo "🌐 Starting server..." &&
-      npm start
+    healthCheckPath: /api/health
+    buildCommand: NODE_OPTIONS="--max-old-space-size=1024" npm ci && npx prisma generate && npx prisma db push --accept-data-loss && npx tsx scripts/create-super-admin.ts && NODE_OPTIONS="--max-old-space-size=1024" npm run build
+    startCommand: NODE_ENV=production NODE_OPTIONS="--max-old-space-size=512" node server.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -54,6 +17,12 @@ services:
         value: 1
       - key: PRISMA_GENERATE_SKIP_AUTOINSTALL
         value: true
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=512"
+      - key: NEXTAUTH_URL
+        value: https://youth-registration-system.onrender.com
+      - key: NEXTAUTH_SECRET
+        value: your-super-secure-nextauth-secret-change-this-in-production
       - key: SKIP_ENV_VALIDATION
         value: false
       - key: REAL_TIME_STATS
@@ -73,7 +42,7 @@ services:
       - key: DEFAULT_ADMIN_EMAIL
         value: admin@mopgomglobal.com
       - key: DEFAULT_ADMIN_PASSWORD
-        value: Admin123!
+        value: SuperAdmin123!
       - key: MINIMUM_AGE
         value: 13
       - key: REGISTRATION_OPEN
@@ -82,93 +51,13 @@ services:
         value: false
       - key: ENABLE_EMAIL_NOTIFICATIONS
         value: true
-      - key: QR_CODE_ENABLED
-        value: true
-      - key: AUTO_VERIFY_REGISTRATIONS
-        value: false
-      - key: ALLOW_DUPLICATE_REGISTRATIONS
-        value: false
-      - key: ENABLE_PARENTAL_PERMISSION
-        value: true
-      - key: ENABLE_EMERGENCY_CONTACTS
-        value: true
-      - key: ENABLE_MEDICAL_INFO
-        value: true
-      - key: ENABLE_DIETARY_RESTRICTIONS
-        value: true
-      - key: ENABLE_SPECIAL_NEEDS
-        value: true
-      - key: ENABLE_ACCOMMODATIONS
-        value: true
-      - key: ENABLE_ROOM_ALLOCATION
-        value: true
-      - key: ENABLE_QR_VERIFICATION
-        value: true
-      - key: ENABLE_BULK_OPERATIONS
-        value: true
-      - key: ENABLE_ANALYTICS
-        value: true
-      - key: ENABLE_REPORTS
-        value: true
-      - key: ENABLE_NOTIFICATIONS
-        value: true
-      - key: ENABLE_USER_MANAGEMENT
-        value: true
-      - key: ENABLE_ROLE_MANAGEMENT
-        value: true
-      - key: ENABLE_SETTINGS_MANAGEMENT
-        value: true
-      - key: ENABLE_BACKUP_RESTORE
-        value: true
-      - key: ENABLE_AUDIT_LOGS
-        value: true
-      - key: ENABLE_REAL_TIME_UPDATES
-        value: true
-      - key: ENABLE_MOBILE_RESPONSIVE
-        value: true
-      - key: ENABLE_DARK_MODE
-        value: false
-      - key: ENABLE_MULTI_LANGUAGE
-        value: false
-      - key: DEFAULT_LANGUAGE
-        value: en
-      - key: DEFAULT_TIMEZONE
-        value: America/Los_Angeles
-      - key: DEFAULT_CURRENCY
-        value: USD
-      - key: ENABLE_PAYMENT_PROCESSING
-        value: false
-      - key: ENABLE_SOCIAL_LOGIN
-        value: false
-      - key: ENABLE_TWO_FACTOR_AUTH
-        value: false
-      - key: SESSION_TIMEOUT_MINUTES
-        value: 60
-      - key: MAX_LOGIN_ATTEMPTS
-        value: 5
-      - key: PASSWORD_MIN_LENGTH
-        value: 8
-      - key: REQUIRE_PASSWORD_COMPLEXITY
-        value: true
-      - key: ENABLE_PASSWORD_RESET
-        value: true
-      - key: ENABLE_ACCOUNT_LOCKOUT
-        value: true
-      - key: ENABLE_SECURITY_HEADERS
-        value: true
-      - key: ENABLE_RATE_LIMITING
-        value: true
-      - key: ENABLE_CORS
-        value: true
-      - key: ENABLE_COMPRESSION
-        value: true
-      - key: ENABLE_CACHING
-        value: true
-      - key: CACHE_TTL_SECONDS
-        value: 300
-      - key: ENABLE_MONITORING
-        value: true
-      - key: LOG_LEVEL
-        value: info
-      - key: ENABLE_DEBUG_MODE
-        value: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mopgomyouth-db
+          property: connectionString
+
+databases:
+  - name: mopgomyouth-db
+    databaseName: mopgomyouth
+    user: mopgomyouth
+    plan: free

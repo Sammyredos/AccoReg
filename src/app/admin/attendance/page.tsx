@@ -27,7 +27,6 @@ import {
   Search,
   CheckCircle,
   Users,
-  RefreshCw,
   Scan,
   Clock,
   ChevronDown,
@@ -166,23 +165,32 @@ function AttendancePageContent() {
 
       // Force immediate data refresh for cross-device sync
       console.log('🔄 Real-time verification event received, triggering updates')
+      console.log('📊 Event data:', event.data)
 
-      // Immediate trigger
+      // Immediate UI update - update the specific registration in state
+      setRegistrations(prevRegistrations =>
+        prevRegistrations.map(reg =>
+          reg.id === event.data.registrationId
+            ? { ...reg, isVerified: true, verifiedAt: new Date().toISOString() }
+            : reg
+        )
+      )
+
+      // Immediate trigger for stats
       triggerStatsUpdate()
 
-      // Delayed refresh for data consistency
+      // Skip delayed refresh to prevent overriding immediate update
+      // The real-time event already provides the most current data
       setTimeout(() => {
-        loadRegistrations(true) // Force refresh
-        loadStats()
-        // Additional trigger for accommodation stats
+        loadStats() // Only refresh stats, not registrations
         triggerStatsUpdate()
-        console.log('🔄 Secondary verification update completed')
-      }, 50) // Reduced delay for faster response
+        console.log('🔄 Secondary stats update completed (registrations preserved)')
+      }, 100)
 
-      // Show success notification ONLY for QR scans (not manual verifications)
-      // Manual verifications have their own success toast in the button handler
-      if (event.data.fullName && event.data.method === 'qr') {
-        success(`✅ ${event.data.fullName} verified via QR scan`)
+      // Show success notification for all verification methods
+      if (event.data.fullName) {
+        const method = event.data.method === 'qr' ? 'QR scan' : 'manual verification'
+        success(`✅ ${event.data.fullName} verified via ${method}`)
       }
 
       // QR scanner stays open after successful scan - user must manually close it
@@ -206,20 +214,32 @@ function AttendancePageContent() {
     }, [success]), // Removed state dependencies since we're using refs
     onStatusChange: useCallback((event) => {
       console.log('📊 Real-time status change received:', event.data)
-      // Force refresh data on any status changes
       console.log('🔄 Real-time status change event received, triggering updates')
 
-      // Immediate trigger
+      // Immediate UI update for status changes
+      if (event.data.registrationId) {
+        setRegistrations(prevRegistrations =>
+          prevRegistrations.map(reg =>
+            reg.id === event.data.registrationId
+              ? {
+                  ...reg,
+                  isVerified: event.data.status === 'present',
+                  verifiedAt: event.data.status === 'present' ? new Date().toISOString() : null
+                }
+              : reg
+          )
+        )
+      }
+
+      // Immediate trigger for stats
       triggerStatsUpdate()
 
-      // Delayed refresh for data consistency
+      // Skip delayed registration refresh to prevent overriding immediate update
       setTimeout(() => {
-        loadRegistrations(true) // Force refresh
-        loadStats()
-        // Additional trigger for accommodation stats
+        loadStats() // Only refresh stats, not registrations
         triggerStatsUpdate()
-        console.log('🔄 Secondary status change update completed')
-      }, 50) // Reduced delay for faster response
+        console.log('🔄 Secondary stats update completed (registrations preserved)')
+      }, 100)
     }, []),
     onError: useCallback((event) => {
       console.log('🚨 Real-time error received:', event.data)
@@ -416,20 +436,27 @@ function AttendancePageContent() {
       const data = await response.json()
 
       if (response.ok) {
-        // Refresh data with current filter state
-        await Promise.all([loadStats(), loadRegistrations()])
+        // Immediate UI update
+        setRegistrations(prevRegistrations =>
+          prevRegistrations.map(reg =>
+            reg.id === confirmTarget.id
+              ? { ...reg, isVerified: true, verifiedAt: new Date().toISOString() }
+              : reg
+          )
+        )
 
         // Trigger accommodation stats update for real-time button visibility
         console.log('🚀 Triggering stats update for verification at', new Date().toISOString())
         console.time('verification-stats-trigger')
         triggerStatsUpdate()
 
-        // Additional trigger with delay to ensure accommodations page updates
+        // Delayed stats refresh only (preserve immediate UI update)
         setTimeout(() => {
+          loadStats() // Only refresh stats, not registrations
           triggerStatsUpdate()
           console.log('🔄 Secondary stats update triggered for verification')
           console.timeEnd('verification-stats-trigger')
-        }, 100)
+        }, 200)
 
         success(`${capitalizeName(data.registration.fullName)} has been verified successfully!`)
         setShowConfirmModal(false)
@@ -464,20 +491,27 @@ function AttendancePageContent() {
       const data = await response.json()
 
       if (response.ok) {
-        // Refresh data
-        await Promise.all([loadStats(), loadRegistrations()])
+        // Immediate UI update
+        setRegistrations(prevRegistrations =>
+          prevRegistrations.map(reg =>
+            reg.id === confirmTarget.id
+              ? { ...reg, isVerified: false, verifiedAt: null }
+              : reg
+          )
+        )
 
         // Trigger accommodation stats update for real-time button visibility
         console.log('🚀 Triggering stats update for unverification at', new Date().toISOString())
         console.time('unverification-stats-trigger')
         triggerStatsUpdate()
 
-        // Additional trigger with delay to ensure accommodations page updates
+        // Delayed stats refresh only (preserve immediate UI update)
         setTimeout(() => {
+          loadStats() // Only refresh stats, not registrations
           triggerStatsUpdate()
           console.log('🔄 Secondary stats update triggered for unverification')
           console.timeEnd('unverification-stats-trigger')
-        }, 100)
+        }, 200)
 
         success(data.message)
         setShowConfirmModal(false)
@@ -540,6 +574,25 @@ function AttendancePageContent() {
         body: JSON.stringify({ qrCode: qrData })
       })
 
+      if (!checkResponse.ok) {
+        const errorText = await checkResponse.text()
+        console.error('QR toggle check failed:', {
+          status: checkResponse.status,
+          statusText: checkResponse.statusText,
+          error: errorText
+        })
+
+        if (checkResponse.status === 404) {
+          error('QR scanning service not available. Please try again later.')
+        } else if (checkResponse.status === 400) {
+          error('Invalid QR code format. Please scan a valid registration QR code.')
+        } else {
+          error('Failed to process QR code. Please try again.')
+        }
+        setLastQRScanId(null)
+        return
+      }
+
       const checkData = await checkResponse.json()
 
       if (checkData.action === 'verify_ready') {
@@ -556,13 +609,27 @@ function AttendancePageContent() {
         const verifyData = await verifyResponse.json()
 
         if (verifyResponse.ok) {
-          // Refresh data and trigger updates
-          await Promise.all([loadStats(), loadRegistrations()])
+          // Immediate UI update
+          setRegistrations(prevRegistrations =>
+            prevRegistrations.map(reg =>
+              reg.id === verifyData.registration.id
+                ? { ...reg, isVerified: true, verifiedAt: new Date().toISOString() }
+                : reg
+            )
+          )
+
+          // Trigger stats update immediately
           triggerStatsUpdate()
+
+          // Delayed stats refresh only (preserve immediate UI update)
           setTimeout(() => {
+            loadStats() // Only refresh stats, not registrations
             triggerStatsUpdate()
             console.log('🔄 Secondary stats update triggered for QR verification')
-          }, 100)
+          }, 200)
+
+          success(`✅ ${capitalizeName(verifyData.registration.fullName)} has been verified with QR code!`)
+          setLastQRScanId(verifyData.registration.id) // Track for duplicate prevention
         } else {
           error(`QR Verification failed: ${verifyData.error}`)
           setLastQRScanId(null)
@@ -600,7 +667,18 @@ function AttendancePageContent() {
 
     } catch (qrError) {
       console.error('Error scanning QR code:', qrError)
-      error('Failed to scan QR code')
+
+      // Provide more specific error messages
+      if (qrError instanceof SyntaxError) {
+        error('Invalid QR code format. Please scan a valid registration QR code.')
+      } else if (qrError.message?.includes('fetch')) {
+        error('Network error. Please check your connection and try again.')
+      } else if (qrError.message?.includes('404')) {
+        error('QR scanning service not found. Please contact support.')
+      } else {
+        error('Failed to scan QR code. Please try again or contact support.')
+      }
+
       setLastQRScanId(null) // Clear tracking on error
     }
   }
@@ -809,26 +887,7 @@ function AttendancePageContent() {
                 <span className="sm:hidden text-white">Scan QR</span>
               </Button>
 
-              {/* Manual Refresh Button - especially useful when real-time is disconnected */}
-              <Button
-                onClick={() => {
-                  console.log('🔄 Manual refresh triggered')
-                  loadRegistrations(true)
-                  loadStats()
-                  success('Data refreshed successfully')
-                }}
-                variant="outline"
-                className={`w-full sm:w-auto ${
-                  !isConnected
-                    ? 'border-orange-300 text-orange-700 hover:bg-orange-50'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
-                title={!isConnected ? 'Real-time disconnected - manual refresh recommended' : 'Manually refresh data'}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Refresh</span>
-                <span className="sm:hidden">Sync</span>
-              </Button>
+
 
               {/* Status Indicators - Responsive */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

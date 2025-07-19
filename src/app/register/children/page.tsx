@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
@@ -31,7 +31,8 @@ interface RegistrationSettings {
   minimumAge: number
 }
 
-export default function ChildrenRegistrationPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function ChildrenRegistrationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
@@ -41,7 +42,15 @@ export default function ChildrenRegistrationPage() {
   const [success, setSuccess] = useState(false)
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ minimumAge: 13 })
   const [systemName, setSystemName] = useState('AccoReg')
-  const [formData, setFormData] = useState<FormData>({
+  const [currentStep, setCurrentStep] = useState(1)
+  const [errors, setErrors] = useState<ValidationError[]>([])
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [showAgeModal, setShowAgeModal] = useState(false)
+  const [userAge, setUserAge] = useState<number | null>(null)
+  const [stepTransitioning, setStepTransitioning] = useState(false)
+
+  // Initial form data function
+  const getInitialFormData = (): FormData => ({
     fullName: '',
     dateOfBirth: '',
     gender: '',
@@ -51,12 +60,8 @@ export default function ChildrenRegistrationPage() {
     parentGuardianPhone: '',
     parentGuardianEmail: ''
   })
-  const [errors, setErrors] = useState<ValidationError[]>([])
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
-  const [showAgeModal, setShowAgeModal] = useState(false)
-  const [userAge, setUserAge] = useState<number | null>(null)
-  const [currentStep, setCurrentStep] = useState(1)
-  const [stepTransitioning, setStepTransitioning] = useState(false)
+
+  const [formData, setFormData] = useState<FormData>(getInitialFormData())
 
   useEffect(() => {
     // Load registration settings (same API as main registration form)
@@ -88,6 +93,29 @@ export default function ChildrenRegistrationPage() {
     loadSettings()
     loadBranding()
   }, [])
+
+  // Handle form reset when "Register Another Child" is clicked
+  useEffect(() => {
+    const shouldReset = searchParams.get('reset')
+    if (shouldReset === 'true') {
+      // Reset all form state
+      setFormData(getInitialFormData())
+      setCurrentStep(1)
+      setErrors([])
+      setLoading(false)
+      setSuccess(false)
+      setIsEditMode(false)
+      setEditingId(null)
+
+      // Clear the reset parameter from URL without page reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete('reset')
+      window.history.replaceState({}, '', url.toString())
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [searchParams])
 
   // Check for edit mode and load existing registration data
   useEffect(() => {
@@ -510,7 +538,7 @@ export default function ChildrenRegistrationPage() {
               </CardDescription>
               <div className="space-y-3">
                 <Button
-                  onClick={() => router.push('/register/children')}
+                  onClick={() => router.push('/register/children?reset=true')}
                   className="w-full font-apercu-medium text-sm sm:text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 >
                   Register Another Child
@@ -1243,5 +1271,26 @@ export default function ChildrenRegistrationPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+// Loading component for Suspense fallback
+function ChildrenRegistrationLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading registration form...</p>
+      </div>
+    </div>
+  )
+}
+
+// Main component with Suspense boundary
+export default function ChildrenRegistrationPage() {
+  return (
+    <Suspense fallback={<ChildrenRegistrationLoading />}>
+      <ChildrenRegistrationContent />
+    </Suspense>
   )
 }
