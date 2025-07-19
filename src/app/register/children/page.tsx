@@ -31,6 +31,18 @@ interface RegistrationSettings {
   minimumAge: number
 }
 
+// Helper function to get initial form data
+const getInitialFormData = (): FormData => ({
+  fullName: '',
+  dateOfBirth: '',
+  gender: '',
+  address: '',
+  branch: '',
+  parentGuardianName: '',
+  parentGuardianPhone: '',
+  parentGuardianEmail: ''
+})
+
 export default function ChildrenRegistrationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -41,18 +53,6 @@ export default function ChildrenRegistrationPage() {
   const [success, setSuccess] = useState(false)
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ minimumAge: 13 })
   const [systemName, setSystemName] = useState('AccoReg')
-  // Function to get initial form data
-  const getInitialFormData = (): FormData => ({
-    fullName: '',
-    dateOfBirth: '',
-    gender: '',
-    address: '',
-    branch: '', // Branch selection required
-    parentGuardianName: '',
-    parentGuardianPhone: '',
-    parentGuardianEmail: ''
-  })
-
   const [formData, setFormData] = useState<FormData>(getInitialFormData())
   const [errors, setErrors] = useState<ValidationError[]>([])
   const [formErrors, setFormErrors] = useState<FormErrors>({})
@@ -60,20 +60,6 @@ export default function ChildrenRegistrationPage() {
   const [userAge, setUserAge] = useState<number | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [stepTransitioning, setStepTransitioning] = useState(false)
-
-  // Function to reset form
-  const resetForm = () => {
-    setFormData(getInitialFormData())
-    setCurrentStep(1)
-    setErrors([])
-    setFormErrors({})
-    setLoading(false)
-    setSuccess(false)
-    setStepTransitioning(false)
-    setShowAgeModal(false)
-    setUserAge(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
 
   useEffect(() => {
     // Load registration settings (same API as main registration form)
@@ -114,17 +100,6 @@ export default function ChildrenRegistrationPage() {
       setEditingId(editId)
       loadExistingRegistration(editId)
     }
-
-    // Handle form reset when "Register Another Child" is clicked
-    const shouldReset = searchParams.get('reset')
-    if (shouldReset === 'true') {
-      resetForm()
-
-      // Clear the reset parameter from URL without page reload
-      const url = new URL(window.location.href)
-      url.searchParams.delete('reset')
-      window.history.replaceState({}, '', url.toString())
-    }
   }, [searchParams])
 
   const loadExistingRegistration = async (id: string) => {
@@ -154,6 +129,45 @@ export default function ChildrenRegistrationPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle form reset when "Register Another Child" is clicked
+  useEffect(() => {
+    const shouldReset = searchParams.get('reset')
+    if (shouldReset === 'true') {
+      // Reset all form state
+      setFormData(getInitialFormData())
+      setCurrentStep(1)
+      setErrors([])
+      setFormErrors({})
+      setLoading(false)
+      setSuccess(false)
+      setStepTransitioning(false)
+      setShowAgeModal(false)
+      setUserAge(null)
+
+      // Clear the reset parameter from URL without page reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete('reset')
+      window.history.replaceState({}, '', url.toString())
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [searchParams])
+
+  // Manual reset function
+  const resetForm = () => {
+    setFormData(getInitialFormData())
+    setCurrentStep(1)
+    setErrors([])
+    setFormErrors({})
+    setLoading(false)
+    setSuccess(false)
+    setStepTransitioning(false)
+    setShowAgeModal(false)
+    setUserAge(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

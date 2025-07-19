@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -70,10 +70,9 @@ export default function ChildrenRegistrationsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
   const [genderFilter, setGenderFilter] = useState('all')
-  const [allRegistrations, setAllRegistrations] = useState<ChildrenRegistration[]>([])
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [selectedRegistration, setSelectedRegistration] = useState<ChildrenRegistration | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -96,20 +95,6 @@ export default function ChildrenRegistrationsPage() {
     description: ''
   })
 
-  // Debounce search term for real-time filtering
-  useEffect(() => {
-    if (searchTerm !== debouncedSearchTerm) {
-      setIsSearching(true)
-    }
-
-    const timeoutId = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm)
-      setIsSearching(false)
-    }, 300) // 300ms debounce
-
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, debouncedSearchTerm])
-
   const fetchRegistrations = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true)
@@ -117,12 +102,11 @@ export default function ChildrenRegistrationsPage() {
       setLoading(true)
     }
     try {
-      // Fetch ALL registrations for client-side filtering
       const params = new URLSearchParams({
-        page: '1',
-        limit: '1000', // Large limit to get all records
-        search: '', // No server-side search
-        gender: 'all' // No server-side gender filter
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: searchTerm,
+        gender: genderFilter
       })
 
       const response = await fetch(`/api/admin/registrations/children?${params}`, {
@@ -135,15 +119,8 @@ export default function ChildrenRegistrationsPage() {
       if (!response.ok) throw new Error('Failed to fetch registrations')
 
       const data = await response.json()
-      setAllRegistrations(data.registrations) // Store all registrations
-
-      // Initial pagination setup
-      setPagination({
-        page: 1,
-        limit: 50,
-        total: data.registrations.length,
-        pages: Math.ceil(data.registrations.length / 50)
-      })
+      setRegistrations(data.registrations)
+      setPagination(data.pagination)
     } catch (err) {
       setErrorModal({
         isOpen: true,
@@ -157,66 +134,36 @@ export default function ChildrenRegistrationsPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [error]) // Remove search and filter dependencies since we're doing client-side filtering
+  }, [pagination.page, pagination.limit, searchTerm, genderFilter, error])
 
   useEffect(() => {
     fetchRegistrations()
   }, [fetchRegistrations])
 
-  // Client-side filtering with real-time search
-  const filteredRegistrations = useMemo(() => {
-    let filtered = [...allRegistrations]
-
-    // Apply search filter
-    if (debouncedSearchTerm.trim()) {
-      const searchLower = debouncedSearchTerm.toLowerCase()
-      filtered = filtered.filter(registration =>
-        registration.fullName.toLowerCase().includes(searchLower) ||
-        registration.parentGuardianName.toLowerCase().includes(searchLower) ||
-        registration.parentGuardianEmail.toLowerCase().includes(searchLower)
-      )
-    }
-
-    // Apply gender filter
-    if (genderFilter !== 'all') {
-      filtered = filtered.filter(registration => registration.gender === genderFilter)
-    }
-
-    return filtered
-  }, [allRegistrations, debouncedSearchTerm, genderFilter])
-
-  // Update pagination when filtered results change
-  useEffect(() => {
-    const totalFiltered = filteredRegistrations.length
-    const totalPages = Math.ceil(totalFiltered / pagination.limit)
-
-    setPagination(prev => ({
-      ...prev,
-      total: totalFiltered,
-      pages: totalPages,
-      page: prev.page > totalPages ? 1 : prev.page // Reset to page 1 if current page exceeds total pages
-    }))
-  }, [filteredRegistrations.length, pagination.limit])
-
-  // Get paginated results from filtered data
-  const paginatedRegistrations = useMemo(() => {
-    const startIndex = (pagination.page - 1) * pagination.limit
-    const endIndex = startIndex + pagination.limit
-    return filteredRegistrations.slice(startIndex, endIndex)
-  }, [filteredRegistrations, pagination.page, pagination.limit])
-
-  // Update registrations state with paginated results
-  useEffect(() => {
-    setRegistrations(paginatedRegistrations)
-  }, [paginatedRegistrations])
-
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPagination(prev => ({ ...prev, page: 1 }))
-  }, [debouncedSearchTerm, genderFilter])
+  }, [searchTerm, genderFilter])
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchTerm(searchInput)
+    }, 300) // 300ms debounce delay
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchInput])
 
   const handleSearch = (value: string) => {
-    setSearchTerm(value)
+    setSearchInput(value)
   }
 
   const handleGenderFilter = (gender: string) => {
@@ -439,7 +386,7 @@ export default function ChildrenRegistrationsPage() {
           </Card>
 
           {/* Registration Cards Skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
             {Array.from({ length: 12 }).map((_, i) => (
               <Card key={i} className="p-4 lg:p-6 bg-white">
                 <div className="flex items-start justify-between mb-4">
@@ -475,7 +422,7 @@ export default function ChildrenRegistrationsPage() {
   }
 
   return (
-    <AdminLayoutNew title="Children Registrations" description="Manage children registrations (Information collection only - no verification required)">
+    <AdminLayoutNew title="Children Registrations" description="Manage children registrations (information collection only - no verification required)">
       <div className="space-y-6">
         {/* Stats Cards */}
         <StatsGrid columns={4}>
@@ -518,26 +465,14 @@ export default function ChildrenRegistrationsPage() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
             <div className="flex-1 lg:max-w-md">
               <div className="relative">
-                <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 transition-colors ${
-                  isSearching ? 'text-indigo-500 animate-pulse' : 'text-gray-400'
-                }`} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search by child name, parent name, or email..."
-                  value={searchTerm}
+                  value={searchInput}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className={`w-full pl-10 pr-10 py-2.5 lg:py-2 border rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm lg:text-base transition-all duration-200 ${
-                    isSearching ? 'border-indigo-300 bg-indigo-50/30' : 'border-gray-300'
-                  }`}
+                  className="w-full pl-10 pr-4 py-2.5 lg:py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm lg:text-base"
                 />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             </div>
 
@@ -592,24 +527,14 @@ export default function ChildrenRegistrationsPage() {
                 ) : (
                   <>
                     Showing {registrations.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} children registrations
-                    {(debouncedSearchTerm || genderFilter !== 'all') && (
-                      <span className="ml-2 text-indigo-600">
-                        • Filtered from {allRegistrations.length} total
-                      </span>
-                    )}
-                    {debouncedSearchTerm && (
+                    {searchTerm && (
                       <span className="ml-2">
-                        • Search: <span className="font-apercu-medium">&quot;{debouncedSearchTerm}&quot;</span>
+                        • Filtered by: <span className="font-apercu-medium">&quot;{searchTerm}&quot;</span>
                       </span>
                     )}
                     {genderFilter !== 'all' && (
                       <span className="ml-2">
                         • Gender: <span className="font-apercu-medium">{genderFilter}</span>
-                      </span>
-                    )}
-                    {isSearching && (
-                      <span className="ml-2 text-indigo-500 animate-pulse">
-                        • Searching...
                       </span>
                     )}
                   </>
@@ -627,7 +552,7 @@ export default function ChildrenRegistrationsPage() {
 
         {/* Children Registrations Grid - Using UserCard UI */}
         {registrations.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
             {registrations.map((registration) => (
               <UserCard
                 key={registration.id}
