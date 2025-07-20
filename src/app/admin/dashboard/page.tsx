@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { DashboardStats } from '@/components/admin/DashboardStats'
+import { DashboardCharts } from '@/components/admin/DashboardCharts'
 import { RecentRegistrations } from '@/components/admin/RecentRegistrations'
 import { NotificationPanel } from '@/components/admin/NotificationPanel'
 import { Card } from '@/components/ui/card'
@@ -92,8 +93,10 @@ export default function AdminDashboard() {
   const [isStatsLoading, setIsStatsLoading] = useState(true)
   const [isRegistrationsLoading, setIsRegistrationsLoading] = useState(true)
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(false) // Load immediately
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(true)
 
   // Real dashboard data - loaded from APIs
+  const [analytics, setAnalytics] = useState<any>(null)
   const [activityFeed, setActivityFeed] = useState<Array<{
     description: string
     timestamp: string
@@ -181,6 +184,7 @@ export default function AdminDashboard() {
       loadActivityData()
       loadCommunicationsData()
       checkSystemStatus()
+      loadAnalyticsData()
 
       // Load analytics in background for trends only (don't overwrite main stats)
       if (statsData) {
@@ -428,6 +432,26 @@ export default function AdminDashboard() {
     }
   }
 
+  const loadAnalyticsData = async () => {
+    try {
+      setIsAnalyticsLoading(true)
+      const response = await fetch('/api/admin/dashboard/analytics', {
+        headers: {
+          'Cache-Control': 'max-age=300', // Cache for 5 minutes
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAnalytics(data.analytics)
+      }
+    } catch (error) {
+      console.error('Failed to load analytics data:', error)
+    } finally {
+      setIsAnalyticsLoading(false)
+    }
+  }
+
   return (
     <AdminLayoutNew title={t('page.dashboard.title')} description={t('page.dashboard.description')}>
       <PageTransition animation="fade">
@@ -448,6 +472,13 @@ export default function AdminDashboard() {
             />
           )}
         </div>
+
+        {/* Beautiful Data Visualizations */}
+        {!isAnalyticsLoading && analytics && (
+          <div className="mb-8">
+            <DashboardCharts analytics={analytics} />
+          </div>
+        )}
 
         {/* Main Dashboard Content - Professional Layout */}
         <div className="space-y-8">
