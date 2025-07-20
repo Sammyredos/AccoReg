@@ -24,20 +24,17 @@ export async function POST(request: NextRequest) {
           OR: [
             {
               fullName: {
-                contains: normalizedSearchTerm,
-                mode: 'insensitive'
+                contains: normalizedSearchTerm
               }
             },
             {
               parentGuardianName: {
-                contains: normalizedSearchTerm,
-                mode: 'insensitive'
+                contains: normalizedSearchTerm
               }
             },
             {
               parentGuardianEmail: {
-                contains: normalizedSearchTerm,
-                mode: 'insensitive'
+                contains: normalizedSearchTerm
               }
             }
           ]

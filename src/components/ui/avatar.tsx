@@ -1,34 +1,36 @@
 "use client"
 
 import * as React from "react"
-import * as AvatarPrimitive from "@radix-ui/react-avatar"
-
 import { cn } from "@/lib/utils"
 
+// Simple Avatar implementation without Radix UI dependencies
 function Avatar({
   className,
+  children,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Root>) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <AvatarPrimitive.Root
+    <div
       data-slot="avatar"
       className={cn(
-        "relative flex size-8 shrink-0 overflow-hidden rounded-full",
+        "relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full",
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </div>
   )
 }
 
 function AvatarImage({
   className,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+}: React.ImgHTMLAttributes<HTMLImageElement>) {
   return (
-    <AvatarPrimitive.Image
+    <img
       data-slot="avatar-image"
-      className={cn("aspect-square size-full", className)}
+      className={cn("aspect-square h-full w-full object-cover", className)}
       {...props}
     />
   )
@@ -36,17 +38,20 @@ function AvatarImage({
 
 function AvatarFallback({
   className,
+  children,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Fallback>) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <AvatarPrimitive.Fallback
+    <div
       data-slot="avatar-fallback"
       className={cn(
-        "bg-muted flex size-full items-center justify-center rounded-full",
+        "bg-muted flex h-full w-full items-center justify-center rounded-full",
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </div>
   )
 }
 

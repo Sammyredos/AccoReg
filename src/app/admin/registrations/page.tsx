@@ -11,7 +11,7 @@ import { ErrorModal } from '@/components/ui/error-modal'
 import { parseApiError } from '@/lib/error-messages'
 // Removed heavy animations for better performance
 import { Input } from '@/components/ui/input'
-import { Avatar } from '@/components/ui/avatar'
+// import { Avatar } from '@/components/ui/avatar'
 import { StatsCard, StatsGrid } from '@/components/ui/stats-card'
 import { UserCard } from '@/components/ui/user-card'
 import { QRCodeDisplay } from '@/components/ui/qr-code-display'
@@ -1305,11 +1305,11 @@ export default function AdminRegistrations() {
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-                  <Avatar className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 flex items-center justify-center flex-shrink-0 rounded-full">
                     <span className="text-white font-apercu-bold text-xs sm:text-sm">
                       {getInitials(selectedRegistration.fullName)}
                     </span>
-                  </Avatar>
+                  </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-apercu-bold text-lg sm:text-xl text-white truncate">
                       {capitalizeName(selectedRegistration.fullName)}
@@ -1609,11 +1609,11 @@ export default function AdminRegistrations() {
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-3">
-                  <Avatar className="h-10 w-10 bg-white/20 flex items-center justify-center">
+                  <div className="h-10 w-10 bg-white/20 flex items-center justify-center rounded-full">
                     <span className="text-white font-apercu-bold text-sm">
                       {getInitials(editFormData.fullName)}
                     </span>
-                  </Avatar>
+                  </div>
                   <div>
                     <h3 className="font-apercu-bold text-xl text-white">
                       Edit Registration
