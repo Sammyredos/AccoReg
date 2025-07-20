@@ -5,7 +5,7 @@
 import React from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Avatar } from '@/components/ui/avatar'
+// import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import {
   User,
@@ -137,11 +137,11 @@ export function UserCard({
   return (
     <Card className="p-4 lg:p-6 hover:shadow-lg transition-shadow duration-200 bg-white">
       <div className="flex items-start justify-between mb-4">
-        <Avatar className="h-10 w-10 lg:h-12 lg:w-12 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+        <div className="h-10 w-10 lg:h-12 lg:w-12 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center rounded-full">
           <span className="text-white font-apercu-bold text-xs lg:text-sm">
             {getInitials(capitalizeName(user.fullName))}
           </span>
-        </Avatar>
+        </div>
         
         {user.isVerified !== undefined && (
           <Badge 
