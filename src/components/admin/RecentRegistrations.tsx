@@ -74,81 +74,67 @@ export function RecentRegistrations({ registrations }: RecentRegistrationsProps)
   const recentRegistrations = registrations.slice(0, 5)
 
   return (
-    <Card className="p-4 sm:p-2 py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 mb-4 sm:mb-6 gap-3 sm:gap-0">
-        <div className="min-w-0 flex-1">
-          <h3 className="font-apercu-bold text-base sm:text-lg text-gray-900 truncate">Recent Registrations</h3>
-          <p className="font-apercu-regular text-xs sm:text-sm text-gray-600">Latest participant sign-ups</p>
-        </div>
-        <Link href="/admin/registrations" className="flex-shrink-0">
-          <Button variant="outline" size="sm" className="font-apercu-medium w-full sm:w-auto">
-            <span className="hidden sm:inline">View All</span>
-            <span className="sm:hidden">View All</span>
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Link>
-      </div>
-
-      <div className="space-y-3 sm:space-y-4">
-        {recentRegistrations.length === 0 ? (
-          <div className="text-center py-6 sm:py-8">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
-            </div>
-            <p className="font-apercu-medium text-sm sm:text-base text-gray-500">No recent registrations</p>
-            <p className="font-apercu-regular text-xs sm:text-sm text-gray-400">New registrations will appear here</p>
+    <div className="space-y-3">
+      {recentRegistrations.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Clock className="w-5 h-5 text-gray-400" />
           </div>
-        ) : (
-          recentRegistrations.map((registration) => (
-            <div key={registration.id} className="flex items-start sm:items-center space-x-3 sm:space-x-4 p-2 sm:p-3 rounded-lg hover:bg-gray-50 transition-colors">
-              <Avatar className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-apercu-bold text-xs sm:text-sm">
-                  {getInitials(capitalizeName(registration.fullName))}
-                </span>
-              </Avatar>
+          <p className="text-sm text-gray-500 font-medium">No recent registrations</p>
+          <p className="text-xs text-gray-400 mt-1">New registrations will appear here</p>
+        </div>
+      ) : (
+        recentRegistrations.map((registration) => (
+          <div key={registration.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50/50 transition-colors group">
+            {/* Avatar */}
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-semibold text-xs">
+                {getInitials(capitalizeName(registration.fullName))}
+              </span>
+            </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                  <p className="font-apercu-medium text-sm text-gray-900 truncate">
-                    {capitalizeName(registration.fullName)}
-                  </p>
-                  <div className="flex gap-1 sm:gap-2">
-                    {isNewRegistration(registration.createdAt) && (
-                      <Badge
-                        variant="default"
-                        className="h-5 px-2 text-xs font-apercu-bold self-start sm:self-auto bg-blue-500 hover:bg-blue-600 text-white"
-                      >
-                        NEW
-                      </Badge>
-                    )}
-                    <Badge
-                      variant={registration.parentalPermissionGranted ? "success" : "warning"}
-                      className="h-5 px-2 text-xs font-apercu-medium self-start sm:self-auto"
-                    >
-                      {registration.parentalPermissionGranted ? (
-                        <>
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Approved
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Pending
-                        </>
-                      )}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-500">
-                  <span className="font-apercu-regular truncate">{registration.emailAddress}</span>
-                  <span className="font-apercu-regular">Age: {calculateAge(registration.dateOfBirth)}</span>
-                  <span className="font-apercu-regular">{formatDate(registration.createdAt)}</span>
-                </div>
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-medium text-sm text-gray-900 truncate">
+                  {capitalizeName(registration.fullName)}
+                </p>
+                {isNewRegistration(registration.createdAt) && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                    New
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-xs text-gray-500">
+                <span className="truncate max-w-[120px]">{registration.emailAddress}</span>
+                <span>•</span>
+                <span>Age {calculateAge(registration.dateOfBirth)}</span>
+                <span>•</span>
+                <span>{formatDate(registration.createdAt)}</span>
               </div>
             </div>
-          ))
-        )}
-      </div>
-    </Card>
+
+            {/* Status */}
+            <div className="flex-shrink-0">
+              {registration.parentalPermissionGranted ? (
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              ) : (
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              )}
+            </div>
+          </div>
+        ))
+      )}
+
+      {/* View All Link */}
+      {recentRegistrations.length > 0 && (
+        <div className="pt-2 border-t border-gray-100">
+          <Link href="/admin/registrations" className="flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            View all registrations
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+    </div>
   )
 }

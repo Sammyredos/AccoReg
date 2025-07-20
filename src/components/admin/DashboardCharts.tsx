@@ -6,49 +6,28 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   AreaChart,
-  Area,
-  Legend
+  Area
 } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Users, 
-  Shield, 
-  TrendingUp, 
-  Home, 
-  UserCheck, 
-  Activity,
-  BarChart3,
-  PieChart as PieChartIcon
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import {
+  Users,
+  TrendingUp,
+  Home,
+  Activity
 } from 'lucide-react'
 
 interface DashboardChartsProps {
   analytics: {
-    roles: {
-      distribution: Array<{
-        id: string
-        name: string
-        userCount: number
-        permissionCount: number
-        permissions: string[]
-      }>
-      totalRoles: number
-      totalActiveUsers: number
-    }
     registrations: {
       total: number
       verified: number
       unverified: number
-      verificationRate: number
       genderDistribution: Array<{ gender: string; _count: { id: number } }>
       branchDistribution: Array<{ branch: string; _count: { id: number } }>
       children: {
@@ -79,46 +58,53 @@ interface DashboardChartsProps {
   }
 }
 
-// Color palettes for charts
-const ROLE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4']
-const GENDER_COLORS = ['#3B82F6', '#EC4899', '#10B981', '#F59E0B']
-const ACCOMMODATION_COLORS = ['#10B981', '#F59E0B', '#EF4444']
+// Beautiful consistent color palette matching dashboard theme
+const COLORS = {
+  primary: '#6366f1',    // Indigo
+  secondary: '#8b5cf6',  // Violet
+  success: '#10b981',    // Emerald
+  warning: '#f59e0b',    // Amber
+  error: '#ef4444',      // Red
+  info: '#06b6d4',       // Cyan
+  purple: '#a855f7',     // Purple
+  orange: '#f97316',     // Orange
+  blue: '#3b82f6',       // Blue
+  teal: '#14b8a6'        // Teal
+}
+
+const CHART_COLORS = [
+  COLORS.primary,    // Indigo
+  COLORS.success,    // Emerald
+  COLORS.warning,    // Amber
+  COLORS.purple,     // Purple
+  COLORS.info,       // Cyan
+  COLORS.orange,     // Orange
+  COLORS.blue,       // Blue
+  COLORS.teal        // Teal
+]
 
 export function DashboardCharts({ analytics }: DashboardChartsProps) {
-  // Prepare data for role distribution chart
-  const roleData = analytics.roles.distribution.map((role, index) => ({
-    name: role.name,
-    users: role.userCount,
-    permissions: role.permissionCount,
-    color: ROLE_COLORS[index % ROLE_COLORS.length]
-  }))
-
-  // Prepare data for registration verification chart
-  const verificationData = [
-    { name: 'Verified', value: analytics.registrations.verified, color: '#10B981' },
-    { name: 'Unverified', value: analytics.registrations.unverified, color: '#F59E0B' }
-  ]
-
   // Prepare data for gender distribution
   const genderData = analytics.registrations.genderDistribution.map((item, index) => ({
-    name: item.gender,
+    name: item.gender || 'Not Specified',
     value: item._count.id,
-    color: GENDER_COLORS[index % GENDER_COLORS.length]
+    color: CHART_COLORS[index % CHART_COLORS.length]
   }))
 
-  // Prepare data for branch distribution (top 6)
+  // Prepare data for branch distribution (top 5)
   const branchData = analytics.registrations.branchDistribution
     .sort((a, b) => b._count.id - a._count.id)
-    .slice(0, 6)
-    .map(item => ({
-      name: item.branch.length > 15 ? item.branch.substring(0, 15) + '...' : item.branch,
-      value: item._count.id
+    .slice(0, 5)
+    .map((item, index) => ({
+      name: item.branch.length > 12 ? item.branch.substring(0, 12) + '...' : item.branch,
+      value: item._count.id,
+      color: CHART_COLORS[index % CHART_COLORS.length]
     }))
 
   // Prepare accommodation data
   const accommodationData = [
-    { name: 'Occupied', value: analytics.accommodations.allocatedRooms, color: '#EF4444' },
-    { name: 'Available', value: analytics.accommodations.totalRooms - analytics.accommodations.allocatedRooms, color: '#10B981' }
+    { name: 'Allocated', value: analytics.accommodations.allocatedRooms, color: COLORS.success },
+    { name: 'Available', value: analytics.accommodations.totalRooms - analytics.accommodations.allocatedRooms, color: COLORS.warning }
   ]
 
   // Activity data
@@ -128,13 +114,14 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
     { name: 'This Month', value: analytics.activity.registrationsThisMonth }
   ]
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Minimalistic tooltip
+  const MinimalTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-apercu-medium text-gray-900">{label}</p>
+        <div className="bg-white px-3 py-2 border border-gray-100 rounded-lg shadow-sm">
+          <p className="text-sm font-medium text-gray-900">{label}</p>
           {payload.map((entry: any, index: number) => (
-            <p key={index} className="font-apercu-regular text-sm" style={{ color: entry.color }}>
+            <p key={index} className="text-xs text-gray-600">
               {entry.name}: {entry.value}
             </p>
           ))}
@@ -145,161 +132,84 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Role Distribution & User Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Role Distribution Bar Chart */}
-        <Card className="bg-white">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Shield className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="font-apercu-bold text-lg text-gray-900">User Roles Distribution</CardTitle>
-                <p className="font-apercu-regular text-sm text-gray-600">Active users by role</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={roleData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 12, fontFamily: 'Apercu' }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis tick={{ fontSize: 12, fontFamily: 'Apercu' }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="users" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {roleData.map((role, index) => (
-                <Badge key={role.name} variant="secondary" className="text-xs">
-                  {role.name}: {role.users} users, {role.permissions} permissions
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Registration Verification Pie Chart */}
-        <Card className="bg-white">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                <UserCheck className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="font-apercu-bold text-lg text-gray-900">Registration Status</CardTitle>
-                <p className="font-apercu-regular text-sm text-gray-600">Verification breakdown</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={verificationData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {verificationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 text-center">
-              <p className="text-2xl font-apercu-bold text-gray-900">
-                {analytics.registrations.verificationRate.toFixed(1)}%
-              </p>
-              <p className="text-sm font-apercu-regular text-gray-600">Verification Rate</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gender & Branch Distribution */}
+    <div className="space-y-8">
+      {/* Registration Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gender Distribution */}
-        <Card className="bg-white">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                <Users className="h-5 w-5 text-white" />
+        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <Users className="w-4 h-4 text-white" />
               </div>
               <div>
-                <CardTitle className="font-apercu-bold text-lg text-gray-900">Gender Distribution</CardTitle>
-                <p className="font-apercu-regular text-sm text-gray-600">Participant demographics</p>
+                <h3 className="text-sm font-semibold text-gray-900">Gender Distribution</h3>
+                <p className="text-xs text-gray-500">Participant demographics</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
+          <CardContent className="pt-0">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={genderData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={2}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {genderData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<MinimalTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {genderData.map((item, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-xs text-gray-600">{item.name}: {item.value}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
         {/* Branch Distribution */}
-        <Card className="bg-white">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-white" />
+        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-white" />
               </div>
               <div>
-                <CardTitle className="font-apercu-bold text-lg text-gray-900">Top Branches</CardTitle>
-                <p className="font-apercu-regular text-sm text-gray-600">Registration by branch</p>
+                <h3 className="text-sm font-semibold text-gray-900">Branch Distribution</h3>
+                <p className="text-xs text-gray-500">Top performing branches</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
+          <CardContent className="pt-0">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={branchData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 12, fontFamily: 'Apercu' }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
+                <BarChart data={branchData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <YAxis tick={{ fontSize: 12, fontFamily: 'Apercu' }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <YAxis hide />
+                  <Tooltip content={<MinimalTooltip />} />
+                  <Bar
+                    dataKey="value"
+                    fill={COLORS.primary}
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -307,162 +217,88 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
         </Card>
       </div>
 
-      {/* Accommodation & Activity Analytics */}
+      {/* Accommodation & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Accommodation Status */}
-        <Card className="bg-white">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
-                <Home className="h-5 w-5 text-white" />
+        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                <Home className="w-4 h-4 text-white" />
               </div>
               <div>
-                <CardTitle className="font-apercu-bold text-lg text-gray-900">Accommodation Status</CardTitle>
-                <p className="font-apercu-regular text-sm text-gray-600">Room occupancy overview</p>
+                <h3 className="text-sm font-semibold text-gray-900">Room Allocation</h3>
+                <p className="text-xs text-gray-500">Accommodation status</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
+          <CardContent className="pt-0">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={accommodationData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={2}
                     dataKey="value"
                   >
                     {accommodationData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
+                  <Tooltip content={<MinimalTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-apercu-bold text-gray-900">
-                  {analytics.accommodations.occupancyRate.toFixed(1)}%
-                </p>
-                <p className="text-sm font-apercu-regular text-gray-600">Occupancy Rate</p>
-              </div>
-              <div>
-                <p className="text-2xl font-apercu-bold text-gray-900">
-                  {analytics.accommodations.totalRooms}
-                </p>
-                <p className="text-sm font-apercu-regular text-gray-600">Total Rooms</p>
-              </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {accommodationData.map((item, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-xs text-gray-600">{item.name}: {item.value}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="bg-white">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Activity className="h-5 w-5 text-white" />
+        {/* Activity Trends */}
+        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-white" />
               </div>
               <div>
-                <CardTitle className="font-apercu-bold text-lg text-gray-900">Registration Activity</CardTitle>
-                <p className="font-apercu-regular text-sm text-gray-600">Recent registration trends</p>
+                <h3 className="text-sm font-semibold text-gray-900">Registration Activity</h3>
+                <p className="text-xs text-gray-500">Recent activity trends</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
+          <CardContent className="pt-0">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={activityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <AreaChart data={activityData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                   <XAxis
                     dataKey="name"
-                    tick={{ fontSize: 12, fontFamily: 'Apercu' }}
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <YAxis tick={{ fontSize: 12, fontFamily: 'Apercu' }} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <YAxis hide />
+                  <Tooltip content={<MinimalTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="value"
-                    stroke="#8B5CF6"
-                    fill="url(#colorActivity)"
+                    stroke={COLORS.primary}
+                    fill={COLORS.primary}
+                    fillOpacity={0.1}
                     strokeWidth={2}
                   />
-                  <defs>
-                    <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-            <div className="mt-4 text-center">
-              <p className="text-sm font-apercu-regular text-gray-600">
-                {analytics.registrations.children.total > 0 && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 mr-2">
-                    {analytics.registrations.children.total} Children Registered
-                  </span>
-                )}
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                  {analytics.registrations.total} Total Registrations
-                </span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* System Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-apercu-medium text-blue-700">Active Roles</p>
-                <p className="text-2xl font-apercu-bold text-blue-900">{analytics.roles.totalRoles}</p>
-              </div>
-              <Shield className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-apercu-medium text-green-700">Total Users</p>
-                <p className="text-2xl font-apercu-bold text-green-900">{analytics.roles.totalActiveUsers}</p>
-              </div>
-              <Users className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-apercu-medium text-purple-700">Verification Rate</p>
-                <p className="text-2xl font-apercu-bold text-purple-900">{analytics.registrations.verificationRate.toFixed(0)}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-amber-100 border-orange-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-apercu-medium text-orange-700">Room Occupancy</p>
-                <p className="text-2xl font-apercu-bold text-orange-900">{analytics.accommodations.occupancyRate.toFixed(0)}%</p>
-              </div>
-              <Home className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>

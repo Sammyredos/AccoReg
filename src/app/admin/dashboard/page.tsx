@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { DashboardStats } from '@/components/admin/DashboardStats'
 import { DashboardCharts } from '@/components/admin/DashboardCharts'
-import { RecentRegistrations } from '@/components/admin/RecentRegistrations'
-import { NotificationPanel } from '@/components/admin/NotificationPanel'
+
+
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+
 import { PageTransition, StaggeredContainer } from '@/components/ui/page-transition'
 import { EmptyStates } from '@/components/ui/empty-state'
 import { usePageReady } from '@/hooks/usePageReady'
@@ -92,7 +92,7 @@ export default function AdminDashboard() {
   // FAST: Minimal loading states for speed
   const [isStatsLoading, setIsStatsLoading] = useState(true)
   const [isRegistrationsLoading, setIsRegistrationsLoading] = useState(true)
-  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false) // Load immediately
+
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(true)
 
   // Real dashboard data - loaded from APIs
@@ -101,10 +101,6 @@ export default function AdminDashboard() {
     description: string
     timestamp: string
     type: string
-  }>>([])
-  const [recentCommunications, setRecentCommunications] = useState<Array<{
-    subject: string
-    timestamp: string
   }>>([])
   const [systemStatus, setSystemStatus] = useState<{
     database: 'checking' | 'online' | 'offline'
@@ -116,7 +112,6 @@ export default function AdminDashboard() {
     smsService: 'checking'
   })
   const [activityLoading, setActivityLoading] = useState(true)
-  const [communicationsLoading, setCommunicationsLoading] = useState(true)
 
   // FAST: Minimal progress tracking
   const { completeProgress } = useProgress()
@@ -141,23 +136,23 @@ export default function AdminDashboard() {
       ])
 
       // 1. STATS - Set from statistics API
-      let statsData = null
+      let statsData: any = null
       if (statisticsResponse.ok) {
         const data = await statisticsResponse.json()
         statsData = data.statistics
 
         const newStats = {
-          totalRegistrations: statsData.registrations.total,
-          newRegistrations: statsData.registrations.recent.thisMonth,
-          completedRegistrations: statsData.registrations.verified,
-          pendingRegistrations: statsData.registrations.unverified,
-          recentActivity: statsData.registrations.recent.today,
+          totalRegistrations: statsData?.registrations?.total || 0,
+          newRegistrations: statsData?.registrations?.recent?.thisMonth || 0,
+          completedRegistrations: statsData?.registrations?.verified || 0,
+          pendingRegistrations: statsData?.registrations?.unverified || 0,
+          recentActivity: statsData?.registrations?.recent?.today || 0,
           previousMonthRegistrations: 0, // Will be calculated from analytics
           previousMonthCompleted: 0, // Will be updated from analytics
-          previousMonthActivity: statsData.registrations.recent.today || 0,
-          totalRooms: statsData.rooms.total,
-          occupiedRooms: statsData.summary.occupiedRooms,
-          availableRooms: statsData.summary.availableRooms
+          previousMonthActivity: statsData?.registrations?.recent?.today || 0,
+          totalRooms: statsData?.rooms?.total || 0,
+          occupiedRooms: statsData?.summary?.occupiedRooms || 0,
+          availableRooms: statsData?.summary?.availableRooms || 0
         }
 
         console.log('🎯 DASHBOARD: Setting main statistics:', {
@@ -180,9 +175,8 @@ export default function AdminDashboard() {
       // FAST: Complete progress bar when essential data is loaded
       completeProgress()
 
-      // Load real activity feed and communications data
+      // Load real activity feed data
       loadActivityData()
-      loadCommunicationsData()
       checkSystemStatus()
       loadAnalyticsData()
 
@@ -194,7 +188,9 @@ export default function AdminDashboard() {
             if (analyticsData?.trends) {
               // Only update previous month data for trends, keep main stats intact
               const lastMonthRegistrations = analyticsData.trends?.monthly?.slice(-2)?.[0]?.count || 0
-              const completionRate = (statsData.registrations.verified / statsData.registrations.total) * 100
+              const completionRate = statsData?.registrations?.total > 0
+                ? (statsData.registrations.verified / statsData.registrations.total) * 100
+                : 0
               const previousMonthCompleted = Math.round(lastMonthRegistrations * (completionRate / 100))
 
               // Update ONLY trend data, preserve main statistics (only if not loading)
@@ -324,68 +320,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const loadCommunicationsData = async () => {
-    try {
-      setCommunicationsLoading(true)
 
-      // Try to fetch recent system-wide communications
-      const response = await fetch('/api/admin/messages/recent?limit=3', {
-        headers: {
-          'Cache-Control': 'max-age=300', // Cache for 5 minutes
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const messages = data.messages || []
-
-        // Transform messages to dashboard format
-        const communications = messages.map((message: any) => ({
-          subject: message.subject || t('common.noSubject'),
-          timestamp: formatTimeAgo(message.sentAt || message.createdAt, t),
-          senderName: message.senderName,
-          recipientName: message.recipientName,
-          status: message.status
-        }))
-
-        // If we have real messages, use them
-        if (communications.length > 0) {
-          setRecentCommunications(communications)
-        } else {
-          // Show registration-based activity as fallback
-          const fallbackComms = [
-            {
-              subject: t('dashboard.welcomeEmailsSent', { count: Math.min(registrations.length, 5) }),
-              timestamp: t('time.minutesAgo', { count: 15 })
-            },
-            {
-              subject: t('dashboard.registrationConfirmationBatchProcessed'),
-              timestamp: t('time.minutesAgo', { count: 30 })
-            }
-          ]
-          setRecentCommunications(fallbackComms)
-        }
-      } else {
-        throw new Error('Failed to fetch communications')
-      }
-    } catch (error) {
-      // Silently handle error and use fallback data for better UX
-      // In production, this would be logged to a monitoring service
-      const fallbackComms = [
-        {
-          subject: t('dashboard.welcomeEmailsSent', { count: Math.min(registrations.length, 5) }),
-          timestamp: t('time.minutesAgo', { count: 15 })
-        },
-        {
-          subject: t('dashboard.registrationConfirmationBatchProcessed'),
-          timestamp: t('time.minutesAgo', { count: 30 })
-        }
-      ]
-      setRecentCommunications(fallbackComms)
-    } finally {
-      setCommunicationsLoading(false)
-    }
-  }
 
   const checkSystemStatus = async () => {
     try {
@@ -454,7 +389,7 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayoutNew title={t('page.dashboard.title')} description={t('page.dashboard.description')}>
-      <PageTransition animation="fade">
+      <PageTransition>
         {/* Hero Stats Section */}
         <div className="mb-8">
           {isStatsLoading ? (
@@ -474,68 +409,100 @@ export default function AdminDashboard() {
         </div>
 
         {/* Beautiful Data Visualizations */}
-        {!isAnalyticsLoading && analytics && (
-          <div className="mb-8">
+        <div className="mb-8">
+          {isAnalyticsLoading ? (
+            <div className="space-y-8">
+              {/* Charts Skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+                    <div className="p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
+                        <div className="space-y-1">
+                          <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+                          <div className="h-2 w-32 bg-gray-200 rounded animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+                      <div className="flex gap-2 mt-3">
+                        {Array.from({ length: 3 }).map((_, j) => (
+                          <div key={j} className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 bg-gray-200 rounded-full animate-pulse" />
+                            <div className="h-2 w-12 bg-gray-200 rounded animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : analytics ? (
             <DashboardCharts analytics={analytics} />
-          </div>
-        )}
+          ) : null}
+        </div>
 
         {/* Main Dashboard Content - Professional Layout */}
         <div className="space-y-8">
-          {/* Primary Content Row - Activity & System Health */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Primary Content Row - Activity, System Health & Quick Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Activity Feed - Primary Focus */}
-            <div className="xl:col-span-2">
+            <div className="lg:col-span-6">
               <Card className="h-full bg-white">
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
+                <div className="p-4 sm:p-6 border-b border-gray-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                        <Activity className="h-5 w-5 text-white" />
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                        <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-apercu-bold text-lg text-gray-900">{t('dashboard.recentActivity')}</h3>
-                        <p className="font-apercu-regular text-sm text-gray-600">Latest system events</p>
+                        <h3 className="font-bold text-base sm:text-lg text-gray-900">{t('dashboard.recentActivity')}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">Latest system events</p>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 font-apercu-medium bg-gray-50 px-2 py-1 rounded-full">
+                    <div className="text-xs text-gray-500 font-medium bg-gray-50 px-2 py-1 rounded-full self-start sm:self-auto">
                       Live
                     </div>
                   </div>
                 </div>
-                <div className="p-6">
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="p-4 sm:p-6">
+                  <div className="space-y-2 max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] overflow-y-auto">
                     {activityLoading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center space-x-3 p-4 rounded-lg bg-gray-50 animate-pulse">
-                          <div className="h-8 w-8 bg-gray-200 rounded-full flex-shrink-0" />
-                          <div className="flex-1 space-y-2 min-w-0">
-                            <div className="h-4 w-full bg-gray-200 rounded" />
-                            <div className="h-3 w-20 bg-gray-200 rounded" />
+                      Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-lg animate-pulse">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-200 rounded-full flex-shrink-0" />
+                          <div className="flex-1 space-y-1 sm:space-y-2 min-w-0">
+                            <div className="h-3 sm:h-3 w-3/4 bg-gray-200 rounded" />
+                            <div className="h-2 sm:h-2 w-1/2 bg-gray-200 rounded" />
                           </div>
                         </div>
                       ))
                     ) : activityFeed.length > 0 ? (
-                      activityFeed.slice(0, 5).map((activity, i) => (
-                        <div key={i} className="flex items-center space-x-3 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-all duration-200 border border-transparent hover:border-gray-200">
-                          <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            activity.type === 'registration' ? 'bg-green-100 text-green-600' : 'bg-indigo-100 text-indigo-600'
+                      activityFeed.slice(0, 10).map((activity, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 sm:p-3 rounded-lg hover:bg-gray-50/50 transition-colors group">
+                          <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            activity.type === 'registration' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'
                           }`}>
-                            <Activity className="h-4 w-4" />
+                            {activity.type === 'registration' ? (
+                              <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded-full"></div>
+                            ) : (
+                              <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded-full"></div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-apercu-medium text-gray-900 truncate">{activity.description}</p>
-                            <p className="text-xs text-gray-500 font-apercu-regular mt-1">{activity.timestamp}</p>
+                            <p className="text-xs sm:text-sm text-gray-900 font-medium leading-tight">{activity.description}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{activity.timestamp}</p>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-12">
-                        <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <Activity className="h-6 w-6 text-gray-400" />
+                      <div className="text-center py-8 sm:py-12">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                         </div>
-                        <p className="text-sm text-gray-500 font-apercu-regular">No recent activity</p>
-                        <p className="text-xs text-gray-400 font-apercu-regular mt-1">Activity will appear here as it happens</p>
+                        <p className="text-sm text-gray-500 font-medium">No recent activity</p>
+                        <p className="text-xs text-gray-400 mt-1">Activity will appear here as it happens</p>
                       </div>
                     )}
                   </div>
@@ -544,7 +511,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* System Health - Compact & Informative */}
-            <div className="xl:col-span-1">
+            <div className="lg:col-span-3">
               <Card className="h-full bg-white">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
@@ -558,7 +525,20 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <div className="space-y-4">
+                  {systemStatus.database === 'checking' && systemStatus.emailService === 'checking' && systemStatus.smsService === 'checking' ? (
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-4 rounded-lg bg-gray-50 border border-gray-200 animate-pulse">
+                          <div className="flex items-center space-x-3">
+                            <div className="h-3 w-3 bg-gray-300 rounded-full" />
+                            <div className="h-3 w-20 bg-gray-300 rounded" />
+                          </div>
+                          <div className="h-5 w-16 bg-gray-300 rounded-full" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50 border border-gray-200">
                       <div className="flex items-center space-x-3">
                         <div className={`h-3 w-3 rounded-full ${
@@ -633,200 +613,94 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                   </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Secondary Content Row - Registrations & Communications */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Recent Registrations - Primary Content */}
-            <div className="xl:col-span-3">
-              <Card className="h-full bg-white">
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
-                        <Users className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-apercu-bold text-lg text-gray-900">{t('dashboard.recentRegistrations')}</h3>
-                        <p className="font-apercu-regular text-sm text-gray-600">Latest participant registrations</p>
-                      </div>
-                    </div>
-                    <Link href="/admin/registrations">
-                      <Button variant="outline" size="sm" className="font-apercu-medium">
-                        View All
-                        <ArrowUpRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-                <div className="p-6">
-                  {isRegistrationsLoading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center space-x-4 p-4 rounded-lg bg-gray-50 animate-pulse">
-                          <div className="h-12 w-12 bg-gray-200 rounded-full" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-4 w-32 bg-gray-200 rounded" />
-                            <div className="h-3 w-48 bg-gray-200 rounded" />
-                          </div>
-                          <div className="h-6 w-16 bg-gray-200 rounded" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : registrations.length > 0 ? (
-                    <RecentRegistrations registrations={registrations} />
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Users className="h-8 w-8 text-gray-400" />
-                      </div>
-                      <EmptyStates.NoRegistrations
-                        action={{
-                          label: t('action.shareRegistrationLink'),
-                          onClick: () => window.open('/register', '_blank'),
-                          variant: "default"
-                        }}
-                      />
-                    </div>
                   )}
                 </div>
               </Card>
             </div>
 
-            {/* Quick Actions & Communications */}
-            <div className="xl:col-span-1">
-              <div className="space-y-6">
-                {/* Quick Actions */}
-                <Card className="bg-white">
-                  <div className="p-6 border-b border-gray-100">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
-                        <Activity className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-apercu-bold text-lg text-gray-900">{t('action.quickActions')}</h3>
-                        <p className="font-apercu-regular text-sm text-gray-600">Common tasks</p>
-                      </div>
+            {/* Quick Actions - Compact & Accessible */}
+            <div className="lg:col-span-3">
+              <Card className="h-full bg-white">
+                <div className="p-4 sm:p-6 border-b border-gray-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                      <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base sm:text-lg text-gray-900">{t('action.quickActions')}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600">Common tasks</p>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <div className="space-y-3">
-                      <Link href="/admin/registrations">
-                        <Button variant="outline" className="w-full justify-start font-apercu-medium text-sm">
-                          <Users className="mr-2 h-4 w-4" />
-                          View Registrations
-                        </Button>
-                      </Link>
-                      <Link href="/admin/analytics">
-                        <Button variant="outline" className="w-full justify-start font-apercu-medium text-sm">
-                          <BarChart3 className="mr-2 h-4 w-4" />
-                          Analytics
-                        </Button>
-                      </Link>
-                      <Link href="/admin/communications">
-                        <Button variant="outline" className="w-full justify-start font-apercu-medium text-sm">
-                          <FileText className="mr-2 h-4 w-4" />
-                          Communications
-                        </Button>
-                      </Link>
-                      <Link href="/register">
-                        <Button className="w-full justify-start font-apercu-medium text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
-                          <FileText className="mr-2 h-4 w-4" />
-                          Registration Form
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Communications Summary */}
-                <Card className="bg-white">
-                  <div className="p-6 border-b border-gray-100">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-apercu-bold text-lg text-gray-900">{t('dashboard.communications')}</h3>
-                        <p className="font-apercu-regular text-sm text-gray-600">Recent messages</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="space-y-3">
-                      {communicationsLoading ? (
-                        Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} className="p-3 rounded-lg bg-gray-50 animate-pulse">
-                            <div className="h-4 w-full bg-gray-200 rounded mb-2" />
-                            <div className="h-3 w-20 bg-gray-200 rounded" />
+                </div>
+                <div className="p-4 sm:p-6">
+                  {isStatsLoading ? (
+                    <div className="grid grid-cols-1 gap-3">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 animate-pulse">
+                          <div className="w-8 h-8 bg-gray-200 rounded-lg flex-shrink-0" />
+                          <div className="flex-1 space-y-1">
+                            <div className="h-3 w-24 bg-gray-200 rounded" />
+                            <div className="h-2 w-16 bg-gray-200 rounded" />
                           </div>
-                        ))
-                      ) : recentCommunications.length > 0 ? (
-                        recentCommunications.slice(0, 3).map((comm, i) => (
-                          <div key={i} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                            <p className="text-sm font-apercu-medium text-gray-900 truncate">{comm.subject}</p>
-                            <p className="text-xs text-gray-500 mt-1">{comm.timestamp}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-6">
-                          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <FileText className="h-4 w-4 text-gray-400" />
-                          </div>
-                          <p className="text-xs text-gray-500">No recent messages</p>
                         </div>
-                      )}
+                      ))}
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                    <Link href="/register" className="group">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 border border-blue-100 hover:border-blue-200">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                          <Users className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">Registration Form</p>
+                          <p className="text-xs text-gray-600">New participant signup</p>
+                        </div>
+                      </div>
+                    </Link>
+
+                    <Link href="/admin/registrations" className="group">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-all duration-200 border border-green-100 hover:border-green-200">
+                        <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">View Registrations</p>
+                          <p className="text-xs text-gray-600">Manage participants</p>
+                        </div>
+                      </div>
+                    </Link>
+
+                    <Link href="/admin/accommodation" className="group">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 transition-all duration-200 border border-purple-100 hover:border-purple-200">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
+                          <BarChart3 className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">Room Management</p>
+                          <p className="text-xs text-gray-600">Allocate accommodations</p>
+                        </div>
+                      </div>
+                    </Link>
+
+                    <Link href="/admin/reports" className="group">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 transition-all duration-200 border border-orange-100 hover:border-orange-200">
+                        <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-amber-600 rounded-lg flex items-center justify-center">
+                          <Activity className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">Reports & Analytics</p>
+                          <p className="text-xs text-gray-600">View insights</p>
+                        </div>
+                      </div>
+                    </Link>
                   </div>
-                </Card>
-              </div>
+                  )}
+                </div>
+              </Card>
             </div>
           </div>
 
-          {/* Notifications Section */}
-          <div className="grid grid-cols-1 gap-6">
-            <Card className="bg-white">
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
-                      <Activity className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-apercu-bold text-lg text-gray-900">{t('nav.notifications')}</h3>
-                      <p className="font-apercu-regular text-sm text-gray-600">System alerts and updates</p>
-                    </div>
-                  </div>
-                  <Link href="/admin/notifications">
-                    <Button variant="outline" size="sm" className="font-apercu-medium">
-                      View All
-                      <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-              <div className="p-6">
-                {isNotificationsLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="flex items-start space-x-3 p-4 rounded-lg bg-gray-50 animate-pulse">
-                        <div className="h-8 w-8 bg-gray-200 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 w-full bg-gray-200 rounded" />
-                          <div className="h-3 w-20 bg-gray-200 rounded" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <NotificationPanel />
-                )}
-              </div>
-            </Card>
-          </div>
         </div>
       </PageTransition>
     </AdminLayoutNew>

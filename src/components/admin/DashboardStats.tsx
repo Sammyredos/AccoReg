@@ -28,7 +28,7 @@ interface DashboardStatsProps {
 export function DashboardStats({ stats, loading }: DashboardStatsProps) {
 
   return (
-    <StatsGrid columns={3}>
+    <StatsGrid columns={4}>
       <StatsCard
         title="Total Registrations"
         value={stats?.totalRegistrations || 0}
@@ -66,26 +66,6 @@ export function DashboardStats({ stats, loading }: DashboardStatsProps) {
         icon={Home}
         gradient="bg-gradient-to-r from-purple-500 to-indigo-600"
         bgGradient="bg-gradient-to-br from-white to-purple-50"
-        loading={loading}
-      />
-
-      <StatsCard
-        title="Occupied"
-        value={stats?.occupiedRooms || 0}
-        subtitle="Rooms in use"
-        icon={Lock}
-        gradient="bg-gradient-to-r from-red-500 to-pink-600"
-        bgGradient="bg-gradient-to-br from-white to-red-50"
-        loading={loading}
-      />
-
-      <StatsCard
-        title="Available"
-        value={stats?.availableRooms || 0}
-        subtitle="Free rooms"
-        icon={Unlock}
-        gradient="bg-gradient-to-r from-teal-500 to-cyan-600"
-        bgGradient="bg-gradient-to-br from-white to-teal-50"
         loading={loading}
       />
     </StatsGrid>
