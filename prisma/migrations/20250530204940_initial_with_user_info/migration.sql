@@ -6,9 +6,9 @@ CREATE TABLE "Admin" (
     "name" TEXT NOT NULL,
     "roleId" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "lastLogin" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "lastLogin" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL,
     CONSTRAINT "Admin_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
@@ -20,9 +20,9 @@ CREATE TABLE "users" (
     "password" TEXT NOT NULL,
     "roleId" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "lastLogin" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "lastLogin" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL,
     "createdBy" TEXT,
     CONSTRAINT "users_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
@@ -33,8 +33,8 @@ CREATE TABLE "roles" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "isSystem" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable
@@ -50,7 +50,7 @@ CREATE TABLE "permissions" (
 CREATE TABLE "registrations" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "fullName" TEXT NOT NULL,
-    "dateOfBirth" DATETIME NOT NULL,
+    "dateOfBirth" TIMESTAMP NOT NULL,
     "gender" TEXT NOT NULL,
     "address" TEXT NOT NULL,
     "phoneNumber" TEXT NOT NULL,
@@ -67,9 +67,9 @@ CREATE TABLE "registrations" (
     "specialNeeds" TEXT,
     "dietaryRestrictions" TEXT,
     "parentalPermissionGranted" BOOLEAN NOT NULL DEFAULT false,
-    "parentalPermissionDate" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "parentalPermissionDate" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable
@@ -84,8 +84,8 @@ CREATE TABLE "notifications" (
     "metadata" TEXT,
     "authorizedBy" TEXT,
     "authorizedByEmail" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable
@@ -99,8 +99,8 @@ CREATE TABLE "settings" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "isSystem" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable

@@ -11,11 +11,11 @@ CREATE TABLE "messages" (
     "recipientType" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'sent',
     "error" TEXT,
-    "sentAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "deliveredAt" DATETIME,
-    "readAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "sentAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deliveredAt" TIMESTAMP,
+    "readAt" TIMESTAMP,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable
@@ -26,8 +26,8 @@ CREATE TABLE "rooms" (
     "capacity" INTEGER NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "description" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL
 );
 
 -- CreateTable
@@ -35,7 +35,7 @@ CREATE TABLE "room_allocations" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "registrationId" TEXT NOT NULL,
     "roomId" TEXT NOT NULL,
-    "allocatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "allocatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "allocatedBy" TEXT,
     CONSTRAINT "room_allocations_registrationId_fkey" FOREIGN KEY ("registrationId") REFERENCES "registrations" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "room_allocations_roomId_fkey" FOREIGN KEY ("roomId") REFERENCES "rooms" ("id") ON DELETE CASCADE ON UPDATE CASCADE
