@@ -27,6 +27,8 @@
     "setup:production": "npx tsx scripts/production-setup.ts",
     "db:switch": "npx tsx scripts/switch-database.ts",
     "check:production": "npx tsx scripts/production-checklist.ts",
+    "secrets:generate": "node scripts/generate-production-secrets.js",
+    "build:test": "node scripts/test-production-build.js",
     "db:generate": "dotenv -e .env.local -- prisma generate",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:push:prod": "prisma db push",
