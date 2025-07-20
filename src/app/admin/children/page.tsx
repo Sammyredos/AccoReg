@@ -63,7 +63,7 @@ export default function ChildrenRegistrationsPage() {
   const [registrations, setRegistrations] = useState<ChildrenRegistration[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
-    limit: 12, // 12 cards per page for better grid layout
+    limit: 10, // 10 cards per page for optimal viewing
     total: 0,
     pages: 0
   })
