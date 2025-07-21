@@ -67,6 +67,12 @@ export default function ChildrenRegistrationsPage() {
     total: 0,
     pages: 0
   })
+  const [stats, setStats] = useState({
+    total: 0,
+    male: 0,
+    female: 0,
+    averageAge: 0
+  })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -121,6 +127,7 @@ export default function ChildrenRegistrationsPage() {
       const data = await response.json()
       setRegistrations(data.registrations)
       setPagination(data.pagination)
+      setStats(data.stats)
     } catch (err) {
       setErrorModal({
         isOpen: true,
@@ -341,16 +348,6 @@ export default function ChildrenRegistrationsPage() {
       age--
     }
     return age
-  }
-
-  // Calculate stats
-  const stats = {
-    total: pagination.total,
-    male: registrations.filter(r => r.gender === 'Male').length,
-    female: registrations.filter(r => r.gender === 'Female').length,
-    averageAge: registrations.length > 0
-      ? Math.round(registrations.reduce((sum, r) => sum + r.age, 0) / registrations.length)
-      : 0
   }
 
   if (loading && registrations.length === 0) {
@@ -979,7 +976,7 @@ export default function ChildrenRegistrationsPage() {
                         <option value="Gudugba">Gudugba</option>
                         <option value="Great City">Great City</option>
                         <option value="Abeokuta">Abeokuta</option>
-                        <option value="Oseile">Oseile</option>
+                        <option value="Osiele">Osiele</option>
                         <option value="Ayetoro 1">Ayetoro 1</option>
                         <option value="Ayetoro 2">Ayetoro 2</option>
                         <option value="Imeko">Imeko</option>

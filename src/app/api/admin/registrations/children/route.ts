@@ -148,6 +148,42 @@ export async function GET(request: NextRequest) {
 
     const pages = Math.ceil(total / limit)
 
+    // Calculate overall statistics (not just current page)
+    const [
+      totalMale,
+      totalFemale,
+      allRegistrations
+    ] = await Promise.all([
+      prisma.childrenRegistration.count({
+        where: { gender: 'Male' }
+      }),
+      prisma.childrenRegistration.count({
+        where: { gender: 'Female' }
+      }),
+      prisma.childrenRegistration.findMany({
+        select: { dateOfBirth: true }
+      })
+    ])
+
+    // Calculate overall average age
+    let overallAverageAge = 0
+    if (allRegistrations.length > 0) {
+      const today = new Date()
+      const totalAge = allRegistrations.reduce((sum, reg) => {
+        const birthDate = new Date(reg.dateOfBirth)
+        let age = today.getFullYear() - birthDate.getFullYear()
+        const monthDiff = today.getMonth() - birthDate.getMonth()
+
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--
+        }
+
+        return sum + age
+      }, 0)
+
+      overallAverageAge = Math.round(totalAge / allRegistrations.length)
+    }
+
     return NextResponse.json({
       registrations: registrationsWithAge,
       pagination: {
@@ -155,6 +191,12 @@ export async function GET(request: NextRequest) {
         limit,
         total,
         pages
+      },
+      stats: {
+        total,
+        male: totalMale,
+        female: totalFemale,
+        averageAge: overallAverageAge
       }
     })
 

@@ -136,7 +136,7 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
       {/* Registration Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gender Distribution */}
-        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+        <Card className="shadow-sm bg-white border-b border-gray-100 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -181,15 +181,15 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
         </Card>
 
         {/* Branch Distribution */}
-        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+        <Card className=" shadow-sm bg-white border-b border-gray-100 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                 <TrendingUp className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Branch Distribution</h3>
-                <p className="text-xs text-gray-500">Top performing branches</p>
+                <h3 className="text-sm font-semibold text-gray-900">Branch Registrations</h3>
+                <p className="text-xs text-gray-500">Branch with Most Registrations</p>
               </div>
             </div>
           </CardHeader>
@@ -220,7 +220,7 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
       {/* Accommodation & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Accommodation Status */}
-        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+        <Card className="border-0 shadow-sm bg-white backdrop-blur-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
@@ -265,7 +265,7 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
         </Card>
 
         {/* Activity Trends */}
-        <Card className="border-0 shadow-sm bg-white/50 backdrop-blur-sm">
+        <Card className="shadow-sm bg-white border-b border-gray-100 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">

@@ -105,6 +105,8 @@ model Registration {
   createdAt                         DateTime        @default(now())
   updatedAt                         DateTime        @updatedAt
   roomAllocation                    RoomAllocation?
+  platoonAllocation                 String?
+  platoonParticipant                PlatoonParticipant?
 
   @@index([isVerified])
   @@index([verifiedAt])
@@ -241,4 +243,41 @@ model ChildrenRegistration {
   @@index([branch])
   @@index([createdAt])
   @@map("children_registrations")
+}
+
+model PlatoonAllocation {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  leaderName   String
+  label        String   @unique
+  leaderPhone  String
+  capacity     Int
+  createdBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  participants PlatoonParticipant[]
+
+  @@index([name])
+  @@index([label])
+  @@index([createdAt])
+  @@map("platoon_allocations")
+}
+
+model PlatoonParticipant {
+  id             String   @id @default(cuid())
+  registrationId String   @unique
+  platoonId      String
+  allocatedBy    String?
+  allocatedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  registration Registration      @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  platoon      PlatoonAllocation @relation(fields: [platoonId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId])
+  @@index([platoonId])
+  @@index([allocatedAt])
+  @@map("platoon_participants")
 }
