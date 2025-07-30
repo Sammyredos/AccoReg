@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Check, Users, Heart, Shield, Baby, Calendar, Search, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Check, Users, Heart, Shield, Baby, Calendar, Search, AlertTriangle, X } from 'lucide-react'
 
 interface FormData {
   fullName: string
@@ -77,6 +77,9 @@ function ChildrenRegistrationContent() {
   const [showSearchResults, setShowSearchResults] = useState(false)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Prefill state
+  const [isPrefilled, setIsPrefilled] = useState(false)
+
   useEffect(() => {
     // Load registration settings (same API as main registration form)
     const loadSettings = async () => {
@@ -117,6 +120,58 @@ function ChildrenRegistrationContent() {
       loadExistingRegistration(editId)
     }
   }, [searchParams])
+
+  // Prefill form data from URL parameters (when coming from main registration form)
+  useEffect(() => {
+    const name = searchParams.get('name')
+    const dob = searchParams.get('dob')
+    const gender = searchParams.get('gender')
+    const address = searchParams.get('address')
+    const branch = searchParams.get('branch')
+    const phone = searchParams.get('phone')
+    const email = searchParams.get('email')
+
+    // Only prefill if we have data and we're not in edit mode
+    if ((name || dob || gender || address || branch || phone || email) && !isEditMode) {
+      console.log('🔄 Prefilling children form with parent/guardian data from main registration form')
+
+      setFormData(prev => ({
+        ...prev,
+        // Keep child fields empty - they need to be filled for the child
+        fullName: prev.fullName,
+        dateOfBirth: prev.dateOfBirth,
+        gender: prev.gender,
+        // Use address and branch from main form (family info)
+        address: address || prev.address,
+        branch: branch || prev.branch,
+        // Map parent/guardian info from main form (the person who was registering)
+        parentGuardianName: name || prev.parentGuardianName,
+        parentGuardianPhone: phone || prev.parentGuardianPhone,
+        parentGuardianEmail: email || prev.parentGuardianEmail
+      }))
+
+      // Set prefilled state to show notification
+      setIsPrefilled(true)
+
+      // Clear URL parameters after prefilling to keep URL clean
+      const url = new URL(window.location.href)
+      const hasParams = url.searchParams.has('name') || url.searchParams.has('dob') ||
+                       url.searchParams.has('gender') || url.searchParams.has('address') ||
+                       url.searchParams.has('branch') || url.searchParams.has('phone') ||
+                       url.searchParams.has('email')
+
+      if (hasParams) {
+        url.searchParams.delete('name')
+        url.searchParams.delete('dob')
+        url.searchParams.delete('gender')
+        url.searchParams.delete('address')
+        url.searchParams.delete('branch')
+        url.searchParams.delete('phone')
+        url.searchParams.delete('email')
+        window.history.replaceState({}, '', url.toString())
+      }
+    }
+  }, [searchParams, isEditMode])
 
   const loadExistingRegistration = async (id: string) => {
     try {
@@ -894,6 +949,32 @@ function ChildrenRegistrationContent() {
                     </div>
                   </div>
                 </div>
+
+                {/* Prefill Notification */}
+                {isPrefilled && (
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-apercu-medium text-green-800">
+                          Parent/Guardian information prefilled from main registration
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          Please fill in your child's information below
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => setIsPrefilled(false)}
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto text-green-600 hover:text-green-700 hover:bg-green-100"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Step 1: Child Information */}
                 {currentStep === 1 && (

@@ -4,7 +4,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { QRCodeDisplay } from '@/components/ui/qr-code-display'
 import { Download, Copy, QrCode, User, Calendar, Mail } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRealTimeAttendance } from '@/hooks/useRealTimeAttendance'
 
 interface QRCodeViewModalProps {
   isOpen: boolean
@@ -16,10 +17,38 @@ interface QRCodeViewModalProps {
     qrCode: string
     createdAt: string
   }
+  autoCloseOnVerification?: boolean
 }
 
-export function QRCodeViewModal({ isOpen, onClose, registration }: QRCodeViewModalProps) {
+export function QRCodeViewModal({ isOpen, onClose, registration, autoCloseOnVerification = true }: QRCodeViewModalProps) {
   const [copied, setCopied] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+
+  // Auto-close when this participant is verified via real-time events
+  useRealTimeAttendance({
+    enabled: isOpen && autoCloseOnVerification,
+    onVerification: (event) => {
+      if (event.data.registrationId === registration.id) {
+        console.log('🔄 Auto-closing QR view modal - participant verified:', event.data.fullName)
+        setIsClosing(true)
+        setTimeout(() => onClose(), 500) // Small delay for visual feedback
+      }
+    },
+    onStatusChange: (event) => {
+      if (event.data.registrationId === registration.id) {
+        console.log('🔄 Auto-closing QR view modal - participant status changed:', event.data.fullName)
+        setIsClosing(true)
+        setTimeout(() => onClose(), 500) // Small delay for visual feedback
+      }
+    }
+  })
+
+  // Reset closing state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsClosing(false)
+    }
+  }, [isOpen])
 
   const handleCopyQRData = async () => {
     try {
@@ -132,6 +161,20 @@ export function QRCodeViewModal({ isOpen, onClose, registration }: QRCodeViewMod
             <p className="text-xs text-gray-500 mb-3 sm:mb-4 px-2">
               📱 Use any QR scanner or the attendance verification system to scan this code
             </p>
+            {autoCloseOnVerification && !isClosing && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-2 mb-3 sm:mb-4">
+                <p className="text-xs text-green-700 text-center font-medium">
+                  ✨ This modal will automatically close when the participant is verified
+                </p>
+              </div>
+            )}
+            {isClosing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3 sm:mb-4">
+                <p className="text-xs text-blue-700 text-center font-medium">
+                  🎉 Participant verified! Closing modal...
+                </p>
+              </div>
+            )}
             <div className="bg-green-50 border border-green-200 rounded-lg p-2 sm:p-3">
               <p className="text-xs text-green-700 font-apercu-medium">
                 ✅ This QR code remains valid until scanned for verification

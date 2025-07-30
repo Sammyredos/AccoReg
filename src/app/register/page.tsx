@@ -713,6 +713,7 @@ function RegistrationForm() {
                           dob: formData.dateOfBirth || '',
                           gender: formData.gender || '',
                           address: formData.address || '',
+                          branch: formData.branch || '',
                           phone: formData.phoneNumber || '',
                           email: formData.emailAddress || ''
                         })

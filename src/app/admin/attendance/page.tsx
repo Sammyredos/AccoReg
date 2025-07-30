@@ -194,9 +194,9 @@ function AttendancePageContent() {
         setConfirmTarget(null)
       }
 
-      // Auto-close QR view modal if it's open
-      if (showQRViewModalRef.current) {
-        console.log('👁️ Auto-closing QR view modal (ref-based)')
+      // Auto-close QR view modal if it's open and matches the verified participant
+      if (showQRViewModalRef.current && qrViewTarget?.id === event.data.registrationId) {
+        console.log('👁️ Auto-closing QR view modal for verified participant:', event.data.fullName)
         setShowQRViewModal(false)
         setQrViewTarget(null)
       }
@@ -598,6 +598,13 @@ function AttendancePageContent() {
           console.log('🎉 Verification successful for:', verifyData.registration?.fullName)
           success(`${verifyData.registration?.fullName || 'Participant'} has been verified successfully!`)
 
+          // Auto-close QR view modal immediately after successful verification
+          if (showQRViewModal && qrViewTarget?.id === registrationId) {
+            console.log('🔄 Auto-closing QR view modal after successful verification')
+            setShowQRViewModal(false)
+            setQRViewTarget(null)
+          }
+
           // Refresh data and trigger updates
           await Promise.all([loadStats(), loadRegistrations()])
           triggerStatsUpdate()
@@ -628,6 +635,13 @@ function AttendancePageContent() {
         if (unverifyResponse.ok) {
           console.log('🔄 Unverification successful for:', unverifyData.registration?.fullName)
           success(`${unverifyData.registration?.fullName || 'Participant'} has been unverified successfully!`)
+
+          // Auto-close QR view modal immediately after successful unverification
+          if (showQRViewModal && qrViewTarget?.id === registrationId) {
+            console.log('🔄 Auto-closing QR view modal after successful unverification')
+            setShowQRViewModal(false)
+            setQRViewTarget(null)
+          }
 
           // Refresh data and trigger updates
           await Promise.all([loadStats(), loadRegistrations()])
@@ -1449,6 +1463,7 @@ function AttendancePageContent() {
             setQRViewTarget(null)
           }}
           registration={qrViewTarget}
+          autoCloseOnVerification={true}
         />
       )}
 
