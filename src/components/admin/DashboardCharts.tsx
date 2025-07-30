@@ -101,10 +101,14 @@ export function DashboardCharts({ analytics }: DashboardChartsProps) {
       color: CHART_COLORS[index % CHART_COLORS.length]
     }))
 
-  // Prepare accommodation data
+  // Prepare accommodation data - Available should represent available bed spaces, not rooms
+  const totalCapacity = analytics.accommodations.roomDetails.reduce((sum, room) => sum + room.capacity, 0)
+  const occupiedSpaces = analytics.accommodations.roomDetails.reduce((sum, room) => sum + room.occupied, 0)
+  const availableSpaces = Math.max(0, totalCapacity - occupiedSpaces)
+
   const accommodationData = [
-    { name: 'Allocated', value: analytics.accommodations.allocatedRooms, color: COLORS.success },
-    { name: 'Available', value: analytics.accommodations.totalRooms - analytics.accommodations.allocatedRooms, color: COLORS.warning }
+    { name: 'Allocated', value: occupiedSpaces, color: COLORS.success },
+    { name: 'Available', value: availableSpaces, color: COLORS.warning }
   ]
 
   // Activity data

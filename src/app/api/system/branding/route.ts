@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { getSafeLogoUrl } from '@/lib/logo-cleanup'
 
 const prisma = new PrismaClient()
 
@@ -19,7 +20,6 @@ export async function GET() {
     // Debug logging removed for production
 
     const systemNameSetting = brandingSettings.find(s => s.key === 'systemName')
-    const logoUrlSetting = brandingSettings.find(s => s.key === 'logoUrl')
 
     let systemName = 'Mopgomglobal' // Default fallback
     let logoUrl: string | null = null
@@ -33,26 +33,16 @@ export async function GET() {
         console.log('✅ System name from raw value:', systemName)
       }
     } else {
-      console.log('⚠️ No system name setting found, using default:', systemName)
-    }
-
-    if (logoUrlSetting) {
-      try {
-        logoUrl = JSON.parse(logoUrlSetting.value)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Logo URL from JSON:', logoUrl)
-        }
-      } catch {
-        logoUrl = logoUrlSetting.value
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Logo URL from raw value:', logoUrl)
-        }
+      // Reduced logging frequency for production
+      if (Math.random() < 0.1) { // Only log 10% of the time
+        console.log('⚠️ No system name setting found, using default:', systemName)
       }
-    } else if (process.env.NODE_ENV === 'development') {
-      console.log('⚠️ No logo URL setting found')
     }
 
-    // Add cache-busting parameter to logo URL
+    // Get safe logo URL that's guaranteed to exist or null
+    logoUrl = await getSafeLogoUrl()
+
+    // Add cache-busting parameter to logo URL only if it exists
     const logoUrlWithCacheBust = logoUrl ? `${logoUrl}?v=${Date.now()}` : null
 
     return NextResponse.json({

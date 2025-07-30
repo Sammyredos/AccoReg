@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
+
 import { useToast } from '@/contexts/ToastContext'
 import { parseApiError } from '@/lib/error-messages'
 import {
@@ -58,7 +58,7 @@ export function AccommodationSearchExport({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<string | null>(null)
-  const [filterType, setFilterType] = useState<'all' | 'allocated' | 'unallocated'>('all')
+  const [filterType] = useState<'all' | 'allocated' | 'unallocated'>('all') // Always search all
   const [showResults, setShowResults] = useState(false)
 
   const { success, error } = useToast()
@@ -198,127 +198,99 @@ export function AccommodationSearchExport({
     }
   }, [refreshTrigger])
 
+  // Real-time search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim()) {
+        searchRegistrants()
+      } else {
+        setSearchResults([])
+        setShowResults(false)
+      }
+    }, 300) // Debounce search by 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="space-y-6 bg-white">
-      {/* Search and Filter Section */}
-      <Card className="p-4 sm:p-6">
+    <div className="space-y-6">
+      {/* Search Section - Match platoon page filter container */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
         <div className="space-y-4">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Search by name, email, phone number..."
-              className="pl-10 pr-10 font-apercu-regular"
-            />
-            {searchQuery && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter and Search Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Filter Buttons */}
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={filterType === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilterType('all')}
-                className="font-apercu-medium flex-1 sm:flex-none"
-              >
-                <Users className="h-4 w-4 mr-1 hidden sm:inline" />
-                All
-              </Button>
-              <Button
-                variant={filterType === 'allocated' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilterType('allocated')}
-                className="font-apercu-medium flex-1 sm:flex-none"
-              >
-                <Home className="h-4 w-4 mr-1 hidden sm:inline" />
-                Allocated
-              </Button>
-              <Button
-                variant={filterType === 'unallocated' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilterType('unallocated')}
-                className="font-apercu-medium flex-1 sm:flex-none"
-              >
-                <Filter className="h-4 w-4 mr-1 hidden sm:inline" />
-                Unallocated
-              </Button>
+          {/* Search Input - Same width as platoon page */}
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Search by name, email, phone number..."
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
-
-            {/* Search Button */}
-            {!isViewerOnly && (
-              <Button
-                onClick={searchRegistrants}
-                disabled={loading}
-                className="font-apercu-medium bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Search className="h-4 w-4 mr-2" />
-                )}
-                Search
-              </Button>
-            )}
           </div>
+
+          {/* Real-time search info */}
+          {!searchQuery && (
+            <div className="text-sm text-gray-500 font-apercu-regular">
+              Start typing to search participants
+            </div>
+          )}
 
           {/* Export Buttons */}
           {canExport && !isViewerOnly && (
-            <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-gray-200">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportData('csv')}
-                disabled={!!exporting}
-                className="font-apercu-medium w-full sm:w-auto"
-              >
-                {exporting === 'csv' ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Export CSV
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportData('pdf')}
-                disabled={!!exporting}
-                className="font-apercu-medium w-full sm:w-auto"
-              >
-                {exporting === 'pdf' ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4 mr-2" />
-                )}
-                Export PDF
-              </Button>
+          <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-gray-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportData('csv')}
+              disabled={!!exporting}
+              className="font-apercu-medium w-full sm:w-auto"
+            >
+              {exporting === 'csv' ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportData('pdf')}
+              disabled={!!exporting}
+              className="font-apercu-medium w-full sm:w-auto"
+            >
+              {exporting === 'pdf' ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4 mr-2" />
+              )}
+              Export PDF
+            </Button>
             </div>
           )}
         </div>
-      </Card>
 
-      {/* Search Results */}
-      {showResults && (
-        <Card className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-            <h3 className="font-apercu-bold text-lg text-gray-900">
+        {/* Search Results - List View like Platoon Page */}
+        {showResults && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-apercu-bold text-base text-gray-900">
               Search Results ({searchResults.length})
             </h3>
             {searchQuery && (
-              <Badge variant="outline" className="font-apercu-medium w-fit">
-                "{searchQuery}" • {filterType}
+              <Badge variant="outline" className="font-apercu-medium w-fit text-xs">
+                "{searchQuery}"
               </Badge>
             )}
           </div>
@@ -326,61 +298,58 @@ export function AccommodationSearchExport({
           {searchResults.length === 0 ? (
             <div className="text-center py-8">
               <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="font-apercu-medium text-gray-500">No registrants found</p>
+              <p className="font-apercu-medium text-gray-500">No participants found</p>
               <p className="font-apercu-regular text-sm text-gray-400">
-                Try adjusting your search terms or filters
+                Try adjusting your search terms
               </p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {searchResults.map((person) => (
+            <div>
+              <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-100 rounded-lg">
+                {searchResults.map((person) => (
                 <div
                   key={person.id}
-                  className="flex flex-col sm:flex-row sm:items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:shadow-sm"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
-                      <div>
-                        <h4 className="font-apercu-bold text-sm text-gray-900 truncate">{capitalizeName(person.fullName)}</h4>
-                        <div className="flex items-center space-x-2 mt-1 flex-wrap">
-                          <Badge className={`${person.gender === 'Male' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'} border-0 text-xs`}>
-                            {person.gender}
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      person.gender === 'Male'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600'
+                        : 'bg-gradient-to-r from-pink-500 to-pink-600'
+                    }`}>
+                      <Users className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-apercu-medium text-sm text-gray-900 truncate">
+                          {capitalizeName(person.fullName)}
+                        </span>
+                        <Badge className={`${person.gender === 'Male' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'} border-0 text-xs`}>
+                          {person.gender}
+                        </Badge>
+                        <span className="font-apercu-regular text-xs text-gray-500">
+                          {calculateAge(person.dateOfBirth)} yrs
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {person.roomAllocation ? (
+                          <Badge className="bg-green-100 text-green-800 border-0 text-xs">
+                            🏠 {person.roomAllocation.room.name}
                           </Badge>
-                          <span className="font-apercu-regular text-xs text-gray-500">
-                            {calculateAge(person.dateOfBirth)} years old
-                          </span>
-                        </div>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            Unallocated
+                          </Badge>
+                        )}
                       </div>
                     </div>
-
-                    <div className="space-y-1 mb-2">
-                      <p className="font-apercu-regular text-xs text-gray-600 truncate">
-                        📧 {person.emailAddress}
-                      </p>
-                      <p className="font-apercu-regular text-xs text-gray-600">
-                        📞 {person.phoneNumber}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      {person.roomAllocation ? (
-                        <Badge className="bg-green-50 text-green-700 border-0 text-xs">
-                          🏠 {person.roomAllocation.room.name}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          Unallocated
-                        </Badge>
-                      )}
-                    </div>
                   </div>
-
                   {canViewPersonDetails && onPersonSelectAction && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onPersonSelectAction(person.id)}
-                      className="font-apercu-medium w-full sm:w-auto flex-shrink-0"
+                      className="font-apercu-medium flex-shrink-0"
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
@@ -388,10 +357,12 @@ export function AccommodationSearchExport({
                   )}
                 </div>
               ))}
+              </div>
             </div>
           )}
-        </Card>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

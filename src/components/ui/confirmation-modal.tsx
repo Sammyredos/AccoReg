@@ -84,7 +84,7 @@ export function ConfirmationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md mx-4">
+      <DialogContent className="sm:max-w-md mx-4 touch-manipulation select-none">
         <DialogHeader>
           <div className="flex items-center space-x-3 mb-2">
             <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${styles.iconBg}`}>
@@ -101,19 +101,19 @@ export function ConfirmationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
           <Button
             variant="outline"
             onClick={onClose}
             disabled={loading}
-            className="font-apercu-medium order-2 sm:order-1"
+            className="font-apercu-medium order-2 sm:order-1 h-11 sm:h-10 touch-manipulation select-none"
           >
             {cancelText}
           </Button>
           <Button
             onClick={onConfirm}
             disabled={loading}
-            className={`font-apercu-medium text-white order-1 sm:order-2 ${styles.buttonBg}`}
+            className={`font-apercu-medium text-white order-1 sm:order-2 h-11 sm:h-10 touch-manipulation select-none ${styles.buttonBg}`}
           >
             {loading ? (
               <>

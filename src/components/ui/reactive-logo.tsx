@@ -91,6 +91,18 @@ export function ReactiveLogo({ className, fallbackIcon, alt = "Logo", onLogoUpda
           src={logoUrl}
           alt={alt}
           className="w-full h-full object-contain"
+          onError={(e) => {
+            console.warn('Logo failed to load, falling back to default', { logoUrl });
+
+            // Clear problematic logo from cache
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('system-logo-url')
+            }
+
+            // Update global state to prevent further attempts
+            setLogoUrl(null);
+            updateGlobalLogo(null);
+          }}
         />
       </div>
     )

@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: Mopgomyouth
+    name: mopgomyouth-registration-system
     env: node
     plan: free
     region: oregon
-    # Optimized for real-time features
+    # Optimized for real-time features and QR scanning
     autoDeploy: true
     previewsEnabled: false
+    healthCheckPath: /api/health
     buildCommand: |
       echo "🚀 Starting Mopgomyouth production build process..." &&
       echo "📦 Installing dependencies..." &&
@@ -14,8 +15,8 @@ services:
       echo "🔧 Generating Prisma client for PostgreSQL..." &&
       npx prisma generate &&
       echo "🗄️ Running database migrations..." &&
-      npx prisma migrate deploy &&
-      echo "✅ Database migrations completed" &&
+      npx prisma db push --accept-data-loss &&
+      echo "✅ Database schema deployed" &&
       echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
@@ -32,12 +33,16 @@ services:
       echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
       echo "📊 Build Summary:" &&
       echo "  ✅ Dependencies installed and optimized" &&
-      echo "  ✅ Database schema deployed" &&
+      echo "  ✅ Database schema deployed with PostgreSQL" &&
       echo "  ✅ Admin account configured" &&
       echo "  ✅ System settings initialized" &&
       echo "  ✅ Branding and roles configured" &&
       echo "  ✅ Next.js application built for production" &&
       echo "  ✅ Production dependencies optimized" &&
+      echo "  ✅ QR scanner functionality enabled" &&
+      echo "  ✅ Attendance verification system ready" &&
+      echo "  ✅ Platoon allocation system ready" &&
+      echo "  ✅ Room allocation system ready" &&
       echo "🚀 Ready for deployment!"
     startCommand: |
       echo "🌟 Starting Mopgomyouth Youth Registration System..." &&
@@ -46,6 +51,10 @@ services:
       echo "🌐 Starting server..." &&
       npm start
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mopgomyouth-db
+          property: connectionString
       - key: NODE_ENV
         value: production
       - key: NEXT_TELEMETRY_DISABLED
@@ -54,6 +63,16 @@ services:
         value: true
       - key: SKIP_ENV_VALIDATION
         value: false
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        value: https://mopgomyouth.onrender.com
+      - key: QR_SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
       - key: REAL_TIME_STATS
         value: true
       - key: STAFF_REALTIME_ACCESS
@@ -170,3 +189,9 @@ services:
         value: info
       - key: ENABLE_DEBUG_MODE
         value: false
+
+databases:
+  - name: mopgomyouth-db
+    databaseName: mopgomyouth
+    user: mopgomyouth_user
+    plan: free

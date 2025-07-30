@@ -95,29 +95,45 @@ export class LogoManager {
   }
   
   /**
-   * Force browser cache invalidation
+   * Force browser cache invalidation (with rate limiting)
    */
   static invalidateBrowserCaches() {
     if (typeof window !== 'undefined') {
-      // Force reload of all logo images
-      const logoImages = document.querySelectorAll('img[src*="logo"], img[src*="branding"]')
-      logoImages.forEach((img: any) => {
-        if (img.src) {
-          const originalSrc = img.src.split('?')[0] // Remove existing cache-busting params
-          img.src = `${originalSrc}?v=${Date.now()}`
-        }
-      })
-      
-      // Force reload of favicon
-      const faviconLinks = document.querySelectorAll('link[rel*="icon"]')
-      faviconLinks.forEach((link: any) => {
-        if (link.href) {
-          const originalHref = link.href.split('?')[0]
-          link.href = `${originalHref}?v=${Date.now()}`
-        }
-      })
-      
-      logger.info('Invalidated browser caches for logo elements')
+      // Rate limit cache invalidation to prevent excessive requests
+      const lastInvalidation = localStorage.getItem('last-logo-cache-invalidation')
+      const now = Date.now()
+
+      if (lastInvalidation && (now - parseInt(lastInvalidation)) < 5000) {
+        logger.debug('Skipping cache invalidation due to rate limiting')
+        return
+      }
+
+      localStorage.setItem('last-logo-cache-invalidation', now.toString())
+
+      // Only invalidate if we have a valid logo URL
+      if (globalLogoUrl) {
+        // Force reload of all logo images
+        const logoImages = document.querySelectorAll('img[src*="logo"], img[src*="branding"]')
+        logoImages.forEach((img: any) => {
+          if (img.src && img.src.includes(globalLogoUrl.split('/').pop() || '')) {
+            const originalSrc = img.src.split('?')[0] // Remove existing cache-busting params
+            img.src = `${originalSrc}?v=${Date.now()}`
+          }
+        })
+
+        // Force reload of favicon only if it's using our logo
+        const faviconLinks = document.querySelectorAll('link[rel*="icon"]')
+        faviconLinks.forEach((link: any) => {
+          if (link.href && link.href.includes('uploads/branding')) {
+            const originalHref = link.href.split('?')[0]
+            link.href = `${originalHref}?v=${Date.now()}`
+          }
+        })
+
+        logger.info('Invalidated browser caches for logo elements')
+      } else {
+        logger.debug('No logo URL available, skipping cache invalidation')
+      }
     }
   }
   
@@ -166,11 +182,11 @@ export class LogoManager {
     // Load initial logo
     await this.loadLogoFromAPI()
     
-    // Set up periodic refresh (every 30 seconds)
+    // Set up periodic refresh (every 5 minutes to reduce API calls)
     if (typeof window !== 'undefined') {
       setInterval(() => {
         this.loadLogoFromAPI()
-      }, 30000)
+      }, 300000) // 5 minutes instead of 30 seconds
     }
   }
   

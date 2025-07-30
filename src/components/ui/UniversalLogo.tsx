@@ -70,15 +70,30 @@ export function UniversalLogo({
 
   const handleImageError = () => {
     logger.warn(`Logo failed to load for ${componentName}`, { logoUrl, retryCount })
-    
-    if (retryCount < 3) {
-      // Retry loading
-      setRetryCount(prev => prev + 1)
+
+    // Immediately set error state to prevent infinite loading attempts
+    setError(true)
+
+    // Clear the problematic logo URL from cache to prevent future attempts
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('system-logo-url')
+    }
+
+    // Update global logo manager to null to stop further attempts
+    LogoManager.updateGlobalLogo(null, true)
+
+    // Only retry once after a longer delay, not multiple times
+    if (retryCount === 0) {
+      setRetryCount(1)
       setTimeout(() => {
-        LogoManager.forceRefresh()
-      }, 1000 * (retryCount + 1)) // Exponential backoff
-    } else {
-      setError(true)
+        // Try to reload logo from API one more time
+        LogoManager.loadLogoFromAPI().then((newLogoUrl) => {
+          if (newLogoUrl && newLogoUrl !== logoUrl) {
+            setError(false)
+            setRetryCount(0)
+          }
+        })
+      }, 5000) // Wait 5 seconds before retry
     }
   }
 
@@ -91,14 +106,14 @@ export function UniversalLogo({
   // Show loading state
   if (loading) {
     return (
-      <div 
-        className={`flex items-center justify-center bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded ${className}`}
+      <span
+        className={`inline-block flex items-center justify-center bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded ${className}`}
         style={{ width: width || 40, height: height || 40, ...style }}
       >
-        <div className="animate-pulse">
+        <span className="animate-pulse">
           {fallbackText}
-        </div>
-      </div>
+        </span>
+      </span>
     )
   }
 
@@ -119,13 +134,13 @@ export function UniversalLogo({
 
   // Show fallback
   return (
-    <div 
-      className={`flex items-center justify-center bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded ${className}`}
+    <span
+      className={`inline-block flex items-center justify-center bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded ${className}`}
       style={{ width: width || 40, height: height || 40, ...style }}
       title={`${alt} (Fallback)`}
     >
       {fallbackText}
-    </div>
+    </span>
   )
 }
 

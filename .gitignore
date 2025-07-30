@@ -131,3 +131,6 @@ public/uploads/*
 
 # Turbo
 .turbo
+
+# Claude
+.claude

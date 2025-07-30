@@ -1,23 +1,10 @@
 'use client'
 
-import React, { useState, memo } from 'react'
+import React, { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/contexts/ToastContext'
-import { capitalizeName } from '@/lib/utils'
-import { parseApiError } from '@/lib/error-messages'
-import {
-  Users,
-  Edit,
-  Trash2,
-  RefreshCw,
-  UserMinus,
-  Eye,
-  AlertTriangle,
-  Phone,
-  User
-} from 'lucide-react'
+import { Users, Edit, Phone, User, Trash2, Loader2 } from 'lucide-react'
+import { PlatoonParticipantsModal } from './PlatoonParticipantsModal'
 
 interface PlatoonAllocation {
   id: string
@@ -45,293 +32,220 @@ interface PlatoonAllocation {
 interface PlatoonAllocationCardProps {
   platoon: PlatoonAllocation
   onEdit: (platoon: PlatoonAllocation) => void
+  onDelete: (platoon: PlatoonAllocation) => void
+  onEmpty: (platoon: PlatoonAllocation) => void
   onRefresh: () => void
-  onPersonPreview?: (registrationId: string) => void
-  canEditPlatoons?: boolean
-  canViewPersonDetails?: boolean
-  canRemoveAllocations?: boolean
+  canEditPlatoons: boolean
+  canViewPersonDetails: boolean
+  canRemoveAllocations: boolean
+  isLoading?: boolean
+  loadingAction?: string // 'edit' | 'delete' | 'empty'
 }
 
-const PlatoonAllocationCardComponent = function PlatoonAllocationCard({
+export function PlatoonAllocationCard({
   platoon,
   onEdit,
+  onDelete,
+  onEmpty,
   onRefresh,
-  onPersonPreview,
-  canEditPlatoons = true,
-  canViewPersonDetails = true,
-  canRemoveAllocations = true
+  canEditPlatoons,
+  canViewPersonDetails,
+  canRemoveAllocations,
+  isLoading = false,
+  loadingAction
 }: PlatoonAllocationCardProps) {
-  const [showParticipants, setShowParticipants] = useState(false)
-  const [removing, setRemoving] = useState<string | null>(null)
-  const [removingAll, setRemovingAll] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showRemoveAllConfirm, setShowRemoveAllConfirm] = useState(false)
-
-  const { success, error } = useToast()
-
-  const showToast = (title: string, type: 'success' | 'error' | 'warning' | 'info') => {
-    if (type === 'success') {
-      success(title)
-    } else if (type === 'error') {
-      error(title)
-    }
-  }
-
-  const handleRemoveParticipant = async (participantId: string, personName: string) => {
-    if (!canRemoveAllocations) return
-
-    setRemoving(participantId)
-    try {
-      const response = await fetch(`/api/admin/platoon-allocations/participants/${participantId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to remove participant')
-      }
-
-      showToast(`${personName} removed from platoon successfully`, 'success')
-      onRefresh()
-    } catch (error) {
-      console.error('Error removing participant:', error)
-      const errorMessage = parseApiError(error)
-      showToast(errorMessage, 'error')
-    } finally {
-      setRemoving(null)
-    }
-  }
-
-  const handleRemoveAllParticipants = async () => {
-    if (!canRemoveAllocations || platoon.participants.length === 0) return
-
-    setRemovingAll(true)
-    try {
-      const response = await fetch(`/api/admin/platoon-allocations/${platoon.id}/clear`, {
-        method: 'POST',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to clear platoon')
-      }
-
-      showToast(`All participants removed from ${platoon.name}`, 'success')
-      onRefresh()
-      setShowRemoveAllConfirm(false)
-    } catch (error) {
-      console.error('Error clearing platoon:', error)
-      const errorMessage = parseApiError(error)
-      showToast(errorMessage, 'error')
-    } finally {
-      setRemovingAll(false)
-    }
-  }
-
-  const handleDeletePlatoon = async () => {
-    if (!canEditPlatoons) return
-
-    setDeleting(true)
-    try {
-      const response = await fetch(`/api/admin/platoon-allocations/${platoon.id}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete platoon')
-      }
-
-      showToast(`Platoon "${platoon.name}" deleted successfully`, 'success')
-      onRefresh()
-      setShowDeleteConfirm(false)
-    } catch (error) {
-      console.error('Error deleting platoon:', error)
-      const errorMessage = parseApiError(error)
-      showToast(errorMessage, 'error')
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const getOccupancyBadgeColor = () => {
-    if (platoon.occupancyRate >= 90) return 'bg-red-100 text-red-700 border-red-200'
-    if (platoon.occupancyRate >= 70) return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-    return 'bg-green-100 text-green-700 border-green-200'
-  }
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false)
+  const participantCount = platoon.participants?.length || 0
+  const capacityPercentage = platoon.capacity > 0 ? (participantCount / platoon.capacity) * 100 : 0
 
   return (
     <>
-      <Card className="p-2 sm:p-3 md:p-4 lg:p-5 bg-white hover:shadow-lg transition-all duration-200 border border-gray-200 hover:border-gray-300">
-        <div className="space-y-2 sm:space-y-3 md:space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 min-w-0 flex-1">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-indigo-600" />
-              <h3 className="font-apercu-bold text-sm sm:text-base text-gray-900 truncate">
-                {platoon.name}
-              </h3>
-            </div>
-            <Badge className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 border-indigo-200">
-              {platoon.label}
-            </Badge>
-          </div>
-
-          {/* Leader Info */}
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
-              <span className="font-apercu-medium text-xs sm:text-sm text-gray-700">
-                Leader: {platoon.leaderName}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
-              <span className="font-apercu-regular text-xs sm:text-sm text-gray-600">
-                {platoon.leaderPhone}
-              </span>
-            </div>
-          </div>
-
-          {/* Occupancy */}
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
-            <span className="font-apercu-medium text-xs sm:text-sm text-gray-700">
-              {platoon.occupancy}/{platoon.capacity}
-            </span>
-            <Badge className={`text-xs px-1.5 py-0.5 ${getOccupancyBadgeColor()}`}>
-              {platoon.occupancyRate}%
-            </Badge>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${
-                platoon.occupancyRate >= 90 ? 'bg-red-500' :
-                platoon.occupancyRate >= 70 ? 'bg-yellow-500' : 'bg-green-500'
-              }`}
-              style={{ width: `${Math.min(platoon.occupancyRate, 100)}%` }}
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-wrap gap-1 sm:gap-2">
-            {canViewPersonDetails && platoon.occupancy > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowParticipants(!showParticipants)}
-                className="text-xs px-2 py-1 h-6 sm:h-7 font-apercu-medium"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                {showParticipants ? 'Hide' : 'View'}
-              </Button>
-            )}
-
-            {canEditPlatoons && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onEdit(platoon)}
-                className="text-xs px-2 py-1 h-6 sm:h-7 font-apercu-medium"
-              >
-                <Edit className="h-3 w-3 mr-1" />
-                Edit
-              </Button>
-            )}
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onRefresh}
-              className="text-xs px-2 py-1 h-6 sm:h-7 font-apercu-medium"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Refresh
-            </Button>
-
-            {canRemoveAllocations && platoon.occupancy > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowRemoveAllConfirm(true)}
-                className="text-xs px-2 py-1 h-6 sm:h-7 font-apercu-medium text-red-600 border-red-200 hover:bg-red-50"
-              >
-                <UserMinus className="h-3 w-3 mr-1" />
-                Clear
-              </Button>
-            )}
-
-            {canEditPlatoons && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="text-xs px-2 py-1 h-6 sm:h-7 font-apercu-medium text-red-600 border-red-200 hover:bg-red-50"
-              >
-                <Trash2 className="h-3 w-3 mr-1" />
-                Delete
-              </Button>
-            )}
-          </div>
-
-          {/* Participants List */}
-          {showParticipants && platoon.participants.length > 0 && (
-            <div className="border-t border-gray-200 pt-2 sm:pt-3 space-y-1 sm:space-y-2">
-              <h4 className="font-apercu-medium text-xs sm:text-sm text-gray-700">
-                Assigned Participants ({platoon.participants.length})
-              </h4>
-              <div className="space-y-1 max-h-32 sm:max-h-40 overflow-y-auto">
-                {platoon.participants.map((participant) => (
-                  <div
-                    key={participant.id}
-                    className="flex items-center justify-between p-1.5 sm:p-2 bg-gray-50 rounded text-xs sm:text-sm"
-                  >
-                    <div className="flex items-center space-x-2 min-w-0 flex-1">
-                      <div className={`h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full flex-shrink-0 ${
-                        participant.registration.gender === 'Male' ? 'bg-blue-500' : 'bg-pink-500'
-                      }`} />
-                      <div className="min-w-0 flex-1">
-                        <span
-                          className="font-apercu-medium text-gray-900 truncate cursor-pointer hover:text-blue-600 block"
-                          onClick={() => canViewPersonDetails && onPersonPreview?.(participant.registration.id)}
-                        >
-                          {capitalizeName(participant.registration.fullName)}
-                        </span>
-                        <span className="font-apercu-regular text-gray-500 text-xs truncate block">
-                          {participant.registration.branch} • {participant.registration.gender}
-                        </span>
+      <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200 bg-white">
+        <div>
+          <div className="flex flex-col space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-3">
+              <div className="flex items-center space-x-4 flex-1 min-w-0">
+                <div className="relative">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                    <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full border-2 border-white shadow-sm"></div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-apercu-bold text-lg sm:text-xl text-gray-900 truncate group-hover:text-indigo-900 transition-colors duration-200">{platoon.name}</h3>
+                  <div className="space-y-1.5 mt-2">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <div className="h-4 w-4 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                        <User className="h-2.5 w-2.5 text-indigo-600" />
                       </div>
+                      <span className="font-apercu-medium">{platoon.leaderName}</span>
                     </div>
-                    {canRemoveAllocations && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRemoveParticipant(participant.id, participant.registration.fullName)}
-                        disabled={removing === participant.id}
-                        className="h-5 w-5 sm:h-6 sm:w-6 p-0 text-red-600 hover:bg-red-100"
-                      >
-                        {removing === participant.id ? (
-                          <RefreshCw className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin" />
-                        ) : (
-                          <UserMinus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                        )}
-                      </Button>
+                    {platoon.leaderPhone && (
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <div className="h-4 w-4 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full flex items-center justify-center">
+                          <Phone className="h-2.5 w-2.5 text-emerald-600" />
+                        </div>
+                        <span className="font-apercu-regular">{platoon.leaderPhone}</span>
+                      </div>
                     )}
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {canEditPlatoons && (
+                <div className="flex items-center space-x-2 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit(platoon)}
+                    disabled={isLoading}
+                    className="font-apercu-medium h-8 w-8 p-0 border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all duration-200"
+                  >
+                    {isLoading && loadingAction === 'edit' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Edit className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDelete(platoon)}
+                    disabled={participantCount > 0 || isLoading}
+                    className={`font-apercu-medium h-8 w-8 p-0 transition-all duration-200 ${
+                      participantCount > 0 || isLoading
+                        ? 'text-gray-400 cursor-not-allowed border-gray-200'
+                        : 'text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300'
+                    }`}
+                    title={participantCount > 0 ? 'Cannot delete platoon with allocated participants' : 'Delete platoon'}
+                  >
+                    {isLoading && loadingAction === 'delete' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              )}
+          </div>
+
+            {/* Participant Stats */}
+            <div className="bg-gradient-to-r from-slate-50/50 to-blue-50/50 rounded-xl p-4 mb-4 border border-slate-100">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="h-8 w-8 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                  <Users className="h-4 w-4 text-indigo-600" />
+                </div>
+                <div>
+                  <span className="font-apercu-bold text-sm text-gray-900">
+                    {participantCount}/{platoon.capacity} participants
+                  </span>
+                  <p className="font-apercu-regular text-xs text-gray-600 mt-0.5">
+                    {platoon.capacity - participantCount} Open Slots
+                  </p>
+                </div>
+              </div>
+
+              {/* Enhanced Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={`font-apercu-medium text-xs ${
+                    capacityPercentage >= 100 ? 'text-red-700' :
+                    capacityPercentage >= 80 ? 'text-amber-700' :
+                    'text-emerald-700'
+                  }`}>
+                    Capacity
+                  </span>
+                  <span className={`font-apercu-bold text-xs ${
+                    capacityPercentage >= 100 ? 'text-red-700' :
+                    capacityPercentage >= 80 ? 'text-amber-700' :
+                    'text-emerald-700'
+                  }`}>
+                    {Math.round(capacityPercentage)}%
+                  </span>
+                </div>
+                <div className={`w-full rounded-full h-3 shadow-inner ${
+                  capacityPercentage >= 100 ? 'bg-red-100' :
+                  capacityPercentage >= 80 ? 'bg-amber-100' :
+                  'bg-emerald-100'
+                }`}>
+                  <div
+                    className={`h-3 rounded-full transition-all duration-500 shadow-sm ${
+                      capacityPercentage >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                      capacityPercentage >= 80 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
+                      'bg-gradient-to-r from-emerald-500 to-green-500'
+                    }`}
+                    style={{ width: `${Math.min(capacityPercentage, 100)}%` }}
+                  />
+                </div>
               </div>
             </div>
-          )}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <div className="h-2.5 w-2.5 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full animate-pulse shadow-sm"></div>
+                  <span className="font-apercu-medium text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
+                    Active
+                  </span>
+                </div>
+                {platoon.label && (
+                  <span className="font-apercu-regular text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    {platoon.label}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2">
+                {participantCount > 0 && (
+                  <Button
+                    onClick={() => setShowParticipantsModal(true)}
+                    variant="outline"
+                    size="sm"
+                    className="font-apercu-medium h-8 px-3 sm:px-4 text-xs text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 shadow-sm w-full sm:w-auto"
+                  >
+                    <Users className="h-3 w-3 mr-1 sm:mr-1.5" />
+                    <span className="hidden sm:inline">View All</span>
+                    <span className="sm:hidden">View</span>
+                  </Button>
+                )}
+                {participantCount > 0 && canEditPlatoons && (
+                  <Button
+                    onClick={() => onEmpty(platoon)}
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading}
+                    className="font-apercu-medium h-8 px-3 sm:px-4 text-xs text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300 disabled:text-gray-400 transition-all duration-200 shadow-sm w-full sm:w-auto"
+                  >
+                    {isLoading && loadingAction === 'empty' ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 sm:mr-1.5 animate-spin" />
+                        <span className="hidden sm:inline">Emptying...</span>
+                        <span className="sm:hidden">...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-3 w-3 mr-1 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Empty</span>
+                        <span className="sm:hidden">Clear</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </Card>
+
+      {/* Participants Modal */}
+      <PlatoonParticipantsModal
+        isOpen={showParticipantsModal}
+        onClose={() => setShowParticipantsModal(false)}
+        platoon={platoon}
+      />
     </>
   )
 }
-
-// Export memoized component for better performance
-export const PlatoonAllocationCard = memo(PlatoonAllocationCardComponent)
-
-PlatoonAllocationCard.displayName = 'PlatoonAllocationCard'

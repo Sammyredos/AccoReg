@@ -17,14 +17,30 @@ export function FontLoader({
 }: FontLoaderProps) {
   const [fontsLoaded, setFontsLoaded] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
-  const [systemName, setSystemName] = useState<string>('Loading...')
+  const [systemName, setSystemName] = useState<string>('')
+  const [isClient, setIsClient] = useState(false)
+
+  // Handle client-side hydration
+  useEffect(() => {
+    // Use a small delay to ensure hydration is complete
+    const timer = setTimeout(() => {
+      setIsClient(true)
+      // Set default system name only on client
+      setSystemName('MOPGOM Global')
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
+    // Only run on client side after hydration
+    if (!isClient) return
+
     // Load system name immediately
     const loadSystemName = async () => {
       try {
         // Try to get cached system name first
-        const cachedName = typeof window !== 'undefined' ? localStorage.getItem('system-name') : null
+        const cachedName = localStorage.getItem('system-name')
         if (cachedName) {
           setSystemName(cachedName)
           return
@@ -46,7 +62,7 @@ export function FontLoader({
             const data = await response.json()
             const brandingSettings = data.settings?.branding || []
             const systemNameSetting = brandingSettings.find((s: any) => s.key === 'systemName')
-            const apiSystemName = systemNameSetting?.value || 'MOPGOM Global'
+            const apiSystemName = systemNameSetting?.value || 'Mopgomyouth'
             setSystemName(apiSystemName)
 
             // Cache for next time
@@ -167,9 +183,15 @@ export function FontLoader({
     return () => {
       clearTimeout(timeoutId)
     }
-  }, [timeout])
+  }, [timeout, isClient])
 
-  // Show loading state while fonts are loading
+  // Only show loading state on client side to prevent hydration mismatch
+  if (!isClient) {
+    // Return children immediately during SSR to prevent hydration issues
+    return <>{children}</>
+  }
+
+  // Show loading state while fonts are loading (client-side only)
   if (!fontsLoaded && showLoadingScreen) {
     return (
       <div
@@ -194,7 +216,7 @@ export function FontLoader({
               color: '#111827',
               lineHeight: '1.2'
             }}>
-              {systemName}
+              {systemName || 'MOPGOM Global'}
             </h1>
             <p style={{
               fontSize: '14px',
@@ -223,8 +245,6 @@ export function FontLoader({
             }} />
           </div>
 
-
-
           <p style={{
             fontSize: '12px',
             margin: '12px 0 0 0',
@@ -233,7 +253,6 @@ export function FontLoader({
             {loadingProgress}% complete
           </p>
         </div>
-
       </div>
     )
   }

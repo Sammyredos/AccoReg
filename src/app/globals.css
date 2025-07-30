@@ -17,6 +17,19 @@
   font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
+/* Mobile touch handling improvements */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.select-none {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
 /* Remove underlines from all links by default */
 a {
   text-decoration: none;

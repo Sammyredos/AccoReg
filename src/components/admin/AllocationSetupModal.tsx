@@ -145,10 +145,10 @@ export function AllocationSetupModal({ isOpen, onCloseAction, onCompleteAction, 
             </div>
             <div>
               <DialogTitle className="font-apercu-bold text-lg">
-                Auto Allocate {gender !== 'All' ? `${gender} ` : ''}Rooms
+                Auto Allocate {gender && gender !== 'All' ? `${gender} ` : ''}Rooms
               </DialogTitle>
               <DialogDescription className="font-apercu-regular">
-                Automatically assign {gender !== 'All' ? `${gender.toLowerCase()} ` : ''}participants to rooms based on age groups and gender
+                Automatically assign {gender && gender !== 'All' ? `${gender.toLowerCase()} ` : ''}participants to rooms based on age groups and gender
               </DialogDescription>
             </div>
           </div>

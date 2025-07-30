@@ -27,8 +27,6 @@ import {
   Search,
   CheckCircle,
   Users,
-  RefreshCw,
-  Scan,
   Clock,
   ChevronDown,
   X
@@ -170,14 +168,15 @@ function AttendancePageContent() {
       // Immediate trigger
       triggerStatsUpdate()
 
-      // Delayed refresh for data consistency
+      // Delayed refresh for data consistency - reduced to prevent race conditions
       setTimeout(() => {
+        console.log('🔄 Secondary verification update starting...')
         loadRegistrations(true) // Force refresh
         loadStats()
         // Additional trigger for accommodation stats
         triggerStatsUpdate()
         console.log('🔄 Secondary verification update completed')
-      }, 50) // Reduced delay for faster response
+      }, 100) // Slightly increased delay to prevent race conditions
 
       // Show success notification ONLY for QR scans (not manual verifications)
       // Manual verifications have their own success toast in the button handler
@@ -212,14 +211,15 @@ function AttendancePageContent() {
       // Immediate trigger
       triggerStatsUpdate()
 
-      // Delayed refresh for data consistency
+      // Delayed refresh for data consistency - reduced to prevent race conditions
       setTimeout(() => {
+        console.log('🔄 Secondary status change update starting...')
         loadRegistrations(true) // Force refresh
         loadStats()
         // Additional trigger for accommodation stats
         triggerStatsUpdate()
         console.log('🔄 Secondary status change update completed')
-      }, 50) // Reduced delay for faster response
+      }, 100) // Slightly increased delay to prevent race conditions
     }, []),
     onError: useCallback((event) => {
       console.log('🚨 Real-time error received:', event.data)
@@ -287,7 +287,10 @@ function AttendancePageContent() {
 
   const loadRegistrations = async (forceRefresh = false) => {
     // Prevent multiple simultaneous requests unless it's a force refresh
-    if (isLoadingRegistrations && !forceRefresh) return
+    if (isLoadingRegistrations && !forceRefresh) {
+      console.log('⏭️ Skipping loadRegistrations - already loading, forceRefresh:', forceRefresh)
+      return
+    }
 
     setIsLoadingRegistrations(true)
     try {
@@ -300,6 +303,7 @@ function AttendancePageContent() {
 
       // Capture current filter state to prevent race conditions
       const currentFilter = verificationFilter
+      console.log('📋 Loading registrations with filter:', currentFilter, 'forceRefresh:', forceRefresh)
 
       // Add verification filter
       if (currentFilter === 'verified') {
@@ -318,7 +322,10 @@ function AttendancePageContent() {
 
         // Only update state if the filter hasn't changed during the request
         if (currentFilter === verificationFilter) {
+          console.log('✅ Loaded registrations:', data.registrations?.length || 0, 'items with filter:', currentFilter)
           setRegistrations(data.registrations || [])
+        } else {
+          console.log('⚠️ Filter changed during request - discarding results. Expected:', currentFilter, 'Current:', verificationFilter)
         }
       }
     } catch (loadError) {
@@ -522,25 +529,57 @@ function AttendancePageContent() {
 
   const handleQRScan = async (qrData: string) => {
     try {
+      console.log('🔍 Starting QR scan process:', qrData.substring(0, 50) + '...')
+
+      // Validate QR data format
+      if (!qrData || qrData.trim().length === 0) {
+        throw new Error('Empty QR code data')
+      }
+
       // Extract registration ID from QR data for tracking
+      let registrationId = null
       try {
         const parsedQR = JSON.parse(qrData)
-        if (parsedQR.id) {
+        if (parsedQR.id && parsedQR.fullName) {
+          registrationId = parsedQR.id
           setLastQRScanId(parsedQR.id)
-          console.log('📝 Tracking QR scan for ID:', parsedQR.id)
+          console.log('📝 Tracking QR scan for ID:', parsedQR.id, 'Name:', parsedQR.fullName)
+        } else {
+          throw new Error('QR code missing required registration data (id or fullName)')
         }
       } catch (parseError) {
-        console.log('⚠️ Could not parse QR data for tracking')
+        console.error('❌ Could not parse QR data:', parseError)
+        throw new Error('Invalid QR code format - expected registration QR code with valid JSON data')
       }
 
       // First, check what action should be taken (verify/unverify/block)
+      console.log('🔄 Checking QR action...')
       const checkResponse = await fetch('/api/admin/attendance/qr-toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrCode: qrData })
       })
 
+      if (!checkResponse.ok) {
+        const errorText = await checkResponse.text()
+        console.error('❌ QR toggle check failed:', errorText)
+
+        // Try to parse as JSON, fallback to text
+        let errorMessage = 'Failed to check QR code'
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          errorMessage = errorText.includes('<!DOCTYPE')
+            ? 'Server error - API endpoint not found'
+            : errorText
+        }
+
+        throw new Error(errorMessage)
+      }
+
       const checkData = await checkResponse.json()
+      console.log('📋 QR check result:', checkData.action)
 
       if (checkData.action === 'verify_ready') {
         // Proceed with verification
@@ -556,6 +595,9 @@ function AttendancePageContent() {
         const verifyData = await verifyResponse.json()
 
         if (verifyResponse.ok) {
+          console.log('🎉 Verification successful for:', verifyData.registration?.fullName)
+          success(`${verifyData.registration?.fullName || 'Participant'} has been verified successfully!`)
+
           // Refresh data and trigger updates
           await Promise.all([loadStats(), loadRegistrations()])
           triggerStatsUpdate()
@@ -564,44 +606,61 @@ function AttendancePageContent() {
             console.log('🔄 Secondary stats update triggered for QR verification')
           }, 100)
         } else {
+          console.error('❌ Verification failed:', verifyData.error)
           error(`QR Verification failed: ${verifyData.error}`)
           setLastQRScanId(null)
         }
 
       } else if (checkData.action === 'unverify_ready') {
-        // Show unverify confirmation for QR scan
-        const registration = registrations.find(r => r.id === checkData.registration.id)
-        if (registration) {
-          setConfirmTarget(registration)
-          setConfirmAction('unverify')
-          setShowConfirmModal(true)
+        // Handle direct unverification for QR scan
+        console.log('🔄 Proceeding with unverification...')
+        const unverifyResponse = await fetch('/api/admin/attendance/unverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            method: 'qr',
+            qrCode: qrData
+          })
+        })
+
+        const unverifyData = await unverifyResponse.json()
+
+        if (unverifyResponse.ok) {
+          console.log('🔄 Unverification successful for:', unverifyData.registration?.fullName)
+          success(`${unverifyData.registration?.fullName || 'Participant'} has been unverified successfully!`)
+
+          // Refresh data and trigger updates
+          await Promise.all([loadStats(), loadRegistrations()])
+          triggerStatsUpdate()
+          setTimeout(() => {
+            triggerStatsUpdate()
+            console.log('🔄 Secondary stats update triggered for QR unverification')
+          }, 100)
+        } else {
+          console.error('❌ Unverification failed:', unverifyData.error)
+          error(`QR Unverification failed: ${unverifyData.error}`)
+          setLastQRScanId(null)
         }
 
       } else if (checkData.action === 'unverify_blocked') {
-        // Show allocation block modal for QR scan
-        setAllocationBlockData({
-          participantName: checkData.registration.fullName,
-          participantEmail: checkData.registration.emailAddress,
-          allocationInfo: {
-            roomName: checkData.roomAllocation.roomName,
-            roomId: checkData.roomAllocation.roomId,
-            roomGender: checkData.roomAllocation.roomGender,
-            roomCapacity: checkData.roomAllocation.roomCapacity,
-            roomOccupancy: checkData.roomAllocation.currentOccupancy,
-            allocationDate: checkData.roomAllocation.allocationDate
-          }
-        })
-        setShowAllocationBlockModal(true)
+        // Participant has room allocation - show warning
+        const participantName = checkData.registration?.fullName || 'Participant'
+        const roomName = checkData.roomAllocation?.roomName || 'Unknown Room'
+        error(`Cannot unverify ${participantName} - they are allocated to ${roomName}. Please deallocate first.`)
+        setLastQRScanId(null)
 
       } else {
-        error(`QR Scan failed: ${checkData.error || 'Unknown error'}`)
-        setLastQRScanId(null)
+        throw new Error(checkData.error || `Unknown action: ${checkData.action}`)
       }
 
-    } catch (qrError) {
-      console.error('Error scanning QR code:', qrError)
-      error('Failed to scan QR code')
+    } catch (qrError: any) {
+      console.error('❌ QR scan error:', qrError)
+      const errorMessage = qrError.message || 'Failed to scan QR code'
+      error(`QR Scan Error: ${errorMessage}`)
       setLastQRScanId(null) // Clear tracking on error
+
+      // Re-throw the error so the QRScanner component can handle it
+      throw qrError
     }
   }
 
@@ -649,10 +708,17 @@ function AttendancePageContent() {
 
   // No need for currentPage useEffect - pagination is client-side now
 
-  // Reload registrations when verification filter changes (instant)
+  // Reload registrations when verification filter changes (with debounce)
   useEffect(() => {
+    console.log('🔄 Verification filter changed to:', verificationFilter)
     setCurrentPage(1) // Reset to first page when filtering
-    loadRegistrations() // Load immediately without delay or clearing
+
+    // Small debounce to prevent rapid filter changes from causing race conditions
+    const timeoutId = setTimeout(() => {
+      loadRegistrations() // Load with slight delay to prevent race conditions
+    }, 50)
+
+    return () => clearTimeout(timeoutId)
   }, [verificationFilter])
 
   // No need for search-based useEffect - we use client-side filtering now
@@ -663,11 +729,6 @@ function AttendancePageContent() {
       handleScannerInput(scannerInputValue)
     }
   }, [scannerInputValue])
-
-  // Reload registrations when verification filter changes
-  useEffect(() => {
-    loadRegistrations()
-  }, [verificationFilter])
 
   useEffect(() => {
     // Load data immediately with initial loading state
@@ -805,91 +866,11 @@ function AttendancePageContent() {
                 className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 w-full sm:w-auto"
               >
                 <QrCode className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline text-white">Camera Scanner</span>
-                <span className="sm:hidden text-white">Scan QR</span>
+                <span className="hidden sm:inline text-white">Manual Scan Now</span>
+                <span className="sm:hidden text-white">Scan Now</span>
               </Button>
 
-              {/* Manual Refresh Button - especially useful when real-time is disconnected */}
-              <Button
-                onClick={() => {
-                  console.log('🔄 Manual refresh triggered')
-                  loadRegistrations(true)
-                  loadStats()
-                  success('Data refreshed successfully')
-                }}
-                variant="outline"
-                className={`w-full sm:w-auto ${
-                  !isConnected
-                    ? 'border-orange-300 text-orange-700 hover:bg-orange-50'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
-                title={!isConnected ? 'Real-time disconnected - manual refresh recommended' : 'Manually refresh data'}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Refresh</span>
-                <span className="sm:hidden">Sync</span>
-              </Button>
 
-              {/* Status Indicators - Responsive */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                {/* External Scanner Status */}
-                <div className="flex items-center space-x-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <Scan className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                  <span className="font-apercu-medium text-xs sm:text-sm text-blue-700">
-                    <span className="hidden sm:inline">External Scanner Ready</span>
-                    <span className="sm:hidden">Scanner Ready</span>
-                  </span>
-                </div>
-
-                {/* Real-time connection status - Stable, non-flickering indicator */}
-                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all duration-500 ease-in-out ${
-                  isConnected
-                    ? 'bg-green-50 border-green-200'
-                    : connectionError
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-blue-50 border-blue-200'
-                }`}>
-                  <div className="relative flex items-center">
-                    <Activity className={`h-4 w-4 flex-shrink-0 transition-all duration-500 ease-in-out ${
-                      isConnected
-                        ? 'text-green-600'
-                        : connectionError
-                        ? 'text-red-600'
-                        : 'text-blue-600'
-                    }`} />
-                    {isConnected && (
-                      <div className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-green-400 rounded-full">
-                        <div className="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-75"></div>
-                      </div>
-                    )}
-                    {isConnecting && (
-                      <div className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                    )}
-                  </div>
-                  <span className={`font-apercu-medium text-xs sm:text-sm transition-all duration-500 ease-in-out ${
-                    isConnected
-                      ? 'text-green-700'
-                      : connectionError
-                      ? 'text-red-700'
-                      : 'text-blue-700'
-                  }`}>
-                    <span className="hidden sm:inline">
-                      {isConnected
-                        ? `Real-time: Connected${eventCount > 0 ? ` (${eventCount})` : ''}`
-                        : connectionError
-                        ? 'Real-time: Offline'
-                        : 'Real-time: Connecting...'}
-                    </span>
-                    <span className="sm:hidden">
-                      {isConnected
-                        ? `Live${eventCount > 0 ? ` (${eventCount})` : ''}`
-                        : connectionError
-                        ? 'Offline'
-                        : 'Connecting...'}
-                    </span>
-                  </span>
-                </div>
-              </div>
             </div>
 
           {/* Statistics Cards - Responsive Grid */}

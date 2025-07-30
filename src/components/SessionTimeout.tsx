@@ -241,7 +241,8 @@ export function SessionTimeout({ }: SessionTimeoutProps) {
             {/* WARNING TEXT */}
             <div className="mt-4 text-center">
               <p className="text-xs text-gray-500">
-                This modal cannot be closed. You must choose an action.
+                This display
+                \] cannot be closed. You must choose an action.
               </p>
             </div>
           </div>

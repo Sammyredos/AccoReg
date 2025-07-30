@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, memo, useCallback, useMemo } from 'react'
+import { useState, memo, useCallback, useMemo, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/contexts/ToastContext'
 import { parseApiError } from '@/lib/error-messages'
 import { useAccommodationUpdates } from '@/contexts/AccommodationUpdatesContext'
+import { RoomParticipantsModal } from './RoomParticipantsModal'
 import {
   Home,
   Users,
@@ -66,15 +67,39 @@ const RoomCardComponent = function RoomCard({
   const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showRemoveAllConfirm, setShowRemoveAllConfirm] = useState(false)
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false)
+  const [progressAnimation, setProgressAnimation] = useState(false)
+  const [previousOccupancy, setPreviousOccupancy] = useState(room.occupancy)
 
   const { success, error } = useToast()
   const { triggerDeallocationUpdate, triggerRoomUpdate, triggerStatsUpdate } = useAccommodationUpdates()
+
+  // Animate progress bar when occupancy changes
+  useEffect(() => {
+    if (room.occupancy !== previousOccupancy) {
+      setProgressAnimation(true)
+      setPreviousOccupancy(room.occupancy)
+
+      // Reset animation after completion
+      const timer = setTimeout(() => {
+        setProgressAnimation(false)
+      }, 800)
+
+      return () => clearTimeout(timer)
+    }
+    // Return undefined for the else case
+    return undefined
+  }, [room.occupancy, previousOccupancy])
 
   const showToast = useCallback((title: string, type: 'success' | 'error' | 'warning' | 'info') => {
     if (type === 'success') {
       success(title)
     } else if (type === 'error') {
       error(title)
+    } else if (type === 'warning') {
+      error(title) // Use error for warning since useToast doesn't have warning
+    } else if (type === 'info') {
+      success(title) // Use success for info since useToast doesn't have info
     }
   }, [success, error])
 
@@ -102,11 +127,12 @@ const RoomCardComponent = function RoomCard({
     } : null
 
     return {
-      occupancyColor: room.occupancyRate >= 90 ? 'text-red-600 bg-red-50' :
-                     room.occupancyRate >= 70 ? 'text-amber-600 bg-amber-50' : 'text-green-600 bg-green-50',
+      occupancyColor: room.occupancyRate >= 100 ? 'text-red-800 bg-red-100' :
+                     room.occupancyRate >= 90 ? 'text-red-700 bg-red-50' :
+                     room.occupancyRate >= 80 ? 'text-amber-700 bg-amber-50' :
+                     room.occupancyRate >= 70 ? 'text-yellow-700 bg-yellow-50' :
+                     'text-green-700 bg-green-50',
       genderColor: room.gender === 'Male' ? 'text-blue-600 bg-blue-50' : 'text-pink-600 bg-pink-50',
-      progressBarColor: room.occupancyRate >= 90 ? 'bg-red-500' :
-                       room.occupancyRate >= 70 ? 'bg-amber-500' : 'bg-green-500',
       ageRange
     }
   }, [room.occupancyRate, room.gender, room.allocations])
@@ -301,19 +327,28 @@ const RoomCardComponent = function RoomCard({
           <p className="font-apercu-medium text-xs text-gray-600">Occupied</p>
         </div>
         <div className="text-center p-2 sm:p-3 bg-gray-50 rounded-lg">
-          <p className="font-apercu-bold text-lg sm:text-xl text-gray-900">{room.availableSpaces}</p>
+          <p className="font-apercu-bold text-lg sm:text-xl text-gray-900">{Math.max(0, room.capacity - room.occupancy)}</p>
           <p className="font-apercu-medium text-xs text-gray-600">Available</p>
         </div>
       </div>
 
       {/* Capacity Info */}
       <div className="mb-4">
-        <div className="flex items-center space-x-2 mb-2">
+        <div className="flex items-center space-x-2 mb-3">
           <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
           <span className="font-apercu-medium text-sm text-gray-700">
             {room.occupancy}/{room.capacity} persons
           </span>
         </div>
+
+        {/* Room Description */}
+        {room.description && (
+          <div className="mb-4">
+            <p className="font-apercu-regular text-sm text-gray-600 leading-relaxed">
+              {room.description}
+            </p>
+          </div>
+        )}
 
         {room.occupancy > 0 && (
           <div className="flex items-center justify-end mt-2 gap-2">
@@ -336,6 +371,15 @@ const RoomCardComponent = function RoomCard({
               )}
             </Button>
 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowParticipantsModal(true)}
+              className="font-apercu-medium text-xs text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
+            >
+              View All
+            </Button>
+
             {canRemoveAllocations && (
               <Button
                 variant="outline"
@@ -352,7 +396,7 @@ const RoomCardComponent = function RoomCard({
                 ) : (
                   <>
                     <UserMinus className="h-3 w-3 mr-1" />
-                    Empty Room
+                    Empty
                   </>
                 )}
               </Button>
@@ -361,12 +405,7 @@ const RoomCardComponent = function RoomCard({
         )}
       </div>
 
-      {/* Description */}
-      {room.description && (
-        <p className="font-apercu-regular text-sm text-gray-600 mb-4">
-          {room.description}
-        </p>
-      )}
+
 
       {/* Allocations List */}
       {showAllocations && room.allocations.length > 0 && (
@@ -429,17 +468,52 @@ const RoomCardComponent = function RoomCard({
         </div>
       )}
 
-      {/* Progress Bar */}
-      <div className="mt-4">
+      {/* Occupancy Progress Bar - Bottom of Card */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
         <div className="flex items-center justify-between mb-2">
-          <span className="font-apercu-medium text-xs text-gray-600">Occupancy</span>
-          <span className="font-apercu-medium text-xs text-gray-600">{room.occupancyRate}%</span>
+          <span className={`font-apercu-medium text-xs ${
+            room.occupancyRate >= 100 ? 'text-red-700' :
+            room.occupancyRate >= 90 ? 'text-red-600' :
+            room.occupancyRate >= 80 ? 'text-amber-600' :
+            room.occupancyRate >= 70 ? 'text-yellow-600' :
+            'text-green-600'
+          }`}>
+            Occupancy
+          </span>
+          <span className={`font-apercu-bold text-xs ${
+            room.occupancyRate >= 100 ? 'text-red-700' :
+            room.occupancyRate >= 90 ? 'text-red-600' :
+            room.occupancyRate >= 80 ? 'text-amber-600' :
+            room.occupancyRate >= 70 ? 'text-yellow-600' :
+            'text-green-600'
+          }`}>
+            {Math.round(room.occupancyRate)}%
+          </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className={`w-full rounded-full h-3 shadow-inner relative overflow-hidden ${
+          room.occupancyRate >= 100 ? 'bg-red-100' :
+          room.occupancyRate >= 90 ? 'bg-red-50' :
+          room.occupancyRate >= 80 ? 'bg-amber-50' :
+          room.occupancyRate >= 70 ? 'bg-yellow-50' :
+          'bg-green-50'
+        }`}>
           <div
-            className={`h-2 rounded-full transition-all duration-300 ${roomStats.progressBarColor}`}
-            style={{ width: `${room.occupancyRate}%` }}
-          />
+            className={`h-3 rounded-full transition-all duration-700 ease-out shadow-sm relative ${
+              progressAnimation ? 'animate-pulse' : ''
+            } ${
+              room.occupancyRate >= 100 ? 'bg-gradient-to-r from-red-600 to-red-700' :
+              room.occupancyRate >= 90 ? 'bg-gradient-to-r from-red-500 to-red-600' :
+              room.occupancyRate >= 80 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
+              room.occupancyRate >= 70 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
+              'bg-gradient-to-r from-green-500 to-emerald-500'
+            }`}
+            style={{ width: `${Math.min(room.occupancyRate, 100)}%` }}
+          >
+            {/* Shimmer effect when animating */}
+            {progressAnimation && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -580,6 +654,13 @@ const RoomCardComponent = function RoomCard({
           </Card>
         </div>
       )}
+
+      {/* Room Participants Modal */}
+      <RoomParticipantsModal
+        isOpen={showParticipantsModal}
+        onClose={() => setShowParticipantsModal(false)}
+        room={room}
+      />
     </Card>
   )
 }

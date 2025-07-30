@@ -81,19 +81,13 @@ const getNavigation = (t: (key: string) => string): NavigationItem[] => [
     requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'], // All roles can access
   },
   {
-    name: 'Platoon',
-    href: '/admin/platoon',
-    icon: Users,
-    badge: null,
-    requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'], // All roles can access
-  },
-  {
     name: 'Allocate Platoon',
     href: '/admin/allocate-platoon',
     icon: UserPlus,
     badge: null,
     requiredRoles: ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'], // All roles can access
   },
+
   {
     name: t('nav.communications'),
     href: '/admin/communications',

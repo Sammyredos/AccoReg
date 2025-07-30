@@ -6,6 +6,7 @@ import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 // Skeleton components are now inline in the loading state
 import { useToast } from '@/contexts/ToastContext'
 import { ErrorModal } from '@/components/ui/error-modal'
@@ -24,7 +25,7 @@ import { PersonPreviewModal } from '@/components/admin/PersonPreviewModal'
 import { PaginationControls } from '@/components/admin/PaginationControls'
 import { GenderTabs, GenderTabContent } from '@/components/ui/gender-tabs'
 import { ManualAllocationModal } from '@/components/admin/ManualAllocationModal'
-import { AccommodationSettingsModal } from '@/components/admin/AccommodationSettingsModal'
+
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 import { AccommodationUpdatesProvider, useAccommodationUpdates, useAccommodationRefresh } from '@/contexts/AccommodationUpdatesContext'
@@ -34,7 +35,7 @@ import {
   Plus,
   Shuffle,
   UserPlus,
-  Settings,
+
   Search,
   Filter,
   X,
@@ -106,7 +107,7 @@ function AccommodationsPageContent() {
   const [roomUpdateTrigger, setRoomUpdateTrigger] = useState<Record<string, number>>({})
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [showManualAllocationModal, setShowManualAllocationModal] = useState(false)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
+
   const [activeGenderTab, setActiveGenderTab] = useState<'Male' | 'Female'>('Male')
 
 
@@ -117,14 +118,30 @@ function AccommodationsPageContent() {
   const [femaleRoomSearchTerm, setFemaleRoomSearchTerm] = useState('')
   const [femaleRoomFilter, setFemaleRoomFilter] = useState<'all' | 'active' | 'inactive' | 'full' | 'available'>('all')
 
+  // Unallocated participants search states
+  const [maleUnallocatedSearchTerm, setMaleUnallocatedSearchTerm] = useState('')
+  const [femaleUnallocatedSearchTerm, setFemaleUnallocatedSearchTerm] = useState('')
+
+  // Enhanced global search with suggestions
+  const [globalSearchTerm, setGlobalSearchTerm] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{
+    name: string
+    status: 'allocated' | 'unallocated'
+    roomName?: string
+    roomId?: string
+    gender?: string
+  }>>([])
+  const [selectedSearchResult, setSelectedSearchResult] = useState<any>(null)
+
   // Pagination state - 8 rooms per page
 
   const [malePagination, setMalePagination] = useState({ currentPage: 1, itemsPerPage: 8 })
   const [femalePagination, setFemalePagination] = useState({ currentPage: 1, itemsPerPage: 8 })
 
-  // Pagination for unallocated participants (6 per page)
-  const [maleUnallocatedPagination, setMaleUnallocatedPagination] = useState({ currentPage: 1, itemsPerPage: 6 })
-  const [femaleUnallocatedPagination, setFemaleUnallocatedPagination] = useState({ currentPage: 1, itemsPerPage: 6 })
+  // Pagination for unallocated participants (12 per page)
+  const [maleUnallocatedPagination, setMaleUnallocatedPagination] = useState({ currentPage: 1, itemsPerPage: 12 })
+  const [femaleUnallocatedPagination, setFemaleUnallocatedPagination] = useState({ currentPage: 1, itemsPerPage: 12 })
 
   const { currentUser, isRole } = useUser()
   const { success: showSuccess, error: showError } = useToast()
@@ -466,14 +483,7 @@ function AccommodationsPageContent() {
     showToast('Manual allocation successful', 'success')
   }
 
-  const handleSettingsOpen = () => {
-    setShowSettingsModal(true)
-  }
 
-  const handleSettingsSaved = () => {
-    setShowSettingsModal(false)
-    showToast('Settings saved successfully', 'success')
-  }
 
 
 
@@ -559,20 +569,43 @@ function AccommodationsPageContent() {
     return filteredFemaleRooms.slice(startIndex, endIndex)
   }, [filteredFemaleRooms, femalePagination.currentPage, femalePagination.itemsPerPage])
 
+  // Filtered unallocated participants
+  const filteredMaleUnallocated = useMemo(() => {
+    const unallocated = unallocatedByGender.Male || []
+    if (!maleUnallocatedSearchTerm) return unallocated
+
+    const searchLower = maleUnallocatedSearchTerm.toLowerCase()
+    return unallocated.filter(participant =>
+      participant.fullName.toLowerCase().includes(searchLower) ||
+      participant.emailAddress.toLowerCase().includes(searchLower) ||
+      participant.gender.toLowerCase().includes(searchLower)
+    )
+  }, [unallocatedByGender.Male, maleUnallocatedSearchTerm])
+
+  const filteredFemaleUnallocated = useMemo(() => {
+    const unallocated = unallocatedByGender.Female || []
+    if (!femaleUnallocatedSearchTerm) return unallocated
+
+    const searchLower = femaleUnallocatedSearchTerm.toLowerCase()
+    return unallocated.filter(participant =>
+      participant.fullName.toLowerCase().includes(searchLower) ||
+      participant.emailAddress.toLowerCase().includes(searchLower) ||
+      participant.gender.toLowerCase().includes(searchLower)
+    )
+  }, [unallocatedByGender.Female, femaleUnallocatedSearchTerm])
+
   // Memoized pagination for unallocated participants
   const paginatedMaleUnallocated = useMemo(() => {
-    const unallocated = unallocatedByGender.Male || []
     const startIndex = (maleUnallocatedPagination.currentPage - 1) * maleUnallocatedPagination.itemsPerPage
     const endIndex = startIndex + maleUnallocatedPagination.itemsPerPage
-    return unallocated.slice(startIndex, endIndex)
-  }, [unallocatedByGender.Male, maleUnallocatedPagination.currentPage, maleUnallocatedPagination.itemsPerPage])
+    return filteredMaleUnallocated.slice(startIndex, endIndex)
+  }, [filteredMaleUnallocated, maleUnallocatedPagination.currentPage, maleUnallocatedPagination.itemsPerPage])
 
   const paginatedFemaleUnallocated = useMemo(() => {
-    const unallocated = unallocatedByGender.Female || []
     const startIndex = (femaleUnallocatedPagination.currentPage - 1) * femaleUnallocatedPagination.itemsPerPage
     const endIndex = startIndex + femaleUnallocatedPagination.itemsPerPage
-    return unallocated.slice(startIndex, endIndex)
-  }, [unallocatedByGender.Female, femaleUnallocatedPagination.currentPage, femaleUnallocatedPagination.itemsPerPage])
+    return filteredFemaleUnallocated.slice(startIndex, endIndex)
+  }, [filteredFemaleUnallocated, femaleUnallocatedPagination.currentPage, femaleUnallocatedPagination.itemsPerPage])
 
   const paginationInfo = useMemo(() => ({
     male: {
@@ -586,14 +619,16 @@ function AccommodationsPageContent() {
       originalTotal: roomsByGender.Female?.length || 0
     },
     maleUnallocated: {
-      totalPages: Math.ceil((unallocatedByGender.Male?.length || 0) / maleUnallocatedPagination.itemsPerPage),
-      totalItems: unallocatedByGender.Male?.length || 0,
+      totalPages: Math.ceil(filteredMaleUnallocated.length / maleUnallocatedPagination.itemsPerPage),
+      totalItems: filteredMaleUnallocated.length,
+      originalTotal: unallocatedByGender.Male?.length || 0,
       currentPage: maleUnallocatedPagination.currentPage,
       itemsPerPage: maleUnallocatedPagination.itemsPerPage
     },
     femaleUnallocated: {
-      totalPages: Math.ceil((unallocatedByGender.Female?.length || 0) / femaleUnallocatedPagination.itemsPerPage),
-      totalItems: unallocatedByGender.Female?.length || 0,
+      totalPages: Math.ceil(filteredFemaleUnallocated.length / femaleUnallocatedPagination.itemsPerPage),
+      totalItems: filteredFemaleUnallocated.length,
+      originalTotal: unallocatedByGender.Female?.length || 0,
       currentPage: femaleUnallocatedPagination.currentPage,
       itemsPerPage: femaleUnallocatedPagination.itemsPerPage
     }
@@ -604,6 +639,8 @@ function AccommodationsPageContent() {
     femalePagination.itemsPerPage,
     roomsByGender.Male?.length,
     roomsByGender.Female?.length,
+    filteredMaleUnallocated.length,
+    filteredFemaleUnallocated.length,
     unallocatedByGender.Male?.length,
     unallocatedByGender.Female?.length,
     maleUnallocatedPagination.currentPage,
@@ -611,6 +648,15 @@ function AccommodationsPageContent() {
     femaleUnallocatedPagination.currentPage,
     femaleUnallocatedPagination.itemsPerPage
   ])
+
+  // Reset pagination when search terms change
+  useEffect(() => {
+    setMaleUnallocatedPagination(prev => ({ ...prev, currentPage: 1 }))
+  }, [maleUnallocatedSearchTerm])
+
+  useEffect(() => {
+    setFemaleUnallocatedPagination(prev => ({ ...prev, currentPage: 1 }))
+  }, [femaleUnallocatedSearchTerm])
 
 
 
@@ -687,6 +733,150 @@ function AccommodationsPageContent() {
 
 
 
+  // Enhanced search functions
+  const generateSearchSuggestions = (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchSuggestions([])
+      return
+    }
+
+    console.log('🔍 Generating suggestions for:', searchTerm)
+
+    // Get unallocated participants
+    const unallocatedSuggestions = [
+      ...(unallocatedByGender.Male || []),
+      ...(unallocatedByGender.Female || [])
+    ]
+      .filter(participant =>
+        participant.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        participant.emailAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        participant.phoneNumber?.includes(searchTerm)
+      )
+      .map(participant => ({
+        name: participant.fullName,
+        status: 'unallocated' as const,
+        roomName: undefined,
+        roomId: undefined,
+        gender: participant.gender
+      }))
+
+    // Get allocated participants from rooms
+    const allocatedSuggestions = [
+      ...(roomsByGender.Male || []),
+      ...(roomsByGender.Female || [])
+    ].flatMap(room =>
+      room.participants
+        .filter(p =>
+          p.registration?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.registration?.emailAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.registration?.phoneNumber?.includes(searchTerm)
+        )
+        .map(p => ({
+          name: p.registration.fullName,
+          status: 'allocated' as const,
+          roomName: room.name,
+          roomId: room.id,
+          gender: p.registration.gender
+        }))
+    )
+
+    const allSuggestions = [...unallocatedSuggestions, ...allocatedSuggestions]
+
+    // Remove duplicates by name and limit to 5
+    const uniqueSuggestions = allSuggestions
+      .filter((suggestion, index, self) =>
+        index === self.findIndex(s => s.name === suggestion.name)
+      )
+      .slice(0, 5)
+
+    console.log('📝 Generated suggestions:', uniqueSuggestions)
+    setSearchSuggestions(uniqueSuggestions)
+  }
+
+  const handleSearchChange = (value: string) => {
+    setGlobalSearchTerm(value)
+    generateSearchSuggestions(value)
+  }
+
+  const handleSuggestionClick = (suggestion: { name: string; status: string; roomName?: string; roomId?: string; gender?: string }) => {
+    console.log('🎯 Suggestion clicked:', suggestion)
+    setGlobalSearchTerm(suggestion.name)
+    setShowSuggestions(false)
+
+    // Find the participant details
+    const foundParticipant = findParticipantByName(suggestion.name)
+    console.log('🔍 Found participant result:', foundParticipant)
+    setSelectedSearchResult(foundParticipant)
+  }
+
+  const findParticipantByName = (name: string) => {
+    console.log('🔍 Searching for participant:', name)
+
+    // Check unallocated participants
+    const allUnallocated = [
+      ...(unallocatedByGender.Male || []),
+      ...(unallocatedByGender.Female || [])
+    ]
+    const unallocatedMatch = allUnallocated.find(p => p.fullName === name)
+    if (unallocatedMatch) {
+      console.log('✅ Found in unallocated:', unallocatedMatch)
+      return {
+        id: unallocatedMatch.id,
+        fullName: unallocatedMatch.fullName,
+        emailAddress: unallocatedMatch.emailAddress,
+        phoneNumber: unallocatedMatch.phoneNumber,
+        gender: unallocatedMatch.gender,
+        dateOfBirth: unallocatedMatch.dateOfBirth,
+        branch: unallocatedMatch.branch,
+        status: 'unallocated',
+        roomName: null,
+        roomId: null,
+        roomDetails: null
+      }
+    }
+
+    // Check allocated participants in rooms
+    const allRooms = [
+      ...(roomsByGender.Male || []),
+      ...(roomsByGender.Female || [])
+    ]
+    for (const room of allRooms) {
+      const allocatedMatch = room.participants.find(p => p.registration?.fullName === name)
+      if (allocatedMatch) {
+        console.log('✅ Found in room:', room.name, allocatedMatch)
+        return {
+          id: allocatedMatch.id,
+          fullName: allocatedMatch.registration.fullName,
+          emailAddress: allocatedMatch.registration.emailAddress,
+          phoneNumber: allocatedMatch.registration.phoneNumber,
+          gender: allocatedMatch.registration.gender,
+          dateOfBirth: allocatedMatch.registration.dateOfBirth,
+          branch: allocatedMatch.registration.branch,
+          status: 'allocated',
+          roomName: room.name,
+          roomId: room.id,
+          roomDetails: {
+            roomNumber: room.roomNumber,
+            capacity: room.capacity,
+            occupancy: room.occupancy,
+            occupancyRate: room.occupancyRate,
+            floor: room.floor,
+            building: room.building
+          }
+        }
+      }
+    }
+
+    console.log('❌ Participant not found')
+    return null
+  }
+
+  const clearSearchResult = () => {
+    setGlobalSearchTerm('')
+    setSelectedSearchResult(null)
+    setSearchSuggestions([])
+  }
+
   // Remove loading screen - page shows immediately with progressive data loading
 
   // Check permissions - Allow all roles including Staff and Viewer
@@ -760,16 +950,7 @@ function AccommodationsPageContent() {
               </Button>
             )}
 
-            {(permissions.canAutoAllocate || permissions.canEditRooms) && (
-              <Button
-                onClick={handleSettingsOpen}
-                variant="outline"
-                className="font-apercu-medium border-gray-200 text-gray-700 hover:bg-gray-50 h-12 sm:h-10"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
-            )}
+
           </div>
         )}
 
@@ -814,6 +995,8 @@ function AccommodationsPageContent() {
           </div>
         )}
 
+
+
         {/* Search and Export */}
         <AccommodationSearchExport
           onPersonSelectAction={handlePersonPreview}
@@ -851,7 +1034,7 @@ function AccommodationsPageContent() {
                     <div className="flex items-center space-x-2">
                       <h3 className="font-apercu-bold text-sm sm:text-lg lg:text-xl text-blue-900 leading-tight">Unallocated Male Participants</h3>
                       <Badge className="bg-amber-100 text-amber-800 border-amber-200 font-apercu-medium text-xs">
-                        {unallocatedByGender.Male.length} unallocated
+                        {filteredMaleUnallocated.length} {maleUnallocatedSearchTerm ? 'found' : 'unallocated'}
                       </Badge>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -868,6 +1051,28 @@ function AccommodationsPageContent() {
 
 
 
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="mb-4">
+                    <div className="relative max-w-md">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-500" />
+                      <Input
+                        type="text"
+                        placeholder="Search by name, email, or gender..."
+                        value={maleUnallocatedSearchTerm}
+                        onChange={(e) => setMaleUnallocatedSearchTerm(e.target.value)}
+                        className="pl-10 pr-10 font-apercu-regular border-blue-200 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                      {maleUnallocatedSearchTerm && (
+                        <button
+                          onClick={() => setMaleUnallocatedSearchTerm('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-400 hover:text-blue-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -919,12 +1124,30 @@ function AccommodationsPageContent() {
                     )}
                   </div>
 
+                  {/* Empty State for Male Unallocated */}
+                  {!isLoading && !unallocatedLoading && filteredMaleUnallocated.length === 0 && maleUnallocatedSearchTerm && (
+                    <div className="text-center py-8 bg-white rounded-lg border border-blue-200">
+                      <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h4 className="font-apercu-medium text-base text-blue-700 mb-2">
+                        No participants found
+                      </h4>
+                      <p className="font-apercu-regular text-sm text-blue-600">
+                        Try adjusting your search terms or clear the search to see all participants.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Pagination for Male Unallocated Participants - Mobile Optimized */}
                   {paginationInfo.maleUnallocated.totalPages > 1 && (
                     <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mt-3 sm:mt-6 pt-3 sm:pt-4 border-t border-blue-100">
                       <div className="flex items-center justify-center sm:justify-start">
                         <span className="font-apercu-regular text-xs text-blue-700 text-center sm:text-left">
                           {((maleUnallocatedPagination.currentPage - 1) * maleUnallocatedPagination.itemsPerPage) + 1}-{Math.min(maleUnallocatedPagination.currentPage * maleUnallocatedPagination.itemsPerPage, paginationInfo.maleUnallocated.totalItems)} of {paginationInfo.maleUnallocated.totalItems}
+                          {maleUnallocatedSearchTerm && (
+                            <span className="ml-2 text-blue-600">• "{maleUnallocatedSearchTerm}"</span>
+                          )}
                         </span>
                       </div>
                       <div className="flex items-center justify-center space-x-1">
@@ -1148,7 +1371,7 @@ function AccommodationsPageContent() {
                     <div className="flex items-center space-x-2">
                       <h3 className="font-apercu-bold text-sm sm:text-lg lg:text-xl text-pink-900 leading-tight">Unallocated Female Participants</h3>
                       <Badge className="bg-amber-100 text-amber-800 border-amber-200 font-apercu-medium text-xs">
-                        {unallocatedByGender.Female.length} unallocated
+                        {filteredFemaleUnallocated.length} {femaleUnallocatedSearchTerm ? 'found' : 'unallocated'}
                       </Badge>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -1165,6 +1388,28 @@ function AccommodationsPageContent() {
 
 
 
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="mb-4">
+                    <div className="relative max-w-md">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-pink-500" />
+                      <Input
+                        type="text"
+                        placeholder="Search by name, email, or gender..."
+                        value={femaleUnallocatedSearchTerm}
+                        onChange={(e) => setFemaleUnallocatedSearchTerm(e.target.value)}
+                        className="pl-10 pr-10 font-apercu-regular border-pink-200 focus:border-pink-500 focus:ring-pink-500"
+                      />
+                      {femaleUnallocatedSearchTerm && (
+                        <button
+                          onClick={() => setFemaleUnallocatedSearchTerm('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-pink-400 hover:text-pink-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1216,12 +1461,30 @@ function AccommodationsPageContent() {
                     )}
                   </div>
 
+                  {/* Empty State for Female Unallocated */}
+                  {!isLoading && !unallocatedLoading && filteredFemaleUnallocated.length === 0 && femaleUnallocatedSearchTerm && (
+                    <div className="text-center py-8 bg-white rounded-lg border border-pink-200">
+                      <div className="h-12 w-12 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search className="h-6 w-6 text-pink-600" />
+                      </div>
+                      <h4 className="font-apercu-medium text-base text-pink-700 mb-2">
+                        No participants found
+                      </h4>
+                      <p className="font-apercu-regular text-sm text-pink-600">
+                        Try adjusting your search terms or clear the search to see all participants.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Pagination for Female Unallocated Participants - Mobile Optimized */}
                   {paginationInfo.femaleUnallocated.totalPages > 1 && (
                     <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mt-3 sm:mt-6 pt-3 sm:pt-4 border-t border-pink-100">
                       <div className="flex items-center justify-center sm:justify-start">
                         <span className="font-apercu-regular text-xs text-pink-700 text-center sm:text-left">
                           {((femaleUnallocatedPagination.currentPage - 1) * femaleUnallocatedPagination.itemsPerPage) + 1}-{Math.min(femaleUnallocatedPagination.currentPage * femaleUnallocatedPagination.itemsPerPage, paginationInfo.femaleUnallocated.totalItems)} of {paginationInfo.femaleUnallocated.totalItems}
+                          {femaleUnallocatedSearchTerm && (
+                            <span className="ml-2 text-pink-600">• "{femaleUnallocatedSearchTerm}"</span>
+                          )}
                         </span>
                       </div>
                       <div className="flex items-center justify-center space-x-1">
@@ -1463,11 +1726,7 @@ function AccommodationsPageContent() {
           onSuccess={handleManualAllocationSuccess}
         />
 
-        <AccommodationSettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => setShowSettingsModal(false)}
-          onSaved={handleSettingsSaved}
-        />
+
 
         {/* Person Preview Modal */}
         <PersonPreviewModal

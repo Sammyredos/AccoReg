@@ -1,20 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/contexts/ToastContext'
 import { parseApiError } from '@/lib/error-messages'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Loader2, Users } from 'lucide-react'
+import { X, Users } from 'lucide-react'
 
 interface PlatoonAllocation {
   id: string
@@ -23,326 +15,281 @@ interface PlatoonAllocation {
   label: string
   leaderPhone: string
   capacity: number
-  occupancy: number
-  occupancyRate: number
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+  participants?: any[]
+  occupancy?: number
+  occupancyRate?: number
 }
 
 interface PlatoonAllocationSetupModalProps {
   isOpen: boolean
-  onClose: () => void
-  onSave: () => void
-  onError?: (error: string) => void
+  onCloseAction: () => void
+  onSaveAction: () => void
   platoon?: PlatoonAllocation | null
 }
 
-export function PlatoonAllocationSetupModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  onError, 
-  platoon 
+export function PlatoonAllocationSetupModal({
+  isOpen,
+  onCloseAction,
+  onSaveAction,
+  platoon
 }: PlatoonAllocationSetupModalProps) {
+  const { success, error } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Safe toast function with better error handling
+  const safeShowToast = (message: string, type: 'success' | 'error') => {
+    try {
+      if (type === 'success') {
+        success(message)
+      } else if (type === 'error') {
+        error(message)
+      }
+    } catch (error) {
+      console.error('Error showing toast:', error, message)
+    }
+  }
   const [formData, setFormData] = useState({
     name: '',
     leaderName: '',
-    label: '',
     leaderPhone: '',
-    capacity: ''
+    capacity: 30
   })
-  const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const { success, error } = useToast()
-
-  const showToast = (title: string, type: 'success' | 'error' | 'warning' | 'info') => {
-    if (type === 'success') {
-      success(title)
-    } else if (type === 'error') {
-      error(title)
-    }
-  }
-
-  const isEditing = !!platoon
-
-  // Reset form when modal opens/closes or platoon changes
   useEffect(() => {
-    if (isOpen) {
-      if (platoon) {
-        // Editing existing platoon
-        setFormData({
-          name: platoon.name,
-          leaderName: platoon.leaderName,
-          label: platoon.label,
-          leaderPhone: platoon.leaderPhone,
-          capacity: platoon.capacity.toString()
-        })
-      } else {
-        // Creating new platoon
-        setFormData({
-          name: '',
-          leaderName: '',
-          label: '',
-          leaderPhone: '',
-          capacity: ''
-        })
-      }
-      setErrors({})
+    if (platoon) {
+      setFormData({
+        name: platoon.name,
+        leaderName: platoon.leaderName,
+        leaderPhone: platoon.leaderPhone,
+        capacity: platoon.capacity
+      })
+    } else {
+      setFormData({
+        name: '',
+        leaderName: '',
+        leaderPhone: '',
+        capacity: 30
+      })
     }
-  }, [isOpen, platoon])
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Platoon name is required'
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Platoon name must be at least 2 characters'
-    } else if (formData.name.trim().length > 50) {
-      newErrors.name = 'Platoon name must be less than 50 characters'
-    }
-
-    if (!formData.leaderName.trim()) {
-      newErrors.leaderName = 'Leader name is required'
-    } else if (formData.leaderName.trim().length < 2) {
-      newErrors.leaderName = 'Leader name must be at least 2 characters'
-    } else if (formData.leaderName.trim().length > 50) {
-      newErrors.leaderName = 'Leader name must be less than 50 characters'
-    }
-
-    if (!formData.label.trim()) {
-      newErrors.label = 'Platoon label is required'
-    } else if (formData.label.trim().length < 1) {
-      newErrors.label = 'Platoon label must be at least 1 character'
-    } else if (formData.label.trim().length > 20) {
-      newErrors.label = 'Platoon label must be less than 20 characters'
-    }
-
-    if (!formData.leaderPhone.trim()) {
-      newErrors.leaderPhone = 'Leader phone number is required'
-    } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(formData.leaderPhone.trim())) {
-      newErrors.leaderPhone = 'Please enter a valid phone number'
-    }
-
-    const capacity = parseInt(formData.capacity)
-    if (!formData.capacity) {
-      newErrors.capacity = 'Capacity is required'
-    } else if (isNaN(capacity) || capacity < 1) {
-      newErrors.capacity = 'Capacity must be at least 1'
-    } else if (capacity > 200) {
-      newErrors.capacity = 'Capacity cannot exceed 200'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+  }, [platoon, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!validateForm()) {
+    // Client-side validation with toaster feedback
+    if (!formData.name.trim()) {
+      safeShowToast('Please enter a platoon name', 'error')
+      return
+    }
+    if (!formData.leaderName.trim()) {
+      safeShowToast('Please enter the leader name', 'error')
       return
     }
 
-    setLoading(true)
+    if (!formData.leaderPhone.trim()) {
+      safeShowToast('Please enter the leader phone number', 'error')
+      return
+    }
+    if (formData.capacity < 1 || formData.capacity > 200) {
+      safeShowToast('Platoon capacity must be between 1 and 200', 'error')
+      return
+    }
+
+    setIsLoading(true)
 
     try {
-      const url = isEditing ? `/api/admin/platoon-allocations/${platoon.id}` : '/api/admin/platoon-allocations'
-      const method = isEditing ? 'PUT' : 'POST'
+      const url = platoon
+        ? `/api/admin/platoon-allocations/${platoon.id}`
+        : '/api/admin/platoon-allocations'
+
+      const method = platoon ? 'PUT' : 'POST'
+
+      // Ensure capacity is a number
+      const requestData = {
+        ...formData,
+        capacity: parseInt(formData.capacity.toString())
+      }
+
+      console.log('🚀 Sending platoon data:', requestData)
 
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          leaderName: formData.leaderName.trim(),
-          label: formData.label.trim(),
-          leaderPhone: formData.leaderPhone.trim(),
-          capacity: parseInt(formData.capacity)
-        }),
+        body: JSON.stringify(requestData),
       })
 
+      const responseData = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} platoon`)
+        const errorMsg = responseData.message || responseData.error || 'Failed to save platoon'
+
+        // Check if it's a duplicate name error and show it in the form
+        if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
+          if (errorMsg.toLowerCase().includes('name')) {
+            setErrors(prev => ({ ...prev, name: 'A platoon with this name already exists. Please choose a different name.' }))
+          }
+        }
+
+        throw new Error(errorMsg)
       }
 
-      showToast(
-        `Platoon ${isEditing ? 'updated' : 'created'} successfully!`,
-        'success'
-      )
+      // Trigger refresh first
+      onSaveAction()
 
-      onSave()
+      // Close modal immediately
+      onCloseAction()
+
+      // Show success notification after modal closes to ensure it's visible
+      const successMessage = platoon
+        ? `Platoon "${formData.name}" updated successfully`
+        : `Platoon "${formData.name}" created successfully`
+
+      setTimeout(() => {
+        safeShowToast(successMessage, 'success')
+      }, 100)
     } catch (error) {
       console.error('Error saving platoon:', error)
       const errorMessage = parseApiError(error)
-      showToast(errorMessage, 'error')
-      if (onError) {
-        onError(errorMessage)
-      }
+      safeShowToast(String(errorMessage), 'error')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const handleClose = () => {
-    if (!loading) {
-      onClose()
-    }
-  }
+  if (!isOpen) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl mx-4 sm:mx-0">
-        <DialogHeader>
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Users className="h-5 w-5 text-white" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 sm:p-6 border-b border-indigo-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-gradient-to-br from-white/20 to-white/10 rounded-xl flex items-center justify-center shadow-lg">
+                <Users className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="font-apercu-bold text-lg text-white">
+                  {platoon ? 'Edit Platoon' : 'Create New Platoon'}
+                </h2>
+                <p className="font-apercu-regular text-sm text-indigo-100">
+                  {platoon ? 'Update platoon details and settings' : 'Set up a new platoon for participant allocation'}
+                </p>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="font-apercu-bold text-lg">
-                {isEditing ? 'Edit Platoon' : 'Create New Platoon'}
-              </DialogTitle>
-              <DialogDescription className="font-apercu-regular">
-                {isEditing ? 'Update platoon details and settings' : 'Set up a new platoon for participant allocation'}
-              </DialogDescription>
-            </div>
+            <Button
+              onClick={onCloseAction}
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-white hover:bg-white/10"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-        </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Platoon Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name" className="font-apercu-medium">
-                Platoon Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., Alpha Platoon"
-                className={`font-apercu-regular ${errors.name ? 'border-red-500 focus:border-red-500' : ''}`}
-                disabled={loading}
-              />
-              {errors.name && (
-                <p className="text-red-500 text-xs font-apercu-regular">{errors.name}</p>
-              )}
-            </div>
-
-            {/* Platoon Label */}
-            <div className="space-y-2">
-              <Label htmlFor="label" className="font-apercu-medium">
-                Platoon Label <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="label"
-                type="text"
-                value={formData.label}
-                onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
-                placeholder="e.g., A1, B2, Charlie"
-                className={`font-apercu-regular ${errors.label ? 'border-red-500 focus:border-red-500' : ''}`}
-                disabled={loading}
-              />
-              {errors.label && (
-                <p className="text-red-500 text-xs font-apercu-regular">{errors.label}</p>
-              )}
-            </div>
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <div>
+            <Label htmlFor="name" className="font-apercu-medium text-sm text-gray-700">
+              Platoon Name *
+            </Label>
+            <Input
+              id="name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, name: e.target.value }))
+                // Clear name error when user starts typing
+                if (errors.name) {
+                  setErrors(prev => ({ ...prev, name: '' }))
+                }
+              }}
+              placeholder="e.g., Alpha Platoon"
+              required
+              className={`mt-1 ${errors.name ? 'border-red-300 focus:border-red-500' : ''}`}
+              disabled={isLoading}
+            />
+            {errors.name && (
+              <p className="text-sm text-red-600 font-apercu-medium mt-1">{errors.name}</p>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Leader Name */}
-            <div className="space-y-2">
-              <Label htmlFor="leaderName" className="font-apercu-medium">
-                Platoon Leader Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="leaderName"
-                type="text"
-                value={formData.leaderName}
-                onChange={(e) => setFormData(prev => ({ ...prev, leaderName: e.target.value }))}
-                placeholder="e.g., John Smith"
-                className={`font-apercu-regular ${errors.leaderName ? 'border-red-500 focus:border-red-500' : ''}`}
-                disabled={loading}
-              />
-              {errors.leaderName && (
-                <p className="text-red-500 text-xs font-apercu-regular">{errors.leaderName}</p>
-              )}
-            </div>
 
-            {/* Leader Phone */}
-            <div className="space-y-2">
-              <Label htmlFor="leaderPhone" className="font-apercu-medium">
-                Leader Phone Number <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="leaderPhone"
-                type="tel"
-                value={formData.leaderPhone}
-                onChange={(e) => setFormData(prev => ({ ...prev, leaderPhone: e.target.value }))}
-                placeholder="e.g., +1234567890"
-                className={`font-apercu-regular ${errors.leaderPhone ? 'border-red-500 focus:border-red-500' : ''}`}
-                disabled={loading}
-              />
-              {errors.leaderPhone && (
-                <p className="text-red-500 text-xs font-apercu-regular">{errors.leaderPhone}</p>
-              )}
-            </div>
+
+          <div>
+            <Label htmlFor="leaderName" className="font-apercu-medium text-sm text-gray-700">
+              Leader Name *
+            </Label>
+            <Input
+              id="leaderName"
+              type="text"
+              value={formData.leaderName}
+              onChange={(e) => setFormData(prev => ({ ...prev, leaderName: e.target.value }))}
+              placeholder="e.g., John Smith"
+              required
+              className="mt-1"
+            />
           </div>
 
-          {/* Capacity */}
-          <div className="space-y-2">
-            <Label htmlFor="capacity" className="font-apercu-medium">
-              Capacity <span className="text-red-500">*</span>
+          <div>
+            <Label htmlFor="leaderPhone" className="font-apercu-medium text-sm text-gray-700">
+              Leader Phone *
+            </Label>
+            <Input
+              id="leaderPhone"
+              type="tel"
+              value={formData.leaderPhone}
+              onChange={(e) => setFormData(prev => ({ ...prev, leaderPhone: e.target.value }))}
+              placeholder="e.g., +1234567890"
+              required
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="capacity" className="font-apercu-medium text-sm text-gray-700">
+              Capacity *
             </Label>
             <Input
               id="capacity"
               type="number"
-              min="1"
-              max="200"
               value={formData.capacity}
-              onChange={(e) => setFormData(prev => ({ ...prev, capacity: e.target.value }))}
-              placeholder="Maximum number of participants"
-              className={`font-apercu-regular ${errors.capacity ? 'border-red-500 focus:border-red-500' : ''}`}
-              disabled={loading}
+              onChange={(e) => setFormData(prev => ({ ...prev, capacity: parseInt(e.target.value) || 0 }))}
+              min="1"
+              max="100"
+              required
+              className="mt-1"
             />
-            {errors.capacity && (
-              <p className="text-red-500 text-xs font-apercu-regular">{errors.capacity}</p>
-            )}
           </div>
 
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+
+
+          <div className="flex gap-3 pt-4">
             <Button
               type="button"
+              onClick={onCloseAction}
               variant="outline"
-              onClick={handleClose}
-              disabled={loading}
-              className="font-apercu-medium"
+              className="flex-1 font-apercu-medium"
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={loading}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 font-apercu-medium"
+              className="flex-1 font-apercu-medium bg-indigo-600 hover:bg-indigo-700"
+              disabled={isLoading}
             >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isEditing ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                <>
-                  <Users className="h-4 w-4 mr-2" />
-                  {isEditing ? 'Update Platoon' : 'Create Platoon'}
-                </>
-              )}
+              {isLoading ? 'Saving...' : platoon ? 'Update Platoon' : 'Create Platoon'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
