@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Check, Users, Heart, Shield, Baby, Calendar, Search, AlertTriangle, X } from 'lucide-react'
+import { ArrowLeft, Check, Users, Shield, Baby, Calendar } from 'lucide-react'
 
 interface FormData {
   fullName: string
@@ -31,15 +31,7 @@ interface RegistrationSettings {
   minimumAge: number
 }
 
-interface SimilarChild {
-  id: string
-  fullName: string
-  parentGuardianEmail: string
-  parentGuardianPhone: string
-  age: number
-  gender: string
-  registrationDate: string
-}
+
 
 // Helper function to get initial form data
 const getInitialFormData = (): FormData => ({
@@ -70,15 +62,9 @@ function ChildrenRegistrationContent() {
   const [userAge, setUserAge] = useState<number | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [stepTransitioning, setStepTransitioning] = useState(false)
+  const [dataTransferred, setDataTransferred] = useState(false)
 
-  // Real-time search state
-  const [searchResults, setSearchResults] = useState<SimilarChild[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [showSearchResults, setShowSearchResults] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Prefill state
-  const [isPrefilled, setIsPrefilled] = useState(false)
 
   useEffect(() => {
     // Load registration settings (same API as main registration form)
@@ -121,7 +107,7 @@ function ChildrenRegistrationContent() {
     }
   }, [searchParams])
 
-  // Prefill form data from URL parameters (when coming from main registration form)
+  // Handle incoming data from main registration form
   useEffect(() => {
     const name = searchParams.get('name')
     const dob = searchParams.get('dob')
@@ -131,45 +117,44 @@ function ChildrenRegistrationContent() {
     const phone = searchParams.get('phone')
     const email = searchParams.get('email')
 
-    // Only prefill if we have data and we're not in edit mode
-    if ((name || dob || gender || address || branch || phone || email) && !isEditMode) {
-      console.log('🔄 Prefilling children form with parent/guardian data from main registration form')
+    // Only populate if we have data and not in edit mode
+    if ((name || dob || gender || address || branch) && !isEditMode) {
+      console.log('📋 Populating children form with data from main form:', {
+        name, dob, gender, address, branch, phone, email
+      })
 
       setFormData(prev => ({
         ...prev,
-        // Keep child fields empty - they need to be filled for the child
-        fullName: prev.fullName,
-        dateOfBirth: prev.dateOfBirth,
-        gender: prev.gender,
-        // Use address and branch from main form (family info)
+        fullName: name || prev.fullName,
+        dateOfBirth: dob || prev.dateOfBirth,
+        gender: gender || prev.gender,
         address: address || prev.address,
         branch: branch || prev.branch,
-        // Map parent/guardian info from main form (the person who was registering)
-        parentGuardianName: name || prev.parentGuardianName,
+        // Use phone and email as parent/guardian info if provided
         parentGuardianPhone: phone || prev.parentGuardianPhone,
         parentGuardianEmail: email || prev.parentGuardianEmail
       }))
 
-      // Set prefilled state to show notification
-      setIsPrefilled(true)
+      // Set flag to show data was transferred
+      setDataTransferred(true)
 
-      // Clear URL parameters after prefilling to keep URL clean
+      // Clear URL parameters after populating form to prevent re-population
       const url = new URL(window.location.href)
-      const hasParams = url.searchParams.has('name') || url.searchParams.has('dob') ||
-                       url.searchParams.has('gender') || url.searchParams.has('address') ||
-                       url.searchParams.has('branch') || url.searchParams.has('phone') ||
-                       url.searchParams.has('email')
+      url.searchParams.delete('name')
+      url.searchParams.delete('dob')
+      url.searchParams.delete('gender')
+      url.searchParams.delete('address')
+      url.searchParams.delete('branch')
+      url.searchParams.delete('phone')
+      url.searchParams.delete('email')
+      window.history.replaceState({}, '', url.toString())
 
-      if (hasParams) {
-        url.searchParams.delete('name')
-        url.searchParams.delete('dob')
-        url.searchParams.delete('gender')
-        url.searchParams.delete('address')
-        url.searchParams.delete('branch')
-        url.searchParams.delete('phone')
-        url.searchParams.delete('email')
-        window.history.replaceState({}, '', url.toString())
-      }
+      console.log('✅ Form populated and URL parameters cleared')
+
+      // Hide the transfer notification after 5 seconds
+      setTimeout(() => {
+        setDataTransferred(false)
+      }, 5000)
     }
   }, [searchParams, isEditMode])
 
@@ -238,62 +223,8 @@ function ChildrenRegistrationContent() {
     setStepTransitioning(false)
     setShowAgeModal(false)
     setUserAge(null)
-    setSearchResults([])
-    setShowSearchResults(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-
-  // Real-time search for similar children
-  const searchSimilarChildren = async (name: string) => {
-    if (!name || name.length < 2) {
-      setSearchResults([])
-      setShowSearchResults(false)
-      return
-    }
-
-    setIsSearching(true)
-    try {
-      const response = await fetch('/api/registrations/children/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ searchTerm: name }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data.results || [])
-        setShowSearchResults(data.results && data.results.length > 0)
-      }
-    } catch (error) {
-      console.error('Error searching for similar children:', error)
-    } finally {
-      setIsSearching(false)
-    }
-  }
-
-  // Debounced search effect
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    if (formData.fullName) {
-      searchTimeoutRef.current = setTimeout(() => {
-        searchSimilarChildren(formData.fullName)
-      }, 300) // 300ms debounce delay
-    } else {
-      setSearchResults([])
-      setShowSearchResults(false)
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [formData.fullName])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -807,6 +738,27 @@ function ChildrenRegistrationContent() {
           </div>
         </div>
 
+        {/* Data Transfer Notification */}
+        {dataTransferred && (
+          <div className="mb-6 mx-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Check className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-apercu-medium text-green-800">
+                    Information transferred successfully!
+                  </p>
+                  <p className="text-xs font-apercu-regular text-green-700 mt-1">
+                    Your basic information has been copied from the main registration form. Please complete the remaining fields.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Back to Main Registration */}
         <div className="mb-4 sm:mb-6">
           <Button
@@ -950,32 +902,6 @@ function ChildrenRegistrationContent() {
                   </div>
                 </div>
 
-                {/* Prefill Notification */}
-                {isPrefilled && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center">
-                      <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-apercu-medium text-green-800">
-                          Parent/Guardian information prefilled from main registration
-                        </p>
-                        <p className="text-xs text-green-600 mt-1">
-                          Please fill in your child's information below
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => setIsPrefilled(false)}
-                        variant="ghost"
-                        size="sm"
-                        className="ml-auto text-green-600 hover:text-green-700 hover:bg-green-100"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Step 1: Child Information */}
                 {currentStep === 1 && (
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-6 border border-blue-100">
@@ -1006,48 +932,7 @@ function ChildrenRegistrationContent() {
                           }`}
                           placeholder="Enter child's full name"
                         />
-                        {isSearching && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <Search className="h-4 w-4 text-gray-400 animate-pulse" />
-                          </div>
-                        )}
                       </div>
-
-                      {/* Search Results */}
-                      {showSearchResults && searchResults.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          <div className="p-3 border-b border-gray-100 bg-yellow-50">
-                            <div className="flex items-center text-yellow-800">
-                              <AlertTriangle className="h-4 w-4 mr-2" />
-                              <span className="text-sm font-apercu-medium">Similar registrations found</span>
-                            </div>
-                          </div>
-                          {searchResults.map((child) => (
-                            <div key={child.id} className="p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <p className="font-apercu-medium text-gray-900 text-sm">{child.fullName}</p>
-                                  <p className="text-xs text-gray-600 mt-1">
-                                    {child.gender}, Age {child.age} • Parent: {child.parentGuardianEmail}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    Registered: {new Date(child.registrationDate).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setShowSearchResults(false)}
-                              className="text-xs text-gray-500 hover:text-gray-700 font-apercu-regular"
-                            >
-                              Close
-                            </button>
-                          </div>
-                        </div>
-                      )}
 
                       {getFieldError('fullName') && (
                         <p className="text-red-600 text-xs sm:text-sm font-apercu-regular">{getFieldError('fullName')}</p>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
+import { prisma } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,8 +16,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // For mock data, skip database user validation
-    console.log('⚠️ Using mock authentication for manual platoon allocation')
+    // Get user details from database
+    const user = await prisma.admin.findUnique({
+      where: { id: payload.adminId },
+      include: {
+        role: {
+          include: {
+            permissions: true
+          }
+        }
+      }
+    })
+
+    if (!user || !user.isActive) {
+      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
+    }
+
+    // Check if user has permission to manually allocate participants (matching accommodations permissions)
+    const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff']
+    if (!allowedRoles.includes(user.role?.name || '')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { participantId, platoonId } = body

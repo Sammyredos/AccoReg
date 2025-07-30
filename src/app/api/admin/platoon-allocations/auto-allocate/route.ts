@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
     }
 
-    // Check if user has permission to allocate participants
-    const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff']
+    // Check if user has permission to auto-allocate participants (matching accommodations permissions)
+    const allowedRoles = ['Super Admin', 'Admin', 'Manager']
     if (!allowedRoles.includes(user.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }

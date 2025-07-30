@@ -134,19 +134,20 @@ function AllocatePlatoonPageContent() {
 
   const { currentUser } = useUser()
 
-  // Permission checks
+  // Memoized permission helpers - matching accommodations page exactly
   const permissions = useMemo(() => {
     const userRole = currentUser?.role?.name || ''
     return {
-      canCreatePlatoons: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
+      canExport: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
+      canAutoAllocate: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
       canEditPlatoons: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
-      canDeletePlatoons: ['Super Admin', 'Admin'].includes(userRole),
-      canAllocateParticipants: ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(userRole),
-      canRemoveAllocations: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
-      canViewPersonDetails: ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'].includes(userRole),
-      canExportData: ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(userRole),
+      canCreatePlatoons: ['Super Admin', 'Admin', 'Manager'].includes(userRole),
+      canViewPersonDetails: ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(userRole),
+      canRemoveAllocations: ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(userRole),
+
+      isViewerOnly: userRole === 'Viewer'
     }
-  }, [currentUser])
+  }, [currentUser?.role?.name])
 
   const { success, error } = useToast()
 
@@ -830,7 +831,7 @@ function AllocatePlatoonPageContent() {
               </Button>
             )}
 
-            {permissions.canAllocateParticipants && (
+            {permissions.canAutoAllocate && (
               <div className="flex flex-col sm:flex-row gap-3 w-full">
                 <Button
                   onClick={handleAutoAllocateConfirm}
@@ -904,29 +905,35 @@ function AllocatePlatoonPageContent() {
             )}
 
             {/* Export and Scan Buttons - On next line like accommodations page */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportCSV}
-                className="font-apercu-medium w-full sm:w-auto flex items-center justify-center sm:justify-start transition-all duration-200 hover:shadow-sm"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportPDF}
-                className="font-apercu-medium w-full sm:w-auto flex items-center justify-center sm:justify-start transition-all duration-200 hover:shadow-sm"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Export PDF
-              </Button>
-
-            </div>
+            {permissions.canExport && (
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCSV}
+                  className="font-apercu-medium w-full sm:w-auto flex items-center justify-center sm:justify-start transition-all duration-200 hover:shadow-sm"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  className="font-apercu-medium w-full sm:w-auto flex items-center justify-center sm:justify-start transition-all duration-200 hover:shadow-sm"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </div>
+            )}
           </div>
+        </div>
+      </div>
 
+      {/* Search Results Section */}
+      <div className="space-y-6 mb-6 sm:mb-8">
+        <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 lg:p-6 shadow-sm">
           {/* Search Results - List View like accommodations page */}
           {globalSearchTerm && (
             <div className="mt-4 pt-4 border-t border-gray-200">
