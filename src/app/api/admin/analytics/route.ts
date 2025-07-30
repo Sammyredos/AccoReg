@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
-
-const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +16,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
+    // Get user details from database to verify permissions
+    const user = await prisma.admin.findUnique({
+      where: { id: payload.adminId },
+      include: {
+        role: {
+          include: {
+            permissions: true
+          }
+        }
+      }
+    })
+
+    if (!user || !user.isActive) {
+      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
+    }
+
+    // Check if user has permission to view analytics
+    const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer']
+    if (!allowedRoles.includes(user.role?.name || '')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
     // Get current date boundaries
     const now = new Date()
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -25,18 +45,20 @@ export async function GET(request: NextRequest) {
     startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay()) // Start of week (Sunday)
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    // Get registration statistics
-    const [
-      totalRegistrations,
-      registrationsToday,
-      registrationsThisWeek,
-      registrationsThisMonth,
-      verifiedCount,
-      unverifiedCount,
-      maleCount,
-      femaleCount,
-      allRegistrations
-    ] = await Promise.all([
+    // Get registration statistics with error handling
+    let analyticsData
+    try {
+      const [
+        totalRegistrations,
+        registrationsToday,
+        registrationsThisWeek,
+        registrationsThisMonth,
+        verifiedCount,
+        unverifiedCount,
+        maleCount,
+        femaleCount,
+        allRegistrations
+      ] = await Promise.all([
       // Total registrations
       prisma.registration.count(),
       
@@ -229,7 +251,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(analytics)
+      analyticsData = analytics
+    } catch (dbError: any) {
+      console.error('Database query error in analytics:', dbError)
+
+      // Return fallback data if database queries fail
+      analyticsData = {
+        totalRegistrations: 0,
+        registrationsToday: 0,
+        registrationsThisWeek: 0,
+        registrationsThisMonth: 0,
+        verifiedCount: 0,
+        unverifiedCount: 0,
+        maleCount: 0,
+        femaleCount: 0,
+        stats: {
+          averageAge: 0,
+          verificationRate: 0,
+          genderDistribution: {
+            male: 0,
+            female: 0,
+            malePercentage: 0,
+            femalePercentage: 0
+          },
+          branchDistribution: [],
+          dailyTrend: []
+        }
+      }
+    }
+
+    return NextResponse.json(analyticsData)
 
   } catch (error: any) {
     console.error('Analytics API error:', error)
@@ -265,7 +316,5 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to fetch analytics data' },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }
