@@ -195,8 +195,8 @@ function AllocatePlatoonPageContent() {
     } catch (error) {
       console.error('Error fetching allocation data:', error)
       const errorMessage = parseApiError(error)
-      setErrorMessage(String(errorMessage))
-      showToast(String(errorMessage), 'error')
+      setErrorMessage(errorMessage.description)
+      showToast(errorMessage.description, 'error')
     } finally {
       setIsLoading(false)
     }
@@ -588,7 +588,7 @@ function AllocatePlatoonPageContent() {
     } catch (error) {
       console.error('Error auto-allocating:', error)
       const errorMessage = parseApiError(error)
-      showToast(String(errorMessage), 'error')
+      showToast(errorMessage.description, 'error')
     } finally {
       setIsAutoAllocating(false)
     }
@@ -619,7 +619,7 @@ function AllocatePlatoonPageContent() {
     } catch (error) {
       console.error('Error emptying platoon:', error)
       const errorMessage = parseApiError(error)
-      showToast(String(errorMessage), 'error')
+      showToast(errorMessage.description, 'error')
     } finally {
       setLoadingPlatoonId(null)
       setLoadingAction(null)
