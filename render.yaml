@@ -119,6 +119,8 @@ services:
         value: true
       - key: ENABLE_ROOM_ALLOCATION
         value: true
+      - key: ENABLE_PLATOON_ALLOCATION
+        value: true
       - key: ENABLE_QR_VERIFICATION
         value: true
       - key: ENABLE_BULK_OPERATIONS
