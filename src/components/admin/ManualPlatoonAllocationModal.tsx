@@ -150,7 +150,7 @@ export function ManualPlatoonAllocationModal({
       const availableSpaces = selectedPlatoon.capacity - currentCount
 
       if (selectedParticipants.length > availableSpaces) {
-        showToast(`Platoon only has ${availableSpaces} available spaces, but you selected ${selectedParticipants.length} participants`, 'error')
+        showToast('Platoon only has ' + availableSpaces + ' available spaces, but you selected ' + selectedParticipants.length + ' participants', 'error')
         setAllocating(false)
         return
       }
@@ -185,12 +185,12 @@ export function ManualPlatoonAllocationModal({
 
       if (failedAllocations.length > 0) {
         const failedNames = failedAllocations.map(f => f.participant.fullName).join(', ')
-        showToast(`Failed to allocate: ${failedNames}`, 'error')
+        showToast('Failed to allocate: ' + failedNames, 'error')
       }
 
       const successCount = selectedParticipants.length - failedAllocations.length
       if (successCount > 0) {
-        showToast(`Successfully allocated ${successCount} participant${successCount > 1 ? 's' : ''} to ${selectedPlatoon.name}`, 'success')
+        showToast('Successfully allocated ' + successCount + ' participant' + (successCount > 1 ? 's' : '') + ' to ' + selectedPlatoon.name, 'success')
         onSuccess()
         onClose()
       }
