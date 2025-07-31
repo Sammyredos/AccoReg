@@ -130,17 +130,7 @@ export async function GET(request: NextRequest) {
     const totalCapacity = accommodationData.totalCapacity._sum.capacity || 0
     const occupiedSpaces = accommodationData.occupiedSpaces || 0
 
-    // Debug logging for accommodation statistics
-    console.log('🏠 Accommodation Stats Debug:', {
-      totalRegistrations: accommodationData.totalRegistrations,
-      verifiedRegistrations: accommodationData.verifiedRegistrations,
-      allocatedRegistrations: accommodationData.allocatedRegistrations,
-      actualUnallocatedCount,
-      unallocatedFromQuery: unallocatedRegistrations.length,
-      totalCapacity,
-      occupiedSpaces,
-      calculation: totalCapacity > 0 ? Math.round((occupiedSpaces / totalCapacity) * 100) : 0
-    })
+
 
     const stats = {
       totalRegistrations: accommodationData.totalRegistrations,

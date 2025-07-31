@@ -1,49 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 
 // GET - Fetch all platoon allocation data
 export async function GET(request: NextRequest) {
   try {
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    // Get user details from database
-    const user = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
-      include: {
-        role: {
-          include: {
-            permissions: true
-          }
-        }
-      }
-    })
-
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
+    const currentUser = authResult.user!
 
     // Check if user has permission to view platoon allocations
-    const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer']
-    if (!allowedRoles.includes(user.role?.name || '')) {
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Temporary workaround: Return mock data until Prisma client is updated
-    // Reduced logging frequency to avoid console spam
-    if (Math.random() < 0.1) { // Only log 10% of the time
-      console.log('⚠️ Platoon models not available in Prisma client. Returning mock data.')
-    }
+
 
     // Fetch verified participants
     const allVerifiedParticipants = await prisma.registration.findMany({
@@ -64,23 +39,9 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Initialize empty mock platoons data if not exists
-    if (!global.mockPlatoons) {
-      global.mockPlatoons = []
-    }
-    const platoons = global.mockPlatoons
-
-    // Get all allocated participant IDs from mock platoons
+    // TODO: Replace with actual platoon database queries when Prisma schema is updated
+    const platoons = []
     const allocatedParticipantIds = new Set()
-    if (global.mockPlatoons) {
-      global.mockPlatoons.forEach(platoon => {
-        if (platoon.participants) {
-          platoon.participants.forEach(participant => {
-            allocatedParticipantIds.add(participant.registration.id)
-          })
-        }
-      })
-    }
 
     // Filter out already allocated participants
     const unallocatedParticipants = allVerifiedParticipants.filter(
@@ -122,37 +83,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new platoon
 export async function POST(request: NextRequest) {
   try {
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    // Get user details from database
-    const user = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
-      include: {
-        role: {
-          include: {
-            permissions: true
-          }
-        }
-      }
-    })
-
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
+    const currentUser = authResult.user!
 
     // Check if user has permission to create platoons
-    const allowedRoles = ['Super Admin', 'Admin', 'Manager']
-    if (!allowedRoles.includes(user.role?.name || '')) {
+    if (!['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -210,32 +150,11 @@ export async function POST(request: NextRequest) {
 
 
     // For now, create a mock platoon response until database is properly set up
-    console.log('⚠️ Creating mock platoon until database schema is updated')
-
-    const mockPlatoon = {
-      id: `mock-${Date.now()}`,
-      name: name.trim(),
-      leaderName: leaderName.trim(),
-      leaderPhone: leaderPhone.trim(),
-      capacity: parseInt(capacity),
-      createdBy: user.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      participants: [] // Add empty participants array
-    }
-
-    // Add to mock data store (in memory for now)
-    if (!global.mockPlatoons) {
-      global.mockPlatoons = []
-    }
-    global.mockPlatoons.push(mockPlatoon)
-
-    console.log(`✅ Successfully created platoon "${mockPlatoon.name}"`)
-
+    // TODO: Implement actual platoon creation when Prisma schema is updated
     return NextResponse.json({
-      ...mockPlatoon,
-      message: `Platoon "${mockPlatoon.name}" created successfully`
-    }, { status: 201 })
+      success: false,
+      message: 'Platoon creation not yet implemented - database schema pending'
+    }, { status: 501 })
 
   } catch (error) {
     console.error('Error creating platoon:', error)

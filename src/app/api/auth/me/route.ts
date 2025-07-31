@@ -8,17 +8,13 @@ export async function GET(request: NextRequest) {
   try {
     // Get token from cookie
     const token = request.cookies.get('auth-token')?.value
-    console.log('Auth check - Token present:', !!token)
     if (!token) {
-      console.log('Auth check - No token found in cookies')
       return NextResponse.json({ error: 'No token provided' }, { status: 401 })
     }
 
     // Verify token
     const payload = verifyToken(token)
-    console.log('Auth check - Token valid:', !!payload)
     if (!payload) {
-      console.log('Auth check - Token verification failed')
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 

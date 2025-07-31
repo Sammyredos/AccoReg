@@ -6,19 +6,15 @@ const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Send email API called')
-
     // Get token from cookie (same as /api/auth/me)
     const token = request.cookies.get('auth-token')?.value
     if (!token) {
-      console.log('No token found in cookies')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Verify token
     const payload = verifyToken(token)
     if (!payload) {
-      console.log('Invalid token')
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 

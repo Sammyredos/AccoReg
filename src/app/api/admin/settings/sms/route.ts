@@ -223,7 +223,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
     }
 
-    console.log('SMS settings PUT request body:', body) // Debug log
+
 
     // Create schema based on environment
     const isDevelopment = process.env.NODE_ENV === 'development'

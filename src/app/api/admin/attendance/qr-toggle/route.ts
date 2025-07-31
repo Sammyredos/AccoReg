@@ -15,12 +15,9 @@ const logger = new Logger('QRToggle')
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔍 QR Toggle API called')
-
     // Authenticate user
     const authResult = await authenticateRequest(request)
     if (!authResult.success) {
-      console.log('❌ Authentication failed:', authResult.error)
       return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
