@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth-helpers'
+import { prisma } from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
@@ -8,49 +9,53 @@ export async function POST(
   try {
     const { id: platoonId } = await params
 
-    // Verify authentication
-    const token = request.headers.get('authorization')?.replace('Bearer ', '') || 
-                  request.cookies.get('auth-token')?.value
-
-    if (!token) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    const payload = await verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    const currentUser = authResult.user!
+
+    // Check if user has permission to empty platoons
+    if (!['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // For mock data, skip database user validation
-    console.log('⚠️ Using mock authentication for platoon empty endpoint')
+    // Check if platoon exists and get participant count
+    const platoon = await prisma.platoonAllocation.findUnique({
+      where: { id: platoonId },
+      include: {
+        participants: true
+      }
+    })
 
-    // For now, work with mock data until Prisma client is updated
-    console.log('⚠️ Emptying mock platoon until Prisma client is updated')
-    
-    if (!global.mockPlatoons) {
-      return NextResponse.json({ error: 'No platoons found' }, { status: 404 })
-    }
-
-    // Find the specific platoon
-    const platoonIndex = global.mockPlatoons.findIndex(p => p.id === platoonId)
-    if (platoonIndex === -1) {
+    if (!platoon) {
       return NextResponse.json({ error: 'Platoon not found' }, { status: 404 })
     }
 
-    const platoon = global.mockPlatoons[platoonIndex]
-    const participantCount = platoon.participants?.length || 0
+    const participantCount = platoon.participants.length
 
     if (participantCount === 0) {
-      return NextResponse.json({ error: 'Platoon is already empty' }, { status: 400 })
+      return NextResponse.json({
+        success: true,
+        message: `Platoon "${platoon.name}" is already empty`,
+        unallocatedCount: 0,
+        platoonName: platoon.name
+      })
     }
 
-    // Empty the specific platoon
-    global.mockPlatoons[platoonIndex].participants = []
+    // Remove all participants from this platoon
+    const deleteResult = await prisma.platoonParticipant.deleteMany({
+      where: {
+        platoonId: platoonId
+      }
+    })
 
     return NextResponse.json({
       success: true,
       message: `Successfully emptied platoon "${platoon.name}"`,
-      unallocatedCount: participantCount,
+      unallocatedCount: deleteResult.count,
       platoonName: platoon.name
     })
 

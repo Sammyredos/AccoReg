@@ -56,7 +56,7 @@ export const generateEnhancedPDF = async (
         }
         
         body {
-            font-family: 'Inter', 'Apercu Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Apercu Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.5;
             color: #111827;
             background: #ffffff;

@@ -12,8 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Users, User, Phone, Mail, Calendar } from 'lucide-react'
+import { Search, Users, User, Phone, Mail, Calendar, Trash2, Loader2 } from 'lucide-react'
 import { PaginationControls } from './PaginationControls'
+import { useToast } from '@/contexts/ToastContext'
 
 interface PlatoonAllocation {
   id: string
@@ -40,16 +41,22 @@ interface PlatoonParticipantsModalProps {
   isOpen: boolean
   onClose: () => void
   platoon: PlatoonAllocation | null
+  onParticipantRemoved?: () => void
+  canRemoveParticipants?: boolean
 }
 
 export function PlatoonParticipantsModal({
   isOpen,
   onClose,
-  platoon
+  platoon,
+  onParticipantRemoved,
+  canRemoveParticipants = false
 }: PlatoonParticipantsModalProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null)
   const participantsPerPage = 10
+  const { success, error } = useToast()
 
   if (!platoon) return null
 
@@ -91,6 +98,42 @@ export function PlatoonParticipantsModal({
   React.useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm])
+
+  // Handle removing participant from platoon
+  const handleRemoveParticipant = async (participantId: string, participantName: string) => {
+    if (!platoon || !canRemoveParticipants) return
+
+    setRemovingParticipantId(participantId)
+
+    try {
+      const response = await fetch(`/api/admin/platoon-allocations/${platoon.id}/remove-participant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ participantId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove participant')
+      }
+
+      success(`Successfully removed ${participantName} from platoon`)
+
+      // Trigger refresh in parent component
+      if (onParticipantRemoved) {
+        onParticipantRemoved()
+      }
+
+    } catch (err) {
+      console.error('Error removing participant:', err)
+      error(err instanceof Error ? err.message : 'Failed to remove participant')
+    } finally {
+      setRemovingParticipantId(null)
+    }
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -181,9 +224,27 @@ export function PlatoonParticipantsModal({
                       {participant.registration.fullName.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-apercu-medium text-gray-900 truncate">
-                        {participant.registration.fullName}
-                      </h3>
+                      <div className="flex items-start justify-between">
+                        <h3 className="font-apercu-medium text-gray-900 truncate">
+                          {participant.registration.fullName}
+                        </h3>
+                        {canRemoveParticipants && (
+                          <Button
+                            onClick={() => handleRemoveParticipant(participant.registration.id, participant.registration.fullName)}
+                            disabled={removingParticipantId === participant.registration.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-2 flex-shrink-0"
+                            title={`Remove ${participant.registration.fullName} from platoon`}
+                          >
+                            {removingParticipantId === participant.registration.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center space-x-3 text-sm text-gray-600">
                           <span className="flex items-center">

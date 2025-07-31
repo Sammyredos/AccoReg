@@ -245,6 +245,8 @@ export function PlatoonAllocationCard({
         isOpen={showParticipantsModal}
         onClose={() => setShowParticipantsModal(false)}
         platoon={platoon}
+        onParticipantRemoved={onRefresh}
+        canRemoveParticipants={canRemoveAllocations}
       />
     </>
   )

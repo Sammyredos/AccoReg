@@ -23,7 +23,7 @@ import { ParticipantViewModal } from '@/components/admin/ParticipantViewModal'
 
 
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
-// import { ManualPlatoonAllocationModal } from '@/components/admin/ManualPlatoonAllocationModal'
+import { ManualPlatoonAllocationModal } from '@/components/admin/ManualPlatoonAllocationModal'
 
 import {
   Users,
@@ -387,14 +387,84 @@ function AllocatePlatoonPageContent() {
   }
 
   // Export functions
-  const handleExportCSV = () => {
-    // TODO: Implement CSV export functionality
-    showToast('CSV export functionality coming soon', 'info')
+  const handleExportCSV = async () => {
+    try {
+      if (!stats) {
+        showToast('No data available for export', 'error')
+        return
+      }
+
+      const { exportPlatoonsToCSV } = await import('@/lib/platoon-export')
+
+      // Transform data to match export interface
+      const exportPlatoons = platoons.map(platoon => ({
+        ...platoon,
+        participants: (platoon.participants || []).map(p => ({
+          id: p.registration.id,
+          fullName: p.registration.fullName,
+          gender: p.registration.gender,
+          dateOfBirth: p.registration.dateOfBirth,
+          phoneNumber: p.registration.phoneNumber,
+          emailAddress: p.registration.emailAddress,
+          branch: p.registration.branch
+        }))
+      }))
+
+      const exportStats = {
+        totalPlatoons: stats.totalPlatoons,
+        totalVerified: stats.totalVerified,
+        totalAllocated: stats.totalAllocated,
+        totalUnallocated: stats.totalUnallocated,
+        allocationRate: stats.allocationRate,
+        activePlatoons: stats.activePlatoons
+      }
+
+      exportPlatoonsToCSV(exportPlatoons, exportStats, safeUnallocatedParticipants)
+      showToast('CSV export completed successfully', 'success')
+    } catch (error) {
+      console.error('CSV export error:', error)
+      showToast('Failed to export CSV. Please try again.', 'error')
+    }
   }
 
-  const handleExportPDF = () => {
-    // TODO: Implement PDF export functionality
-    showToast('PDF export functionality coming soon', 'info')
+  const handleExportPDF = async () => {
+    try {
+      if (!stats) {
+        showToast('No data available for export', 'error')
+        return
+      }
+
+      const { exportPlatoonsToPDF } = await import('@/lib/platoon-export')
+
+      // Transform data to match export interface
+      const exportPlatoons = platoons.map(platoon => ({
+        ...platoon,
+        participants: (platoon.participants || []).map(p => ({
+          id: p.registration.id,
+          fullName: p.registration.fullName,
+          gender: p.registration.gender,
+          dateOfBirth: p.registration.dateOfBirth,
+          phoneNumber: p.registration.phoneNumber,
+          emailAddress: p.registration.emailAddress,
+          branch: p.registration.branch
+        }))
+      }))
+
+      const exportStats = {
+        totalPlatoons: stats.totalPlatoons,
+        totalVerified: stats.totalVerified,
+        totalAllocated: stats.totalAllocated,
+        totalUnallocated: stats.totalUnallocated,
+        allocationRate: stats.allocationRate,
+        activePlatoons: stats.activePlatoons
+      }
+
+      await exportPlatoonsToPDF(exportPlatoons, exportStats, safeUnallocatedParticipants)
+      showToast('PDF export completed successfully', 'success')
+    } catch (error) {
+      console.error('PDF export error:', error)
+      showToast('Failed to export PDF. Please try again.', 'error')
+    }
   }
 
 
@@ -641,13 +711,12 @@ function AllocatePlatoonPageContent() {
     setShowManualAllocationModal(true)
   }
 
-  // This function will be used when manual allocation is implemented
-  // const handleManualAllocationSuccess = async () => {
-  //   console.log('🎯 Manual allocation successful, refreshing data...')
-  //   setShowManualAllocationModal(false)
-  //   await fetchAllocationData(true) // Force refresh
-  //   console.log('✅ Manual allocation refresh completed')
-  // }
+  const handleManualAllocationSuccess = async () => {
+    console.log('🎯 Manual allocation successful, refreshing data...')
+    setShowManualAllocationModal(false)
+    await fetchAllocationData(true) // Force refresh
+    console.log('✅ Manual allocation refresh completed')
+  }
 
   const handleConfirmAction = (
     action: () => void,
@@ -1332,13 +1401,13 @@ function AllocatePlatoonPageContent() {
         platoon={editingPlatoon}
       />
 
-      {/* <ManualPlatoonAllocationModal
+      <ManualPlatoonAllocationModal
         isOpen={showManualAllocationModal}
         onClose={() => setShowManualAllocationModal(false)}
         onSuccess={handleManualAllocationSuccess}
         unallocatedParticipants={safeUnallocatedParticipants}
         platoons={platoons}
-      /> */}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmationModal

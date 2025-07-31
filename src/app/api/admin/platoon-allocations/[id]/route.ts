@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 
 // DELETE - Delete a platoon
@@ -10,62 +10,56 @@ export async function DELETE(
   try {
     const { id: platoonId } = await params
 
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    const currentUser = authResult.user!
+
+    // Check if user has permission to delete platoons
+    if (!['Super Admin', 'Admin'].includes(currentUser.role?.name || '')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Get user details from database
-    const user = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
+    // Check if platoon exists
+    const platoon = await prisma.platoonAllocation.findUnique({
+      where: { id: platoonId },
       include: {
-        role: {
+        participants: {
           include: {
-            permissions: true
+            registration: {
+              select: { fullName: true }
+            }
           }
         }
       }
     })
 
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
-
-    // Check if user has permission to delete platoons
-    const allowedRoles = ['Super Admin', 'Admin']
-    if (!allowedRoles.includes(user.role?.name || '')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-
-    // For now, delete from mock data until Prisma client is updated
-    console.log('⚠️ Deleting from mock platoons until Prisma client is updated')
-
-    if (!global.mockPlatoons) {
+    if (!platoon) {
       return NextResponse.json({ error: 'Platoon not found' }, { status: 404 })
     }
 
-    const platoonIndex = global.mockPlatoons.findIndex(p => p.id === platoonId)
-    if (platoonIndex === -1) {
-      return NextResponse.json({ error: 'Platoon not found' }, { status: 404 })
+    // Check if platoon has participants
+    if (platoon.participants.length > 0) {
+      return NextResponse.json({
+        error: `Cannot delete platoon "${platoon.name}" because it has ${platoon.participants.length} allocated participants. Please remove all participants first.`
+      }, { status: 400 })
     }
 
-    // Remove the platoon from mock data
-    const deletedPlatoon = global.mockPlatoons.splice(platoonIndex, 1)[0]
+    // Delete the platoon (participants will be automatically deleted due to CASCADE)
+    await prisma.platoonAllocation.delete({
+      where: { id: platoonId }
+    })
 
     return NextResponse.json({
       success: true,
-      message: `Platoon "${deletedPlatoon.name}" deleted successfully`,
+      message: `Platoon "${platoon.name}" deleted successfully`,
       deletedPlatoon: {
-        id: deletedPlatoon.id,
-        name: deletedPlatoon.name,
-        participantsUnallocated: deletedPlatoon.participants?.length || 0
+        id: platoon.id,
+        name: platoon.name,
+        participantsUnallocated: 0
       }
     })
 
@@ -86,83 +80,121 @@ export async function PUT(
   try {
     const { id: platoonId } = await params
 
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    // Get user details from database
-    const user = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
-      include: {
-        role: {
-          include: {
-            permissions: true
-          }
-        }
-      }
-    })
-
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
+    const currentUser = authResult.user!
 
     // Check if user has permission to edit platoons
-    const allowedRoles = ['Super Admin', 'Admin', 'Manager']
-    if (!allowedRoles.includes(user.role?.name || '')) {
+    if (!['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const body = await request.json()
     const { name, leaderName, leaderPhone, capacity } = body
 
-    // Validate required fields
-    if (!name || !leaderName || !leaderPhone || !capacity) {
-      return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
+    // Validate required fields with specific messages
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'Platoon name is required' }, { status: 400 })
+    }
+    if (!leaderName?.trim()) {
+      return NextResponse.json({ error: 'Leader name is required' }, { status: 400 })
+    }
+    if (!leaderPhone?.trim()) {
+      return NextResponse.json({ error: 'Leader phone number is required' }, { status: 400 })
+    }
+    if (!capacity || isNaN(capacity)) {
+      return NextResponse.json({ error: 'Valid capacity is required' }, { status: 400 })
     }
 
-    // Validate capacity
+    // Validate capacity range
     if (capacity < 1 || capacity > 200) {
-      return NextResponse.json({ error: 'Capacity must be between 1 and 200' }, { status: 400 })
+      return NextResponse.json({ error: 'Platoon capacity must be between 1 and 200 participants' }, { status: 400 })
     }
 
-    // For now, update mock data until Prisma client is updated
-    console.log('⚠️ Updating mock platoons until Prisma client is updated')
+    // Validate name length
+    if (name.trim().length < 2) {
+      return NextResponse.json({ error: 'Platoon name must be at least 2 characters long' }, { status: 400 })
+    }
+    if (name.trim().length > 50) {
+      return NextResponse.json({ error: 'Platoon name must be less than 50 characters' }, { status: 400 })
+    }
 
-    if (!global.mockPlatoons) {
+    // Validate phone number format
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/
+    if (!phoneRegex.test(leaderPhone.replace(/[\s\-\(\)]/g, ''))) {
+      return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })
+    }
+
+    // Check if platoon exists
+    const existingPlatoon = await prisma.platoonAllocation.findUnique({
+      where: { id: platoonId },
+      include: {
+        participants: true
+      }
+    })
+
+    if (!existingPlatoon) {
       return NextResponse.json({ error: 'Platoon not found' }, { status: 404 })
     }
 
-    const platoonIndex = global.mockPlatoons.findIndex(p => p.id === platoonId)
-    if (platoonIndex === -1) {
-      return NextResponse.json({ error: 'Platoon not found' }, { status: 404 })
+    // Check for duplicate platoon names (excluding current platoon)
+    const duplicatePlatoon = await prisma.platoonAllocation.findFirst({
+      where: {
+        name: {
+          equals: name.trim(),
+          mode: 'insensitive'
+        },
+        id: {
+          not: platoonId
+        }
+      }
+    })
+
+    if (duplicatePlatoon) {
+      return NextResponse.json({
+        error: `A platoon with the name "${name.trim()}" already exists. Please choose a different name.`
+      }, { status: 400 })
     }
 
-    // Check if platoon name already exists (excluding current platoon)
-    const duplicateName = global.mockPlatoons.find(p => p.name === name && p.id !== platoonId)
-    if (duplicateName) {
-      return NextResponse.json({ error: 'Platoon name already exists' }, { status: 400 })
+    // Check if new capacity is less than current participants
+    const currentParticipantCount = existingPlatoon.participants.length
+    if (capacity < currentParticipantCount) {
+      return NextResponse.json({
+        error: `Cannot reduce capacity to ${capacity}. Platoon currently has ${currentParticipantCount} allocated participants. Please remove participants first or increase capacity.`
+      }, { status: 400 })
     }
 
-    // Update the platoon in mock data
-    const existingPlatoon = global.mockPlatoons[platoonIndex]
-    const updatedPlatoon = {
-      ...existingPlatoon,
-      name,
-      leaderName,
-      leaderPhone,
-      capacity,
-      updatedAt: new Date().toISOString()
-    }
-
-    global.mockPlatoons[platoonIndex] = updatedPlatoon
+    // Update the platoon
+    const updatedPlatoon = await prisma.platoonAllocation.update({
+      where: { id: platoonId },
+      data: {
+        name: name.trim(),
+        leaderName: leaderName.trim(),
+        leaderPhone: leaderPhone.trim(),
+        capacity: parseInt(capacity.toString())
+      },
+      include: {
+        participants: {
+          include: {
+            registration: {
+              select: {
+                id: true,
+                fullName: true,
+                gender: true,
+                dateOfBirth: true,
+                phoneNumber: true,
+                emailAddress: true,
+                branch: true
+              }
+            }
+          }
+        }
+      }
+    })
 
     return NextResponse.json({
       success: true,
