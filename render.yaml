@@ -15,7 +15,7 @@ services:
       echo "🔧 Generating Prisma client for PostgreSQL..." &&
       npx prisma generate &&
       echo "🗄️ Running database migrations..." &&
-      npx prisma db push --accept-data-loss &&
+      npx tsx scripts/deploy-database.ts &&
       echo "✅ Database schema deployed" &&
       echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
