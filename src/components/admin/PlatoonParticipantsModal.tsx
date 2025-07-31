@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Users, User, Phone, Mail, Calendar, Trash2, Loader2 } from 'lucide-react'
+import { Search, Users, User, Phone, Mail, Calendar, UserMinus, Loader2 } from 'lucide-react'
 import { PaginationControls } from './PaginationControls'
 import { useToast } from '@/contexts/ToastContext'
 
@@ -234,13 +234,13 @@ export function PlatoonParticipantsModal({
                             disabled={removingParticipantId === participant.registration.id}
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-2 flex-shrink-0"
+                            className="h-8 w-8 p-0 font-apercu-medium text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
                             title={`Remove ${participant.registration.fullName} from platoon`}
                           >
                             {removingParticipantId === participant.registration.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-3 w-3 animate-spin" />
                             ) : (
-                              <Trash2 className="h-4 w-4" />
+                              <UserMinus className="h-3 w-3" />
                             )}
                           </Button>
                         )}

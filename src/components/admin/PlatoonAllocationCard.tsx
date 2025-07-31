@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Edit, Phone, User, Trash2, Loader2 } from 'lucide-react'
+import { Users, Edit, Phone, User, Trash2, UserMinus, Loader2 } from 'lucide-react'
 import { PlatoonParticipantsModal } from './PlatoonParticipantsModal'
 
 interface PlatoonAllocation {
@@ -227,7 +227,7 @@ export function PlatoonAllocationCard({
                       </>
                     ) : (
                       <>
-                        <Trash2 className="h-3 w-3 mr-1 sm:mr-1.5" />
+                        <UserMinus className="h-3 w-3 mr-1 sm:mr-1.5" />
                         <span className="hidden sm:inline">Empty</span>
                         <span className="sm:hidden">Clear</span>
                       </>
