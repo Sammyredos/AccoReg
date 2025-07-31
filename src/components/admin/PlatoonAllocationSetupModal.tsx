@@ -156,7 +156,7 @@ export function PlatoonAllocationSetupModal({
     } catch (error) {
       console.error('Error saving platoon:', error)
       const errorMessage = parseApiError(error)
-      safeShowToast(String(errorMessage), 'error')
+      safeShowToast(errorMessage.description, 'error')
     } finally {
       setIsLoading(false)
     }

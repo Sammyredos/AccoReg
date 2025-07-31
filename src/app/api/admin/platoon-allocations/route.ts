@@ -136,24 +136,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })
     }
 
-    // Check for duplicate platoon names in mock data
-    if (!global.mockPlatoons) {
-      global.mockPlatoons = []
-    }
-
-    // Check for duplicate platoon names
-    const existingPlatoon = global.mockPlatoons.find(p => p.name.toLowerCase() === name.trim().toLowerCase())
-    if (existingPlatoon) {
-      return NextResponse.json({ error: `A platoon with the name "${name.trim()}" already exists. Please choose a different name.` }, { status: 400 })
-    }
-
-
-
-    // For now, create a mock platoon response until database is properly set up
     // TODO: Implement actual platoon creation when Prisma schema is updated
+    // For now, return a proper error message
     return NextResponse.json({
-      success: false,
-      message: 'Platoon creation not yet implemented - database schema pending'
+      error: 'Platoon creation is not yet available. The database schema is being updated to support platoon management. Please contact your system administrator for more information.'
     }, { status: 501 })
 
   } catch (error) {
