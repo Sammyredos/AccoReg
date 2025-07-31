@@ -28,11 +28,77 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO: Implement actual manual allocation when database schema is updated
+    // Check if participant exists and is verified
+    const participant = await prisma.registration.findUnique({
+      where: { id: participantId },
+      include: {
+        platoonParticipant: true
+      }
+    })
+
+    if (!participant) {
+      return NextResponse.json({ error: 'Participant not found' }, { status: 404 })
+    }
+
+    if (!participant.isVerified) {
+      return NextResponse.json({ error: 'Participant must be verified before allocation' }, { status: 400 })
+    }
+
+    if (participant.platoonParticipant) {
+      return NextResponse.json({ error: 'Participant is already allocated to a platoon' }, { status: 400 })
+    }
+
+    // Check if platoon exists and has capacity
+    const platoon = await prisma.platoonAllocation.findUnique({
+      where: { id: platoonId },
+      include: {
+        participants: true
+      }
+    })
+
+    if (!platoon) {
+      return NextResponse.json({ error: 'Platoon not found' }, { status: 404 })
+    }
+
+    if (platoon.participants.length >= platoon.capacity) {
+      return NextResponse.json({
+        error: `Platoon "${platoon.name}" is at full capacity (${platoon.capacity}/${platoon.capacity})`
+      }, { status: 400 })
+    }
+
+    // Create the allocation
+    const allocation = await prisma.platoonParticipant.create({
+      data: {
+        registrationId: participantId,
+        platoonId: platoonId,
+        allocatedBy: currentUser.id
+      },
+      include: {
+        registration: {
+          select: {
+            fullName: true
+          }
+        },
+        platoon: {
+          select: {
+            name: true,
+            capacity: true
+          }
+        }
+      }
+    })
+
     return NextResponse.json({
-      success: false,
-      message: 'Manual allocation not yet implemented - database schema pending'
-    }, { status: 501 })
+      success: true,
+      message: `Successfully allocated ${allocation.registration.fullName} to platoon "${allocation.platoon.name}"`,
+      allocation: {
+        participantId: participantId,
+        participantName: allocation.registration.fullName,
+        platoonId: platoonId,
+        platoonName: allocation.platoon.name,
+        platoonCapacity: `${platoon.participants.length + 1}/${platoon.capacity}`
+      }
+    })
 
   } catch (error) {
     console.error('Error in manual platoon allocation:', error)

@@ -39,9 +39,36 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // TODO: Replace with actual platoon database queries when Prisma schema is updated
-    const platoons = []
-    const allocatedParticipantIds = new Set()
+    // Fetch all platoons with their participants
+    const platoons = await prisma.platoonAllocation.findMany({
+      include: {
+        participants: {
+          include: {
+            registration: {
+              select: {
+                id: true,
+                fullName: true,
+                gender: true,
+                dateOfBirth: true,
+                phoneNumber: true,
+                emailAddress: true,
+                branch: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    // Get allocated participant IDs
+    const allocatedParticipantIds = new Set(
+      platoons.flatMap(platoon =>
+        platoon.participants.map(p => p.registrationId)
+      )
+    )
 
     // Filter out already allocated participants
     const unallocatedParticipants = allVerifiedParticipants.filter(
@@ -136,11 +163,72 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })
     }
 
-    // TODO: Implement actual platoon creation when Prisma schema is updated
-    // For now, return a proper error message
+    // Check for duplicate platoon names
+    const existingPlatoon = await prisma.platoonAllocation.findFirst({
+      where: {
+        name: {
+          equals: name.trim(),
+          mode: 'insensitive'
+        }
+      }
+    })
+
+    if (existingPlatoon) {
+      return NextResponse.json({
+        error: `A platoon with the name "${name.trim()}" already exists. Please choose a different name.`
+      }, { status: 400 })
+    }
+
+    // Generate a unique label (A, B, C, etc.)
+    const existingPlatoons = await prisma.platoonAllocation.findMany({
+      select: { label: true },
+      orderBy: { label: 'asc' }
+    })
+
+    let label = 'A'
+    const usedLabels = new Set(existingPlatoons.map(p => p.label))
+    for (let i = 0; i < 26; i++) {
+      const currentLabel = String.fromCharCode(65 + i) // A, B, C, ...
+      if (!usedLabels.has(currentLabel)) {
+        label = currentLabel
+        break
+      }
+    }
+
+    // Create the platoon
+    const newPlatoon = await prisma.platoonAllocation.create({
+      data: {
+        name: name.trim(),
+        leaderName: leaderName.trim(),
+        leaderPhone: leaderPhone.trim(),
+        capacity: parseInt(capacity.toString()),
+        label,
+        createdBy: currentUser.id
+      },
+      include: {
+        participants: {
+          include: {
+            registration: {
+              select: {
+                id: true,
+                fullName: true,
+                gender: true,
+                dateOfBirth: true,
+                phoneNumber: true,
+                emailAddress: true,
+                branch: true
+              }
+            }
+          }
+        }
+      }
+    })
+
     return NextResponse.json({
-      error: 'Platoon creation is not yet available. The database schema is being updated to support platoon management. Please contact your system administrator for more information.'
-    }, { status: 501 })
+      success: true,
+      message: `Platoon "${newPlatoon.name}" created successfully`,
+      platoon: newPlatoon
+    }, { status: 201 })
 
   } catch (error) {
     console.error('Error creating platoon:', error)

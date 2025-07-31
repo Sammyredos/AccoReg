@@ -17,11 +17,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // TODO: Implement actual empty-all when database schema is updated
+    // Count current allocations before emptying
+    const currentAllocations = await prisma.platoonParticipant.count()
+
+    if (currentAllocations === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'All platoons are already empty',
+        unallocatedCount: 0,
+        platoonsEmptied: 0
+      })
+    }
+
+    // Get platoon count for response
+    const platoonCount = await prisma.platoonAllocation.count()
+
+    // Remove all platoon allocations
+    const deleteResult = await prisma.platoonParticipant.deleteMany({})
+
     return NextResponse.json({
-      success: false,
-      message: 'Empty all platoons not yet implemented - database schema pending'
-    }, { status: 501 })
+      success: true,
+      message: `Successfully emptied all platoons`,
+      unallocatedCount: deleteResult.count,
+      platoonsEmptied: platoonCount
+    })
 
   } catch (error) {
     console.error('Error emptying platoons:', error)

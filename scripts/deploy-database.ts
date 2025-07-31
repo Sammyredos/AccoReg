@@ -22,6 +22,10 @@ async function deployDatabase() {
       // If migrations fail, try to baseline the database
       console.log('🔄 Attempting to baseline existing database...')
       execSync('prisma migrate resolve --applied "20250117000002_postgresql_final_setup"', { stdio: 'inherit' })
+      execSync('prisma migrate resolve --applied "20250530204940_initial_with_user_info"', { stdio: 'inherit' })
+      execSync('prisma migrate resolve --applied "20250531202131_add_room_accommodation_tables"', { stdio: 'inherit' })
+      execSync('prisma migrate resolve --applied "20250605071911_add_system_config_table"', { stdio: 'inherit' })
+      execSync('prisma migrate resolve --applied "20250704000000_add_unverification_tracking"', { stdio: 'inherit' })
       console.log('✅ Database baselined successfully!')
       
       // Now try migrations again
