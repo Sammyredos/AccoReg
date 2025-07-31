@@ -1,40 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    // Get user details from database to verify permissions
-    const user = await prisma.admin.findUnique({
-      where: { id: payload.adminId },
-      include: {
-        role: {
-          include: {
-            permissions: true
-          }
-        }
-      }
-    })
-
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
+    const currentUser = authResult.user!
 
     // Check if user has permission to view analytics
-    const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer']
-    if (!allowedRoles.includes(user.role?.name || '')) {
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff', 'Viewer'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
