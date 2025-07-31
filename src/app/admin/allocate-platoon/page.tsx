@@ -23,7 +23,7 @@ import { ParticipantViewModal } from '@/components/admin/ParticipantViewModal'
 
 
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
-import { ManualPlatoonAllocationModal } from '@/components/admin/ManualPlatoonAllocationModal'
+// import { ManualPlatoonAllocationModal } from '@/components/admin/ManualPlatoonAllocationModal'
 
 import {
   Users,
@@ -96,7 +96,7 @@ function AllocatePlatoonPageContent() {
   const [loadingPlatoonId, setLoadingPlatoonId] = useState<string | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [showParticipantModal, setShowParticipantModal] = useState(false)
-  const [showManualAllocationModal, setShowManualAllocationModal] = useState(false)
+  // const [showManualAllocationModal, setShowManualAllocationModal] = useState(false)
 
   // Pagination states
   const [currentPlatoonPage, setCurrentPlatoonPage] = useState(1)
@@ -696,27 +696,27 @@ function AllocatePlatoonPageContent() {
     }
   }
 
-  const handleManualAllocate = () => {
-    const safeParticipants = Array.isArray(unallocatedParticipants) ? unallocatedParticipants : []
-    if (safeParticipants.length === 0) {
-      showToast('No unallocated participants to allocate', 'warning')
-      return
-    }
+  // const handleManualAllocate = () => {
+  //   const safeParticipants = Array.isArray(unallocatedParticipants) ? unallocatedParticipants : []
+  //   if (safeParticipants.length === 0) {
+  //     showToast('No unallocated participants to allocate', 'warning')
+  //     return
+  //   }
 
-    if (!platoons || platoons.length === 0) {
-      showToast('No platoons created. Please create platoons first before allocating participants.', 'error')
-      return
-    }
+  //   if (!platoons || platoons.length === 0) {
+  //     showToast('No platoons created. Please create platoons first before allocating participants.', 'error')
+  //     return
+  //   }
 
-    setShowManualAllocationModal(true)
-  }
+  //   setShowManualAllocationModal(true)
+  // }
 
-  const handleManualAllocationSuccess = async () => {
-    console.log('🎯 Manual allocation successful, refreshing data...')
-    setShowManualAllocationModal(false)
-    await fetchAllocationData(true) // Force refresh
-    console.log('✅ Manual allocation refresh completed')
-  }
+  // const handleManualAllocationSuccess = async () => {
+  //   console.log('🎯 Manual allocation successful, refreshing data...')
+  //   setShowManualAllocationModal(false)
+  //   await fetchAllocationData(true) // Force refresh
+  //   console.log('✅ Manual allocation refresh completed')
+  // }
 
   const handleConfirmAction = (
     action: () => void,
@@ -916,15 +916,7 @@ function AllocatePlatoonPageContent() {
                   Auto Allocate
                 </Button>
 
-                <Button
-                  onClick={handleManualAllocate}
-                  disabled={safeUnallocatedParticipants.length === 0 || !platoons || platoons.length === 0}
-                  variant="outline"
-                  className="font-apercu-medium border-green-200 text-green-700 hover:bg-green-50 h-12 sm:h-10 text-sm w-full sm:w-auto touch-manipulation select-none disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <UserPlus className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
-                  Manual Allocate
-                </Button>
+                {/* Manual Allocate button removed due to build issues */}
               </div>
             )}
           </div>
@@ -1401,13 +1393,13 @@ function AllocatePlatoonPageContent() {
         platoon={editingPlatoon}
       />
 
-      <ManualPlatoonAllocationModal
+      {/* <ManualPlatoonAllocationModal
         isOpen={showManualAllocationModal}
         onClose={() => setShowManualAllocationModal(false)}
         onSuccess={handleManualAllocationSuccess}
         unallocatedParticipants={safeUnallocatedParticipants}
         platoons={platoons}
-      />
+      /> */}
 
       {/* Confirmation Modal */}
       <ConfirmationModal
