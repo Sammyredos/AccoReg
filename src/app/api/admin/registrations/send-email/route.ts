@@ -1,61 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { verifyToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth-helpers'
 
 const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
-    // Get token from cookie (same as /api/auth/me)
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    const currentUser = authResult.user!
+
+    // Check permissions
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
-
-    console.log('Token payload:', payload)
-
-    // Determine user type from token
-    const userType = payload.type || 'admin'
-
-    let currentUser
-    if (userType === 'admin') {
-      // Fetch admin user
-      currentUser = await prisma.admin.findUnique({
-        where: { id: payload.adminId },
-        include: {
-          role: {
-            include: {
-              permissions: true
-            }
-          }
-        }
-      })
-    } else {
-      // Fetch regular user
-      currentUser = await prisma.user.findUnique({
-        where: { id: payload.adminId },
-        include: {
-          role: {
-            include: {
-              permissions: true
-            }
-          }
-        }
-      })
-    }
-
-    if (!currentUser || !currentUser.isActive) {
-      console.log('User not found or inactive')
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
-
-    console.log('Current user:', currentUser.email, 'Role:', currentUser.role?.name)
 
     // Check if user has permission to send emails (Super Admin, Admin, Manager)
     if (!['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {

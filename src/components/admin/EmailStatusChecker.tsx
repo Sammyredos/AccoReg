@@ -58,7 +58,12 @@ export function EmailStatusChecker() {
       const data = await response.json()
       
       if (response.ok) {
-        alert(`✅ Test email sent successfully to ${testEmail}`)
+        const isDevelopmentMode = data.details?.mode === 'development'
+        if (isDevelopmentMode) {
+          alert(`🔧 Development Mode: Email test simulated successfully for ${testEmail}. No actual email sent in development mode.`)
+        } else {
+          alert(`✅ Test email sent successfully to ${testEmail}`)
+        }
         setTestEmail('')
       } else {
         alert(`❌ Test failed: ${data.message || data.error}`)

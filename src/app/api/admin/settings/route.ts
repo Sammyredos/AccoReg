@@ -1,45 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { verifyToken } from '@/lib/auth'
+import { authenticateRequest } from '@/lib/auth-helpers'
 
 const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
+    const currentUser = authResult.user!
 
-    // Determine user type from token
-    const userType = payload.type || 'admin'
-
-    let currentUser
-    if (userType === 'admin') {
-      currentUser = await prisma.admin.findUnique({
-        where: { id: payload.adminId },
-        include: { role: true }
-      })
-    } else {
-      currentUser = await prisma.user.findUnique({
-        where: { id: payload.adminId },
-        include: { role: true }
-      })
-    }
-
-    if (!currentUser || !currentUser.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
-
-    // Check if user has permission to view settings (Super Admin, Admin only)
-    if (!['Super Admin', 'Admin'].includes(currentUser.role?.name || '')) {
+    // Check if user has permission to view settings
+    if (!['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -98,37 +74,13 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Get token from cookie
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(request)
+    if (!authResult.success) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status || 401 })
     }
 
-    // Verify token
-    const payload = verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    // Determine user type from token
-    const userType = payload.type || 'admin'
-
-    let currentUser
-    if (userType === 'admin') {
-      currentUser = await prisma.admin.findUnique({
-        where: { id: payload.adminId },
-        include: { role: true }
-      })
-    } else {
-      currentUser = await prisma.user.findUnique({
-        where: { id: payload.adminId },
-        include: { role: true }
-      })
-    }
-
-    if (!currentUser || !currentUser.isActive) {
-      return NextResponse.json({ error: 'User not found or inactive' }, { status: 401 })
-    }
+    const currentUser = authResult.user!
 
     // Check if user has permission to update settings (Super Admin only)
     if (currentUser.role?.name !== 'Super Admin') {

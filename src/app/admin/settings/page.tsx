@@ -1651,14 +1651,20 @@ export default function SettingsPage() {
       <Card className="p-6 bg-white">
         <div className="text-center py-8">
           <Mail className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Communications</h3>
-          <p className="font-apercu-regular text-sm text-gray-600">
-            Communications settings are available in Data Management.
+          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Communications Management</h3>
+          <p className="font-apercu-regular text-sm text-gray-600 mb-4">
+            Manage email and SMS communications, test configurations, and send bulk messages.
           </p>
+          <Button
+            onClick={() => window.location.href = '/admin/communications'}
+            className="font-apercu-medium bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Go to Communications
+          </Button>
         </div>
       </Card>
     </div>
-
   )
 
   // Security Tab Content
@@ -2319,8 +2325,8 @@ export default function SettingsPage() {
 
 
 
-  // Check permissions - Allow Super Admin and Admin roles only
-  const allowedRoles = ['Super Admin', 'Admin']
+  // Check permissions - Allow Super Admin, Admin, Manager, and Staff roles
+  const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff']
   if (currentUser && !allowedRoles.includes(currentUser.role?.name || '')) {
     return (
       <AdminLayoutNew title={t('page.settings.title')} description={t('page.settings.description')}>

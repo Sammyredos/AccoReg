@@ -99,7 +99,22 @@ export function EmailConfigDisplay() {
       const data = await response.json()
 
       if (response.ok) {
-        success('Test Email Sent', `Test email sent successfully to ${testEmail}. Check your inbox to verify the configuration.`)
+        // Check if this was a development mode simulation
+        const isDevelopmentMode = data.details?.mode === 'development'
+        const actualEmailSent = data.details?.actualEmailSent !== false
+
+        if (isDevelopmentMode) {
+          success(
+            'Development Mode: Email Test Simulated',
+            `Email test simulated successfully for ${testEmail}. In development mode, no actual email is sent. Configure SMTP settings for production email sending.`
+          )
+        } else {
+          success(
+            'Test Email Sent',
+            `Test email sent successfully to ${testEmail}. Check your inbox to verify the configuration.`
+          )
+        }
+
         setTestEmail('')
         setShowTestInput(false)
       } else {
