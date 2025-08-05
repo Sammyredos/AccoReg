@@ -146,7 +146,8 @@ export async function PUT(
       where: {
         name: {
           equals: name.trim(),
-          mode: 'insensitive'
+          // Only use mode: 'insensitive' for PostgreSQL
+          ...(process.env.DATABASE_URL?.includes('postgresql') && { mode: 'insensitive' })
         },
         id: {
           not: platoonId

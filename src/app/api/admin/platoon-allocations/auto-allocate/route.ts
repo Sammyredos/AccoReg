@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
+import { sendPlatoonAllocationEmail } from '@/lib/email'
 
 // POST - Auto allocate participants to platoons
 export async function POST(request: NextRequest) {
@@ -114,10 +115,56 @@ export async function POST(request: NextRequest) {
       )
     )
 
+    // Send platoon allocation emails to participants
+    console.log('📧 Sending platoon allocation emails to participants...')
+    const emailResults = []
+
+    for (const allocation of allocations) {
+      try {
+        // Get full registration and platoon data for email
+        const registration = await prisma.registration.findUnique({
+          where: { id: allocation.registrationId }
+        })
+
+        const platoon = await prisma.platoonAllocation.findUnique({
+          where: { id: allocation.platoonId }
+        })
+
+        if (registration && platoon) {
+          const emailResult = await sendPlatoonAllocationEmail(registration, platoon)
+          emailResults.push({
+            participantId: allocation.registrationId,
+            participantName: registration.fullName,
+            platoonName: platoon.name,
+            emailSent: emailResult.success,
+            error: emailResult.error
+          })
+
+          if (emailResult.success) {
+            console.log(`✅ Platoon allocation email sent to ${registration.fullName}`)
+          } else {
+            console.error(`❌ Failed to send platoon allocation email to ${registration.fullName}:`, emailResult.error)
+          }
+        }
+      } catch (emailError) {
+        console.error('Error sending platoon allocation email:', emailError)
+        emailResults.push({
+          participantId: allocation.registrationId,
+          emailSent: false,
+          error: emailError.message
+        })
+      }
+    }
+
+    const successfulEmails = emailResults.filter(r => r.emailSent).length
+    console.log(`📧 Platoon allocation emails: ${successfulEmails}/${allocations.length} sent successfully`)
+
     return NextResponse.json({
       success: true,
       totalAllocated: allocations.length,
       message: `Successfully allocated ${allocations.length} participants to platoons.`,
+      emailsSent: successfulEmails,
+      emailResults,
       allocations: allocations.map(a => ({
         participantId: a.registrationId,
         platoonId: a.platoonId

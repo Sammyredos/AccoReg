@@ -8,6 +8,7 @@ import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/c
 import { Button } from '@/components/ui/button'
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, ArrowRight, Check, User, Calendar, Users, Shield, AlertCircle, Clock, Baby } from 'lucide-react'
+import { checkAndTriggerRegistrationUpdate } from '@/lib/registration-events'
 
 // Types
 interface ValidationError {
@@ -522,6 +523,10 @@ function RegistrationForm() {
 
       // Registration successful - show success immediately
       setLoadingMessage('Registration completed successfully!')
+
+      // Trigger real-time updates for admin communications
+      checkAndTriggerRegistrationUpdate(response)
+
       setSuccess(true)
     } catch (error) {
       console.error('Registration error:', error)

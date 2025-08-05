@@ -245,11 +245,25 @@ export async function PUT(
 
     console.log('Registration updated successfully:', updatedRegistration.id)
 
-    return NextResponse.json({
+    // Create response with real-time update headers
+    const response = NextResponse.json({
       success: true,
       message: 'Registration updated successfully',
       registration: updatedRegistration
     })
+
+    // Add headers to trigger real-time updates
+    response.headers.set('X-Registration-Updated', 'true')
+    response.headers.set('X-Registration-Action', 'edit')
+    response.headers.set('X-Updated-Registration-Data', JSON.stringify({
+      id: updatedRegistration.id,
+      fullName: updatedRegistration.fullName,
+      emailAddress: updatedRegistration.emailAddress,
+      phoneNumber: updatedRegistration.phoneNumber,
+      updatedAt: updatedRegistration.updatedAt
+    }))
+
+    return response
 
   } catch (error) {
     console.error('Update registration error:', error)

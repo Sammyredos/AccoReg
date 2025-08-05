@@ -84,31 +84,31 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
-    // Check if SMTP is configured
+    // Check if SMTP is configured for real email sending
     const hasSmtpConfig = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
 
-    if (!hasSmtpConfig && process.env.NODE_ENV === 'development') {
-      // Development mode without SMTP - simulate email
-      console.log('📧 Development Mode: Test email simulation (no SMTP configured)')
+    if (!hasSmtpConfig) {
+      // No SMTP configured - simulate email
+      console.log('📧 No SMTP Configuration: Test email simulation')
       console.log('📧 To:', testEmail)
-      console.log('📧 From:', currentUser.email)
+      console.log('📧 From:', process.env.EMAIL_FROM || 'admin@mopgomglobal.com')
       console.log('📧 Subject: Email Configuration Test')
 
       return NextResponse.json({
         success: true,
-        message: `Development Mode: Test email simulated successfully to ${testEmail}`,
+        message: `SMTP Not Configured: Test email simulated successfully to ${testEmail}`,
         details: {
-          messageId: `dev-test-${Date.now()}`,
-          note: 'Email simulated in development mode (no SMTP configured)',
+          messageId: `sim-test-${Date.now()}`,
+          note: 'Email simulated - Configure SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to send real emails',
           sentAt: new Date().toISOString(),
           sentBy: currentUser.email,
-          mode: 'development',
+          mode: 'simulation',
           actualEmailSent: false
         }
       })
     }
 
-    // SMTP configured - attempt to send real email (works in both dev and production)
+    // SMTP configured - attempt to send real email
     try {
       const result = await sendEmail({
         to: [testEmail],

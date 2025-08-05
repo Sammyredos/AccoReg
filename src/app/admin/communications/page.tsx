@@ -137,7 +137,103 @@ export default function CommunicationsPage() {
 
   useEffect(() => {
     fetchRegistrations()
+
+    // Set up real-time polling for new registrations
+    const pollInterval = setInterval(() => {
+      fetchRegistrations()
+    }, 30000) // Poll every 30 seconds for new registrations
+
+    // Listen for storage events (when new registrations are added)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'registration_updated') {
+        console.log('🔄 New registration detected, refreshing list...')
+        fetchRegistrations()
+        // Clear the storage flag
+        localStorage.removeItem('registration_updated')
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+
+    // Also listen for custom events within the same tab
+    const handleRegistrationUpdate = () => {
+      console.log('🔄 Registration update event received, refreshing list...')
+      fetchRegistrations()
+    }
+
+    window.addEventListener('registrationUpdated', handleRegistrationUpdate)
+
+    return () => {
+      clearInterval(pollInterval)
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('registrationUpdated', handleRegistrationUpdate)
+    }
   }, [fetchRegistrations])
+
+  // Listen for real-time registration updates (email/phone changes)
+  useEffect(() => {
+    const handleRegistrationUpdate = (event: any) => {
+      console.log('📧 Registration update detected in communications:', event.detail)
+
+      if (event.detail?.action === 'edit' && event.detail?.registration) {
+        const updatedReg = event.detail.registration
+
+        // Update the registration in our list
+        setRegistrations(prev => {
+          const index = prev.findIndex(reg => reg.id === updatedReg.id)
+          if (index !== -1) {
+            const updated = [...prev]
+            updated[index] = { ...updated[index], ...updatedReg }
+            console.log('✅ Updated registration in communications list:', updatedReg.fullName)
+            return updated
+          }
+          return prev
+        })
+      } else {
+        // For new registrations or general updates, refetch data
+        console.log('🔄 Refetching registrations due to update')
+        fetchRegistrations()
+      }
+    }
+
+    // Listen for storage events (cross-tab updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'registration_edit_data') {
+        const editData = localStorage.getItem('registration_edit_data')
+        if (editData) {
+          try {
+            const updatedReg = JSON.parse(editData)
+            setRegistrations(prev => {
+              const index = prev.findIndex(reg => reg.id === updatedReg.id)
+              if (index !== -1) {
+                const updated = [...prev]
+                updated[index] = { ...updated[index], ...updatedReg }
+                console.log('✅ Updated registration from storage:', updatedReg.fullName)
+                return updated
+              }
+              return prev
+            })
+            localStorage.removeItem('registration_edit_data')
+          } catch (error) {
+            console.error('Error parsing registration edit data:', error)
+          }
+        }
+      } else if (e.key === 'registration_updated') {
+        fetchRegistrations()
+        localStorage.removeItem('registration_updated')
+      }
+    }
+
+    window.addEventListener('registrationUpdated', handleRegistrationUpdate)
+    window.addEventListener('storage', handleStorageChange)
+
+    return () => {
+      window.removeEventListener('registrationUpdated', handleRegistrationUpdate)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [fetchRegistrations])
+
+
 
   // Memoize expensive filtering operations for each tab with optimized search
   const emailFilteredRegistrations = useMemo(() => {
@@ -1371,6 +1467,19 @@ export default function CommunicationsPage() {
                         disabled={isSendingBulkEmail}
                       >
                         Reminder
+                      </button>
+                      <span className="text-gray-300 hidden sm:inline">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setBulkEmailData(prev => ({
+                          ...prev,
+                          subject: 'Your Registration Information & QR Code',
+                          message: 'Dear [Name],\n\nThank you for registering for LINGER NO LONGER 6.0! Please find your registration details below:\n\n📋 REGISTRATION DETAILS:\n• Full Name: [Your Name]\n• Registration ID: [Registration ID]\n• Date of Birth: [Date of Birth]\n• Gender: [Gender]\n• Phone: [Phone Number]\n• Email: [Email Address]\n• Registration Date: [Registration Date]\n\n📱 QR CODE:\nYour unique QR code is attached to this email. Please:\n• Save it to your phone\n• Present it during check-in\n• Keep it accessible throughout the event\n\n✅ NEXT STEPS:\n1. Save your QR code\n2. Wait for room allocation notification\n3. Prepare for the event\n\nIf you have any questions, please contact our support team.\n\nBest regards,\nYouth Program Team\n\n---\nThis email contains your personal registration information. Please keep it secure.'
+                        }))}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-apercu-regular px-2 py-1 rounded bg-indigo-50 sm:bg-transparent sm:px-0 sm:py-0"
+                        disabled={isSendingBulkEmail}
+                      >
+                        Registration Info
                       </button>
                     </div>
                   </div>

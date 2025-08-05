@@ -125,63 +125,80 @@ export async function POST(request: NextRequest) {
       message: 'Registration submitted successfully'
     })
 
+    // Add headers to trigger real-time updates in admin communications
+    response.headers.set('X-Registration-Updated', 'true')
+    response.headers.set('X-Registration-Action', 'new')
+    response.headers.set('X-New-Registration-Data', JSON.stringify({
+      id: registration.id,
+      fullName: registration.fullName,
+      emailAddress: registration.emailAddress,
+      phoneNumber: registration.phoneNumber,
+      gender: registration.gender,
+      isVerified: registration.isVerified,
+      createdAt: registration.createdAt
+    }))
+
     // Process background tasks without blocking the response
     // These operations will continue after the response is sent
-    Promise.allSettled([
-      // Generate QR code for the registration
-      generateRegistrationQR(registration.id).then(qrResult => {
+    Promise.resolve().then(async () => {
+      try {
+        // First, generate QR code synchronously
+        console.log('🔄 Generating QR code for registration:', registration.id)
+        const qrResult = await generateRegistrationQR(registration.id)
         if (qrResult.success) {
-          console.log('QR code generated for registration:', registration.id)
+          console.log('✅ QR code generated for registration:', registration.id)
         } else {
-          console.error('Failed to generate QR code:', qrResult.error)
+          console.error('❌ Failed to generate QR code:', qrResult.error)
         }
-      }).catch(qrError => {
-        console.error('QR code generation error:', qrError)
-      }),
 
-      // Create notification record in database
-      prisma.notification.create({
-        data: {
-          type: 'new_registration',
-          title: 'New Registration',
-          message: `${registration.fullName} has registered for the youth program`,
-          priority: 'medium',
-          metadata: JSON.stringify({
-            registrationId: registration.id,
-            participantName: registration.fullName,
-            participantEmail: registration.emailAddress,
-            participantPhone: registration.phoneNumber,
-            parentGuardian: registration.parentGuardianName,
-            registrationDate: registration.createdAt
+        // Get the updated registration with QR code
+        const updatedRegistration = await prisma.registration.findUnique({
+          where: { id: registration.id }
+        })
+
+        // Then run other tasks in parallel
+        const results = await Promise.allSettled([
+          // Create notification record in database
+          prisma.notification.create({
+            data: {
+              type: 'new_registration',
+              title: 'New Registration',
+              message: `${registration.fullName} has registered for the youth program`,
+              priority: 'medium',
+              metadata: JSON.stringify({
+                registrationId: registration.id,
+                participantName: registration.fullName,
+                participantEmail: registration.emailAddress,
+                participantPhone: registration.phoneNumber,
+                parentGuardian: registration.parentGuardianName,
+                registrationDate: registration.createdAt
+              })
+            }
+          }).then(() => {
+            console.log('✅ Database notification created for:', registration.fullName)
+          }),
+
+          // Send confirmation email with QR code to registrant (QR code is now ready)
+          sendRegistrationConfirmationEmail(updatedRegistration || registration).then(() => {
+            console.log('✅ Registration confirmation email sent to:', registration.emailAddress)
+          }),
+
+          // Send notification email to admins
+          sendRegistrationNotification(registration).then(() => {
+            console.log('✅ Registration notification sent for:', registration.fullName)
           })
-        }
-      }).then(() => {
-        console.log('Database notification created for:', registration.fullName)
-      }).catch(notificationError => {
-        console.error('Failed to create notification record:', notificationError)
-      }),
+        ])
 
-      // Send confirmation email with QR code to registrant
-      sendRegistrationConfirmationEmail(registration).then(() => {
-        console.log('Registration confirmation email sent to:', registration.emailAddress)
-      }).catch(emailError => {
-        console.error('Failed to send registration confirmation email:', emailError)
-      }),
-
-      // Send notification email to admins
-      sendRegistrationNotification(registration).then(() => {
-        console.log('Registration notification sent for:', registration.fullName)
-      }).catch(emailError => {
-        console.error('Failed to send registration notification:', emailError)
-      })
-    ]).then(results => {
-      console.log('Background tasks completed for registration:', registration.id)
-      // Log any failures for monitoring
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          console.error(`Background task ${index} failed:`, result.reason)
-        }
-      })
+        console.log('✅ Background tasks completed for registration:', registration.id)
+        // Log any failures for monitoring
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`❌ Background task ${index} failed:`, result.reason)
+          }
+        })
+      } catch (error) {
+        console.error('❌ Background tasks error for registration:', registration.id, error)
+      }
     })
 
     return response

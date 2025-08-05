@@ -16,6 +16,21 @@ import { EmailConfigDisplay } from '@/components/admin/EmailConfigDisplay'
 import { useTranslation } from '@/contexts/LanguageContext'
 import { LogoManager } from '@/lib/logo-manager'
 import { RolesPermissionsManager } from '@/components/admin/RolesPermissionsManager'
+import { SettingsTestComponent } from '@/components/admin/SettingsTestComponent'
+
+import {
+  SettingsPageSkeleton,
+  SettingsTabSkeleton,
+  SettingsCardSkeleton,
+  NotificationCardSkeleton,
+  SecurityCardSkeleton
+} from '@/components/admin/SettingsSkeletons'
+import {
+  getDefaultSettingsByCategory,
+  mergeWithDefaults,
+  SettingDefinition
+} from '@/lib/default-settings'
+
 // import { BackupIntegrationGuide } from '@/components/admin/BackupIntegrationGuide'
 import {
   Settings,
@@ -28,11 +43,12 @@ import {
   Download,
   Upload,
   Save,
+  Eye,
+  EyeOff,
+  Send,
+  Loader2,
   Check,
   AlertCircle,
-  Eye,
-  // EyeOff, // Commented out as unused
-  Loader2,
   Image,
   RefreshCw,
   Trash2,
@@ -67,7 +83,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false) // Start with false for instant display
   const [saving, setSaving] = useState(false)
   // Removed legacy message state - now using useToast consistently
-  const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [editingCategories, setEditingCategories] = useState<Record<string, boolean>>({})
+  const [editingSections, setEditingSections] = useState<Record<string, boolean>>({})
   const [userRole, setUserRole] = useState<string>('')
   const [testingEmail, setTestingEmail] = useState(false)
   const [testingSms, setTestingSms] = useState(false)
@@ -75,6 +92,7 @@ export default function SettingsPage() {
   const [testPhone, setTestPhone] = useState('')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [currentLogo, setCurrentLogo] = useState<string | null>(null)
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
 
   const [rateLimits, setRateLimits] = useState({
     apiRequests: { limit: 100, window: 'minute' },
@@ -89,38 +107,38 @@ export default function SettingsPage() {
 
   // Helper function to determine write access
   const hasWriteAccess = (tabId: string) => {
-    console.log('🔍 WRITE ACCESS CHECK:', {
-      tabId,
-      currentUser: currentUser ? {
-        email: currentUser.email,
-        roleName: currentUser.role?.name,
-        hasRole: !!currentUser.role
-      } : null
-    })
-
     if (!currentUser?.role?.name) {
-      console.log('❌ No user role - denying write access')
       return false
     }
 
     // Super Admin has write access to everything
     if (currentUser.role.name === 'Super Admin') {
-      console.log('✅ Super Admin - granting write access to', tabId)
       return true
     }
 
     // Admin has read-only access to security and notifications
     if (currentUser.role.name === 'Admin') {
-      if (tabId === 'security' || tabId === 'notifications') {
-        console.log('⚠️ Admin - read-only access to', tabId)
+      if (tabId.startsWith('security') || tabId.startsWith('notifications')) {
         return false // Read-only for Admin
       }
-      console.log('✅ Admin - granting write access to', tabId)
       return true // Write access to other tabs
     }
 
-    console.log('❌ Other role - denying write access')
     return false
+  }
+
+  const toggleEdit = (category: string) => {
+    setEditingCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }))
+  }
+
+  const toggleSectionEdit = (sectionId: string) => {
+    setEditingSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }))
   }
 
   // Helper function to show read-only warning
@@ -331,6 +349,7 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
+      // Load main settings
       const response = await fetch('/api/admin/settings')
 
       if (response.status === 403) {
@@ -367,6 +386,190 @@ export default function SettingsPage() {
           }))
         })
 
+        // Load additional settings (email, sms, notifications and security)
+        try {
+          const [emailRes, smsRes, notificationsRes, securityRes] = await Promise.all([
+            fetch('/api/admin/settings/email'),
+            fetch('/api/admin/settings/sms'),
+            fetch('/api/admin/settings/notifications'),
+            fetch('/api/admin/settings/security')
+          ])
+
+          // Load email settings
+          if (emailRes.ok) {
+            const emailData = await emailRes.json()
+            if (emailData.success) {
+              const emailMappings = {
+                smtpHost: { name: 'SMTP Host', description: 'SMTP server hostname' },
+                smtpPort: { name: 'SMTP Port', description: 'SMTP server port (587 for TLS, 465 for SSL)' },
+                smtpUser: { name: 'SMTP Username', description: 'SMTP authentication username' },
+                smtpPass: { name: 'SMTP Password', description: 'SMTP authentication password' },
+                smtpSecure: { name: 'Use SSL/TLS', description: 'Enable secure connection' },
+                emailFromName: { name: 'From Name', description: 'Display name for outgoing emails' },
+                emailReplyTo: { name: 'Reply To Email', description: 'Reply-to email address' },
+                adminEmails: { name: 'Admin Emails', description: 'Comma-separated admin email addresses' }
+              }
+
+              transformedSettings.email = Object.entries(emailData.settings).map(([key, value]) => {
+                const mapping = emailMappings[key as keyof typeof emailMappings] || { name: key, description: `Email setting: ${key}` }
+                let inputType = 'text'
+                if (typeof value === 'boolean') {
+                  inputType = 'boolean'
+                } else if (typeof value === 'number') {
+                  inputType = 'number'
+                } else if (key.includes('Pass')) {
+                  inputType = 'password'
+                } else if (key.includes('Email')) {
+                  inputType = 'email'
+                }
+
+                return {
+                  key,
+                  name: mapping.name,
+                  value,
+                  type: inputType,
+                  description: mapping.description
+                }
+              })
+            }
+          }
+
+          // Load SMS settings
+          if (smsRes.ok) {
+            const smsData = await smsRes.json()
+            if (smsData.success) {
+              const smsMappings = {
+                smsEnabled: { name: 'Enable SMS', description: 'Enable SMS notifications' },
+                smsProvider: { name: 'SMS Provider', description: 'SMS service provider' },
+                smsApiKey: { name: 'API Key', description: 'SMS provider API key' },
+                smsApiSecret: { name: 'API Secret', description: 'SMS provider API secret' },
+                smsFromNumber: { name: 'From Number/Name', description: 'Sender ID or phone number' },
+                smsRegion: { name: 'Region', description: 'SMS service region' },
+                smsGatewayUrl: { name: 'Gateway URL', description: 'Custom SMS gateway URL (if applicable)' },
+                smsUsername: { name: 'Username', description: 'SMS provider username (if required)' }
+              }
+
+              transformedSettings.sms = Object.entries(smsData.settings).map(([key, value]) => {
+                const mapping = smsMappings[key as keyof typeof smsMappings] || { name: key, description: `SMS setting: ${key}` }
+                let inputType = 'text'
+                if (typeof value === 'boolean') {
+                  inputType = 'boolean'
+                } else if (key.includes('Api') || key.includes('Secret')) {
+                  inputType = 'password'
+                } else if (key === 'smsProvider') {
+                  inputType = 'select'
+                }
+
+                const setting: any = {
+                  key,
+                  name: mapping.name,
+                  value,
+                  type: inputType,
+                  description: mapping.description
+                }
+
+                // Add options for SMS provider
+                if (key === 'smsProvider') {
+                  setting.options = [
+                    { value: 'twilio', label: 'Twilio' },
+                    { value: 'aws-sns', label: 'AWS SNS' },
+                    { value: 'termii', label: 'Termii' },
+                    { value: 'kudisms', label: 'KudiSMS' },
+                    { value: 'bulk-sms-nigeria', label: 'Bulk SMS Nigeria' },
+                    { value: 'smart-sms', label: 'Smart SMS' }
+                  ]
+                }
+
+                return setting
+              })
+            }
+          }
+
+          // Load notification settings
+          if (notificationsRes.ok) {
+            const notificationsData = await notificationsRes.json()
+            if (notificationsData.success) {
+              // Create proper notification settings with correct names and descriptions
+              const notificationMappings = {
+                emailOnRegistration: { name: 'New Registration', description: 'Send email when someone registers' },
+                emailOnVerification: { name: 'Verification Complete', description: 'Send email when registration is verified' },
+                emailOnAllocation: { name: 'Room Allocation', description: 'Send email when room is allocated' },
+                emailOnPlatoonAssignment: { name: 'Platoon Assignment', description: 'Send email when assigned to platoon' },
+                emailDailyReport: { name: 'Daily Reports', description: 'Send daily summary reports to admins' },
+                emailWeeklyReport: { name: 'Weekly Reports', description: 'Send weekly summary reports to admins' },
+                smsOnRegistration: { name: 'Registration Confirmation', description: 'Send SMS confirmation when someone registers' },
+                smsOnVerification: { name: 'Verification Complete', description: 'Send SMS when registration is verified' },
+                smsOnAllocation: { name: 'Room Allocation', description: 'Send SMS when room is allocated' },
+                smsReminders: { name: 'Event Reminders', description: 'Send SMS reminders before events' },
+                smsUrgentAlerts: { name: 'Urgent Alerts', description: 'Send SMS for urgent notifications only' },
+                notificationDelay: { name: 'Notification Delay', description: 'Minutes to wait before sending notifications' },
+                reminderAdvance: { name: 'Reminder Advance Time', description: 'Hours before event to send reminders' },
+                quietHoursStart: { name: 'Quiet Hours Start', description: 'Time to stop sending notifications (24h format)' },
+                quietHoursEnd: { name: 'Quiet Hours End', description: 'Time to resume sending notifications (24h format)' }
+              }
+
+              transformedSettings.notifications = Object.entries(notificationsData.settings).map(([key, value]) => {
+                const mapping = notificationMappings[key as keyof typeof notificationMappings] || { name: key, description: `Notification setting: ${key}` }
+
+                // Determine the correct input type based on key patterns and value type
+                let inputType = 'text'
+                if (typeof value === 'boolean' || key.startsWith('email') || key.startsWith('sms')) {
+                  inputType = 'boolean'
+                } else if (typeof value === 'number' || key.includes('Delay') || key.includes('Advance')) {
+                  inputType = 'number'
+                } else if (key.includes('quiet') && key.includes('Hours')) {
+                  inputType = 'time'
+                }
+
+                return {
+                  key,
+                  name: mapping.name,
+                  value,
+                  type: inputType,
+                  description: mapping.description
+                }
+              })
+            }
+          }
+
+          // Load security settings
+          if (securityRes.ok) {
+            const securityData = await securityRes.json()
+            if (securityData.success) {
+              const securityMappings = {
+                sessionTimeout: { name: 'Session Timeout', description: 'Minutes before auto-logout' },
+                maxLoginAttempts: { name: 'Max Login Attempts', description: 'Failed attempts before lockout' },
+                lockoutDuration: { name: 'Lockout Duration', description: 'Minutes to lock account after failed attempts' },
+                passwordMinLength: { name: 'Minimum Password Length', description: 'Minimum characters required' },
+                requireStrongPassword: { name: 'Require Strong Passwords', description: 'Enforce uppercase, lowercase, numbers, symbols' },
+                twoFactorAuth: { name: 'Two-Factor Authentication', description: 'Enable 2FA for admin accounts' },
+                encryptSensitiveData: { name: 'Encrypt Sensitive Data', description: 'Encrypt personal information in database' },
+                enableAuditLog: { name: 'Enable Audit Logging', description: 'Log all admin actions for security auditing' },
+                anonymizeData: { name: 'Data Anonymization', description: 'Anonymize data for analytics and reporting' },
+                gdprCompliance: { name: 'GDPR Compliance Mode', description: 'Enable GDPR compliance features' },
+                dataRetentionPolicy: { name: 'Data Retention Policy', description: 'Automatically delete old data based on policy' },
+                apiRateLimit: { name: 'API Rate Limit', description: 'Requests per minute per IP' },
+                apiKeyRequired: { name: 'Require API Keys', description: 'Require API keys for external access' },
+                corsEnabled: { name: 'Enable CORS', description: 'Allow cross-origin requests' },
+                ipWhitelist: { name: 'IP Whitelist', description: 'Comma-separated list of allowed IPs' }
+              }
+
+              transformedSettings.security = Object.entries(securityData.settings).map(([key, value]) => {
+                const mapping = securityMappings[key as keyof typeof securityMappings] || { name: key, description: `Security setting: ${key}` }
+                return {
+                  key,
+                  name: mapping.name,
+                  value,
+                  type: typeof value === 'boolean' ? 'boolean' : typeof value === 'number' ? 'number' : 'text',
+                  description: mapping.description
+                }
+              })
+            }
+          }
+        } catch (additionalError) {
+          console.warn('Failed to load additional settings:', additionalError)
+        }
+
         setSettings(transformedSettings)
       } else {
         throw new Error('Invalid response format')
@@ -387,16 +590,31 @@ export default function SettingsPage() {
 
   const updateSetting = (category: string, settingId: string, newValue: string | boolean) => {
     try {
+      // Check if user has write access to this category
+      if (!hasWriteAccess(category)) {
+        console.warn(`User does not have write access to category: ${category}`)
+        error('Access Denied', 'You do not have permission to edit these settings. Contact a Super Admin for assistance.')
+        return
+      }
+
       setSettings(prev => {
         // Validate previous settings exist
         if (!prev || typeof prev !== 'object') {
           console.error('Settings object is invalid:', prev)
+          error('Data Error', 'Settings data is not properly loaded. Please refresh the page.')
           return prev
         }
 
         // Validate category exists and is an array
-        if (!prev[category] || !Array.isArray(prev[category])) {
+        if (!prev[category]) {
+          console.error(`Category ${category} does not exist in settings:`, Object.keys(prev))
+          error('Category Error', `Settings category "${category}" not found. Please refresh the page.`)
+          return prev
+        }
+
+        if (!Array.isArray(prev[category])) {
           console.error(`Category ${category} is not a valid array:`, prev[category])
+          error('Data Structure Error', `Settings for "${category}" are not properly formatted. Please refresh the page.`)
           return prev
         }
 
@@ -409,7 +627,19 @@ export default function SettingsPage() {
               return setting
             }
 
-            return setting.key === settingId ? { ...setting, value: newValue } : setting
+            if (setting.key === settingId) {
+              // Convert the value to the correct type based on setting type
+              let convertedValue = newValue
+
+              if (setting.type === 'number') {
+                convertedValue = Number(newValue) || 0
+              } else if (setting.type === 'boolean' || setting.type === 'toggle') {
+                convertedValue = newValue === true || newValue === 'true' || newValue === 1 || newValue === '1'
+              }
+
+              return { ...setting, value: convertedValue }
+            }
+            return setting
           })
         }
       })
@@ -430,11 +660,15 @@ export default function SettingsPage() {
   const saveSettings = async (category: string) => {
     setSaving(true)
     try {
-      // Use specialized API endpoints for email and SMS
+      // Use specialized API endpoints for different categories
       if (category === 'email') {
         await saveEmailSettings()
       } else if (category === 'sms') {
         await saveSmsSettings()
+      } else if (category.startsWith('notifications')) {
+        await saveNotificationSettings()
+      } else if (category.startsWith('security')) {
+        await saveSecuritySettings()
       } else {
         // Use general settings API for other categories
         // Validate settings object exists
@@ -493,15 +727,37 @@ export default function SettingsPage() {
 
       // Show success toast
       success('Settings Saved Successfully', `${getCategoryDisplayName(category)} settings have been saved and are now in effect across the system.`)
-      setEditingCategory(null)
+
+      // Exit editing mode for both category and all sections
+      setEditingCategories(prev => ({ ...prev, [category]: false }))
+
+      // Reset all section editing states for this category
+      setEditingSections(prev => {
+        const newState = { ...prev }
+        // Reset all sections that belong to this category
+        Object.keys(newState).forEach(sectionId => {
+          if (sectionId.startsWith(category)) {
+            newState[sectionId] = false
+          }
+        })
+        return newState
+      })
     } catch (error) {
       const errorMessage = parseApiError(error)
+      console.error('Settings save error:', {
+        error,
+        errorMessage,
+        category,
+        currentUser: currentUser?.email,
+        userRole: currentUser?.role?.name
+      })
+
       setErrorModal({
         isOpen: true,
         type: 'error',
         title: 'Failed to Save Settings',
         description: 'Unable to save the settings changes. This could be due to validation errors or insufficient permissions.',
-        details: `Error: ${errorMessage}\nCategory: ${getCategoryDisplayName(category)}\nTime: ${new Date().toISOString()}`,
+        details: `Error: ${errorMessage}\nCategory: ${getCategoryDisplayName(category)}\nUser: ${currentUser?.email}\nRole: ${currentUser?.role?.name}\nTime: ${new Date().toISOString()}`,
         errorCode: 'SETTINGS_SAVE_ERROR'
       })
     } finally {
@@ -661,6 +917,111 @@ export default function SettingsPage() {
     console.log('SMS settings save result:', result) // Debug log
   }
 
+  const saveNotificationSettings = async () => {
+
+    if (!settings || typeof settings !== 'object') {
+      throw new Error('Settings not loaded. Please refresh the page.')
+    }
+
+    const notificationSettings = settings.notifications || []
+
+    // Use mergeWithDefaults to get settings with proper type information
+    const mergedNotificationSettings = mergeWithDefaults(notificationSettings, 'notifications')
+
+    if (!Array.isArray(mergedNotificationSettings) || mergedNotificationSettings.length === 0) {
+      throw new Error('No notification settings found. Please refresh the page and try again.')
+    }
+
+    // Collect all notification settings from the merged state (which has type info)
+    const notificationData = mergedNotificationSettings.reduce((acc, setting) => {
+      if (!setting || typeof setting !== 'object' || !setting.key) {
+        console.warn('Invalid setting object:', setting)
+        return acc
+      }
+
+      // Values should already be properly typed from updateSetting function
+      let value = setting.value
+
+      acc[setting.key] = value
+      return acc
+    }, {} as Record<string, any>)
+
+
+
+    if (Object.keys(notificationData).length === 0) {
+      throw new Error('No valid notification settings to save. Please check the settings data.')
+    }
+
+    const response = await fetch('/api/admin/settings/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(notificationData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+
+      throw new Error(errorData.error || 'Failed to save notification settings')
+    }
+
+    const result = await response.json()
+    console.log('Notification settings save result:', result)
+  }
+
+  const saveSecuritySettings = async () => {
+
+    if (!settings || typeof settings !== 'object') {
+      throw new Error('Settings not loaded. Please refresh the page.')
+    }
+
+    const securitySettings = settings.security || []
+
+    // Use mergeWithDefaults to get settings with proper type information
+    const mergedSecuritySettings = mergeWithDefaults(securitySettings, 'security')
+
+    if (!Array.isArray(mergedSecuritySettings) || mergedSecuritySettings.length === 0) {
+      throw new Error('No security settings found. Please refresh the page and try again.')
+    }
+
+    const securityData = mergedSecuritySettings.reduce((acc, setting) => {
+      if (!setting || typeof setting !== 'object' || !setting.key) {
+        console.warn('Invalid setting object:', setting)
+        return acc
+      }
+
+      // Values should already be properly typed from updateSetting function
+      let value = setting.value
+
+      acc[setting.key] = value
+      return acc
+    }, {} as Record<string, any>)
+
+
+
+    if (Object.keys(securityData).length === 0) {
+      throw new Error('No valid security settings to save. Please check the settings data.')
+    }
+
+    const response = await fetch('/api/admin/settings/security', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(securityData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+
+      throw new Error(errorData.error || 'Failed to save security settings')
+    }
+
+    const result = await response.json()
+    console.log('Security settings save result:', result)
+  }
+
   const testEmailConfiguration = async () => {
     if (!testEmail) {
       error('Missing Email', 'Please enter an email address to send the test email to.')
@@ -701,8 +1062,24 @@ export default function SettingsPage() {
 
     setTestingEmail(true)
     try {
-      // Test email functionality has been removed
-      throw new Error('Email testing functionality is not available')
+      const response = await fetch('/api/admin/settings/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'test',
+          testEmail: testEmail || 'admin@example.com'
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        success('Test Email Sent', data.message || 'Test email sent successfully')
+      } else {
+        throw new Error(data.error || 'Failed to send test email')
+      }
     } catch (err) {
       console.error('Email test error:', err)
       error('Test Email Failed', err instanceof Error ? err.message : 'Failed to send test email')
@@ -759,6 +1136,13 @@ export default function SettingsPage() {
     } finally {
       setTestingSms(false)
     }
+  }
+
+  const togglePasswordVisibility = (settingId: string) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [settingId]: !prev[settingId]
+    }))
   }
 
   const configureEmailFromEnv = async () => {
@@ -1270,7 +1654,7 @@ export default function SettingsPage() {
 
   // Helper function to render edit buttons
   const renderEditButtons = (categoryId: string) => {
-    const isEditing = editingCategory === categoryId
+    const isEditing = editingCategories[categoryId] || false
     const canEdit = hasWriteAccess(categoryId)
 
     // Show read-only indicator for Admin users on restricted tabs
@@ -1290,7 +1674,7 @@ export default function SettingsPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setEditingCategory(categoryId)}
+          onClick={() => setEditingCategories(prev => ({ ...prev, [categoryId]: true }))}
           className="font-apercu-medium"
         >
           <Settings className="h-4 w-4 mr-1" />
@@ -1303,7 +1687,7 @@ export default function SettingsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setEditingCategory(null)}
+            onClick={() => setEditingCategories(prev => ({ ...prev, [categoryId]: false }))}
             className="font-apercu-medium"
           >
             Cancel
@@ -1311,6 +1695,71 @@ export default function SettingsPage() {
           <Button
             size="sm"
             onClick={() => saveSettings(categoryId)}
+            disabled={saving}
+            className="font-apercu-medium"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-1" />
+                Save
+              </>
+            )}
+          </Button>
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  // Helper function to render section-specific edit buttons
+  const renderSectionEditButtons = (sectionId: string, category: string) => {
+    const isEditing = editingSections[sectionId] || false
+    const canEdit = hasWriteAccess(category)
+
+    // Show read-only indicator for Admin users on restricted tabs
+    if (!canEdit && currentUser?.role?.name === 'Admin') {
+      return (
+        <div className="flex items-center text-amber-600">
+          <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm font-medium">Read Only</span>
+        </div>
+      )
+    }
+
+    if (!isEditing && canEdit) {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setEditingSections(prev => ({ ...prev, [sectionId]: true }))}
+          className="font-apercu-medium"
+        >
+          <Settings className="h-4 w-4 mr-1" />
+          Edit
+        </Button>
+      )
+    } else if (canEdit && isEditing) {
+      return (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditingSections(prev => ({ ...prev, [sectionId]: false }))}
+            className="font-apercu-medium"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => saveSettings(category)}
             disabled={saving}
             className="font-apercu-medium"
           >
@@ -1646,56 +2095,465 @@ export default function SettingsPage() {
   )
 
   // Communications Tab Content
-  const renderCommunicationsTab = () => (
-    <div className="space-y-6">
-      <Card className="p-6 bg-white">
-        <div className="text-center py-8">
-          <Mail className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Communications Management</h3>
-          <p className="font-apercu-regular text-sm text-gray-600 mb-4">
-            Manage email and SMS communications, test configurations, and send bulk messages.
-          </p>
-          <Button
-            onClick={() => window.location.href = '/admin/communications'}
-            className="font-apercu-medium bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            Go to Communications
-          </Button>
-        </div>
-      </Card>
-    </div>
-  )
+  const renderCommunicationsTab = () => {
+    // Get email and SMS settings from loaded settings
+    const emailSettings = settings?.email || []
+    const smsSettings = settings?.sms || []
+
+    return (
+      <div className="space-y-6">
+        {/* Email Configuration Section */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4">
+                <Mail className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">Email Configuration</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure SMTP settings for email notifications</p>
+              </div>
+            </div>
+            {renderEditButtons('email')}
+          </div>
+
+          {/* Email Settings List */}
+          {loading ? (
+            <div className="space-y-4 mb-6">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                  <div className="flex-1 min-w-0 lg:pr-4">
+                    <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-1"></div>
+                    <div className="h-3 w-48 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                    <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : emailSettings && Array.isArray(emailSettings) && emailSettings.length > 0 ? (
+            <div className="space-y-4 mb-6">
+              {emailSettings.filter(setting => setting && setting.key).map((setting) => (
+                <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                  <div className="flex-1 min-w-0 lg:pr-4">
+                    <p className="font-apercu-medium text-sm text-gray-900">{setting.name || 'Unknown Setting'}</p>
+                    {setting.description && (
+                      <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                    {renderSettingInput('email', setting)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Show default settings if none loaded */}
+          {(!emailSettings || emailSettings.length === 0) &&
+            getDefaultSettingsByCategory('email').map((setting) => (
+              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                <div className="flex-1 min-w-0 lg:pr-4">
+                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                  <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                </div>
+                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                  {renderSettingInput('email', setting)}
+                </div>
+              </div>
+            ))}
+        </Card>
+
+        {/* SMS Configuration Section */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
+                <Phone className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">SMS Configuration</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure SMS provider settings for text notifications</p>
+              </div>
+            </div>
+            {renderEditButtons('sms')}
+          </div>
+
+          {/* SMS Settings List */}
+          {smsSettings && Array.isArray(smsSettings) && smsSettings.length > 0 && (
+            <div className="space-y-4 mb-6">
+              {smsSettings.filter(setting => setting && setting.key).map((setting) => (
+                <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                  <div className="flex-1 min-w-0 lg:pr-4">
+                    <p className="font-apercu-medium text-sm text-gray-900">{setting.name || 'Unknown Setting'}</p>
+                    {setting.description && (
+                      <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                    {renderSettingInput('sms', setting)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Show default settings if none loaded */}
+          {(!smsSettings || smsSettings.length === 0) &&
+            getDefaultSettingsByCategory('sms').map((setting) => (
+              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                <div className="flex-1 min-w-0 lg:pr-4">
+                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                  <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                </div>
+                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                  {renderSettingInput('sms', setting)}
+                </div>
+              </div>
+            ))}
+        </Card>
+
+        {/* Quick Actions */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-apercu-bold text-lg text-gray-900">Quick Actions</h3>
+              <p className="font-apercu-regular text-sm text-gray-600">Test and manage communication settings</p>
+            </div>
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => window.location.href = '/admin/communications'}
+                variant="outline"
+                className="font-apercu-medium"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Full Communications Page
+              </Button>
+              <Button
+                onClick={testEmailConfiguration}
+                disabled={testingEmail}
+                className="font-apercu-medium"
+              >
+                {testingEmail ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Test Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   // Security Tab Content
-  const renderSecurityTab = () => (
-    <div className="space-y-6">
-      <Card className="p-6 bg-white">
-        <div className="text-center py-8">
-          <Shield className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Security</h3>
-          <p className="font-apercu-regular text-sm text-gray-600">
-            Security settings are available in Data Management.
-          </p>
-        </div>
-      </Card>
-    </div>
-  )
+  const renderSecurityTab = () => {
+    const securitySettings = settings?.security || []
+
+    return (
+      <div className="space-y-6">
+        {/* Authentication Settings */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
+                <Shield className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">Authentication & Access</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure login and access security settings</p>
+              </div>
+            </div>
+            {renderSectionEditButtons('security-auth', 'security')}
+          </div>
+
+          {/* Authentication Settings List */}
+          <div className="space-y-4 mb-6">
+            {mergeWithDefaults(securitySettings, 'security')
+              .filter(setting => ['sessionTimeout', 'maxLoginAttempts', 'lockoutDuration', 'passwordMinLength', 'requireStrongPassword', 'twoFactorAuth'].includes(setting.key))
+              .map((setting) => (
+                <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                  <div className="flex-1 min-w-0 lg:pr-4">
+                    <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                  </div>
+                  <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                    {renderSettingInput('security', setting, 'security-auth')}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+
+        {/* Data Protection */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mr-4">
+                <Database className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">Data Protection</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure data encryption and privacy settings</p>
+              </div>
+            </div>
+            {renderSectionEditButtons('security-data', 'security')}
+          </div>
+
+          {/* Data Protection Settings List */}
+          <div className="space-y-4 mb-6">
+            {mergeWithDefaults(securitySettings, 'security')
+              .filter(setting => ['encryptSensitiveData', 'enableAuditLog', 'anonymizeData', 'gdprCompliance', 'dataRetentionPolicy'].includes(setting.key))
+              .map((setting) => (
+                <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                  <div className="flex-1 min-w-0 lg:pr-4">
+                    <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                  </div>
+                  <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                    {renderSettingInput('security', setting, 'security-data')}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+
+        {/* API Security */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4">
+                <Zap className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">API Security</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure API access and rate limiting</p>
+              </div>
+            </div>
+            {renderSectionEditButtons('security-api', 'security')}
+          </div>
+
+          {/* API Security Settings List */}
+          <div className="space-y-4 mb-6">
+            {mergeWithDefaults(securitySettings, 'security')
+              .filter(setting => ['apiRateLimit', 'apiKeyRequired', 'corsEnabled', 'ipWhitelist'].includes(setting.key))
+              .map((setting) => (
+                <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                  <div className="flex-1 min-w-0 lg:pr-4">
+                    <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                  </div>
+                  <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                    {renderSettingInput('security', setting, 'security-api')}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+
+        {/* Security Actions */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-apercu-bold text-lg text-gray-900">Security Actions</h3>
+              <p className="font-apercu-regular text-sm text-gray-600">Manage security-related actions</p>
+            </div>
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => window.location.href = '/admin/users'}
+                variant="outline"
+                className="font-apercu-medium"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Manage Users
+              </Button>
+              <Button
+                onClick={() => window.location.href = '/admin/settings?tab=roles'}
+                variant="outline"
+                className="font-apercu-medium"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Roles & Permissions
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   // Notifications Tab Content
-  const renderNotificationsTab = () => (
-    <div className="space-y-6">
-      <Card className="p-6 bg-white">
-        <div className="text-center py-8">
-          <Bell className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
-          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Notifications</h3>
-          <p className="font-apercu-regular text-sm text-gray-600">
-            Notification settings are available in Data Management.
-          </p>
-        </div>
-      </Card>
-    </div>
-  )
+  const renderNotificationsTab = () => {
+    // Use mergeWithDefaults to ensure we always have the default settings
+    const notificationSettings = settings?.notifications || []
+    const mergedNotificationSettings = mergeWithDefaults(notificationSettings, 'notifications')
+
+    return (
+      <div className="space-y-6">
+        {/* Email Notifications */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center mr-4">
+                <Mail className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">Email Notifications</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure when to send email notifications</p>
+              </div>
+            </div>
+            {renderSectionEditButtons('notifications-email', 'notifications')}
+          </div>
+
+          {/* Email Notification Settings List */}
+          <div className="space-y-4 mb-6">
+            {mergedNotificationSettings.filter(setting =>
+              setting && setting.key && setting.key.startsWith('email')
+            ).map((setting) => (
+              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                <div className="flex-1 min-w-0 lg:pr-4">
+                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                  <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                </div>
+                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                  {renderSettingInput('notifications', setting, 'notifications-email')}
+                </div>
+              </div>
+            ))}
+
+            {/* Show default settings if none loaded */}
+            {(!mergedNotificationSettings || mergedNotificationSettings.filter(s => s.key?.startsWith('email')).length === 0) &&
+              getDefaultSettingsByCategory('notifications')
+                .filter(setting => setting.key.startsWith('email'))
+                .map((setting) => (
+                  <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                    <div className="flex-1 min-w-0 lg:pr-4">
+                      <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                      <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                    </div>
+                    <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                      {renderSettingInput('notifications', setting, 'notifications-email')}
+                    </div>
+                  </div>
+                ))}
+          </div>
+        </Card>
+
+        {/* SMS Notifications */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4">
+                <Phone className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">SMS Notifications</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure when to send SMS notifications</p>
+              </div>
+            </div>
+            {renderSectionEditButtons('notifications-sms', 'notifications')}
+          </div>
+
+          {/* SMS Notification Settings List */}
+          <div className="space-y-4 mb-6">
+            {mergedNotificationSettings.filter(setting =>
+              setting && setting.key && setting.key.startsWith('sms')
+            ).map((setting) => (
+              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                <div className="flex-1 min-w-0 lg:pr-4">
+                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                  <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                </div>
+                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                  {renderSettingInput('notifications', setting, 'notifications-sms')}
+                </div>
+              </div>
+            ))}
+
+            {/* Show default settings if none loaded */}
+            {(!mergedNotificationSettings || mergedNotificationSettings.filter(s => s.key?.startsWith('sms')).length === 0) &&
+              getDefaultSettingsByCategory('notifications')
+                .filter(setting => setting.key.startsWith('sms'))
+                .map((setting) => (
+                  <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                    <div className="flex-1 min-w-0 lg:pr-4">
+                      <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                      <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                    </div>
+                    <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                      {renderSettingInput('notifications', setting, 'notifications-sms')}
+                    </div>
+                  </div>
+                ))}
+          </div>
+        </Card>
+
+        {/* Notification Timing */}
+        <Card className="p-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="h-10 w-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
+                <Clock className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-apercu-bold text-lg text-gray-900">Notification Timing</h3>
+                <p className="font-apercu-regular text-sm text-gray-600">Configure when notifications are sent</p>
+              </div>
+            </div>
+            {renderSectionEditButtons('notifications-timing', 'notifications')}
+          </div>
+
+          {/* Notification Timing Settings List */}
+          <div className="space-y-4 mb-6">
+            {mergedNotificationSettings.filter(setting =>
+              setting && setting.key && (
+                setting.key.includes('notification') ||
+                setting.key.includes('reminder') ||
+                setting.key.includes('quiet')
+              )
+            ).map((setting) => (
+              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                <div className="flex-1 min-w-0 lg:pr-4">
+                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                  <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                </div>
+                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                  {renderSettingInput('notifications', setting, 'notifications-timing')}
+                </div>
+              </div>
+            ))}
+
+            {/* Show default settings if none loaded */}
+            {(!mergedNotificationSettings || mergedNotificationSettings.filter(s => s.key && (s.key.includes('notification') || s.key.includes('reminder') || s.key.includes('quiet'))).length === 0) &&
+              getDefaultSettingsByCategory('notifications')
+                .filter(setting => setting.key.includes('notification') || setting.key.includes('reminder') || setting.key.includes('quiet'))
+                .map((setting) => (
+                  <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
+                    <div className="flex-1 min-w-0 lg:pr-4">
+                      <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
+                      <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
+                    </div>
+                    <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
+                      {renderSettingInput('notifications', setting, 'notifications-timing')}
+                    </div>
+                  </div>
+                ))}
+          </div>
+        </Card>
+
+        {/* Settings Integration Test */}
+        <SettingsTestComponent />
+      </div>
+    )
+  }
 
   // Rate Limits Tab Content
   const renderRateLimitsTab = () => (
@@ -2169,7 +3027,7 @@ export default function SettingsPage() {
   // Removed settingsCategories as it's not used in the current implementation
 
 
-  const renderSettingInput = (category: string, setting: SettingItem) => {
+  const renderSettingInput = (category: string, setting: SettingItem, sectionId?: string) => {
     // Validate inputs to prevent runtime errors
     if (!setting || !setting.key || !setting.type) {
       console.warn('Invalid setting object:', setting)
@@ -2180,21 +3038,64 @@ export default function SettingsPage() {
       )
     }
 
-    const isEditing = editingCategory === category
+    const isEditing = sectionId ? (editingSections[sectionId] || false) : (editingCategories[category] || false)
+    const canEdit = hasWriteAccess(category)
     const settingValue = setting.value ?? ''
+
+    // Show read-only state for restricted categories
+    if (!canEdit && currentUser?.role?.name === 'Admin') {
+      return (
+        <div className="flex items-center space-x-2">
+          {(setting.type === 'toggle' || setting.type === 'boolean') ? (
+            <div className="flex items-center space-x-2">
+              <Badge
+                className={`font-apercu-medium text-xs ${
+                  (settingValue === true || settingValue === 'true' || settingValue === 1 || settingValue === '1')
+                    ? 'bg-green-100 text-green-800 border-green-200'
+                    : 'bg-gray-100 text-gray-800 border-gray-200'
+                }`}
+              >
+                {(settingValue === true || settingValue === 'true' || settingValue === 1 || settingValue === '1') ? 'Enabled' : 'Disabled'}
+              </Badge>
+              <Badge variant="outline" className="font-apercu-medium text-xs text-amber-600 border-amber-200">
+                Read Only
+              </Badge>
+            </div>
+          ) : setting.type === 'password' ? (
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary" className="font-apercu-medium text-xs">
+                {settingValue ? '••••••••' : 'Not set'}
+              </Badge>
+              <Badge variant="outline" className="font-apercu-medium text-xs text-amber-600 border-amber-200">
+                Read Only
+              </Badge>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary" className="font-apercu-medium text-xs">
+                {settingValue ? settingValue.toString() : 'Not set'}
+              </Badge>
+              <Badge variant="outline" className="font-apercu-medium text-xs text-amber-600 border-amber-200">
+                Read Only
+              </Badge>
+            </div>
+          )}
+        </div>
+      )
+    }
 
     if (!isEditing) {
       return (
         <div className="flex items-center space-x-2">
-          {setting.type === 'toggle' ? (
+          {(setting.type === 'toggle' || setting.type === 'boolean') ? (
             <Badge
               className={`font-apercu-medium text-xs ${
-                settingValue
+                (settingValue === true || settingValue === 'true' || settingValue === 1 || settingValue === '1')
                   ? 'bg-green-100 text-green-800 border-green-200'
                   : 'bg-gray-100 text-gray-800 border-gray-200'
               }`}
             >
-              {settingValue ? 'Enabled' : 'Disabled'}
+              {(settingValue === true || settingValue === 'true' || settingValue === 1 || settingValue === '1') ? 'Enabled' : 'Disabled'}
             </Badge>
           ) : setting.type === 'password' ? (
             <Badge variant="secondary" className="font-apercu-medium text-xs">
@@ -2211,9 +3112,11 @@ export default function SettingsPage() {
 
     switch (setting.type) {
       case 'toggle':
+        // Improved boolean value detection
+        const toggleValue = settingValue === true || settingValue === 'true' || settingValue === 1 || settingValue === '1'
         return (
           <select
-            value={Boolean(settingValue) ? 'true' : 'false'}
+            value={toggleValue ? 'true' : 'false'}
             onChange={(e) => updateSetting(category, setting.key, e.target.value === 'true')}
             className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
           >
@@ -2233,18 +3136,25 @@ export default function SettingsPage() {
             {options.length === 0 && (
               <option value="">No options available</option>
             )}
-            {options.map((option, index) => (
-              <option key={`${option}-${index}`} value={option.toLowerCase()}>
-                {option}
-              </option>
-            ))}
+            {options.map((option, index) => {
+              // Handle both string options and object options with value/label
+              const optionValue = typeof option === 'object' ? option.value : option
+              const optionLabel = typeof option === 'object' ? option.label : option
+              return (
+                <option key={`${optionValue}-${index}`} value={optionValue}>
+                  {optionLabel}
+                </option>
+              )
+            })}
           </select>
         )
 
       case 'boolean':
+        // Improved boolean value detection
+        const boolValue = settingValue === true || settingValue === 'true' || settingValue === 1 || settingValue === '1'
         return (
           <select
-            value={Boolean(settingValue) ? 'true' : 'false'}
+            value={boolValue ? 'true' : 'false'}
             onChange={(e) => updateSetting(category, setting.key, e.target.value === 'true')}
             className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
           >
@@ -2271,6 +3181,16 @@ export default function SettingsPage() {
             onChange={(e) => updateSetting(category, setting.key, e.target.value)}
             placeholder="Enter SMTP password"
             className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm min-w-0"
+          />
+        )
+
+      case 'time':
+        return (
+          <input
+            type="time"
+            value={settingValue as string || ''}
+            onChange={(e) => updateSetting(category, setting.key, e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
           />
         )
 
@@ -2312,21 +3232,18 @@ export default function SettingsPage() {
   }
 
   // Show loading state while user data is being fetched
-  if (userLoading) {
+  if (userLoading || loading) {
     return (
       <AdminLayoutNew title={t('page.settings.title')} description={t('page.settings.description')}>
-        <div className="text-center py-12">
-          <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mx-auto" />
-          <p className="mt-4 font-apercu-regular text-gray-600">Loading user permissions...</p>
-        </div>
+        <SettingsPageSkeleton />
       </AdminLayoutNew>
     )
   }
 
 
 
-  // Check permissions - Allow Super Admin, Admin, Manager, and Staff roles
-  const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff']
+  // Check permissions - Allow Super Admin and Admin roles only
+  const allowedRoles = ['Super Admin', 'Admin']
   if (currentUser && !allowedRoles.includes(currentUser.role?.name || '')) {
     return (
       <AdminLayoutNew title={t('page.settings.title')} description={t('page.settings.description')}>

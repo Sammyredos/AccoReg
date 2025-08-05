@@ -11,6 +11,7 @@ import { authenticateRequest } from '@/lib/auth-helpers'
 import { verifyQRCode, generateRegistrationQR } from '@/lib/qr-code'
 import { Logger } from '@/lib/logger'
 import { broadcastAttendanceEvent } from '../events/route'
+import { sendVerificationConfirmationEmail } from '@/lib/email'
 
 const logger = new Logger('AttendanceVerification')
 
@@ -124,6 +125,28 @@ export async function POST(request: NextRequest) {
       method,
       verifiedBy: currentUser.email
     })
+
+    // Send verification confirmation email to participant
+    try {
+      const emailResult = await sendVerificationConfirmationEmail(updatedRegistration)
+      if (emailResult.success) {
+        logger.info('Verification confirmation email sent', {
+          registrationId: registration.id,
+          participantEmail: registration.emailAddress
+        })
+      } else {
+        logger.warn('Failed to send verification confirmation email', {
+          registrationId: registration.id,
+          error: emailResult.error
+        })
+      }
+    } catch (emailError) {
+      logger.error('Error sending verification confirmation email', {
+        registrationId: registration.id,
+        error: emailError
+      })
+      // Don't fail the verification if email sending fails
+    }
 
     // Small delay to ensure database transaction is committed before broadcasting
     await new Promise(resolve => setTimeout(resolve, 50))

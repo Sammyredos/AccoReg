@@ -230,11 +230,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    // Create response with real-time update headers
+    const response = NextResponse.json({
       success: true,
       message: 'Children registration submitted successfully',
       registrationId: registration.id
     })
+
+    // Add headers to trigger real-time updates in admin communications
+    response.headers.set('X-Registration-Updated', 'true')
+    response.headers.set('X-Registration-Action', 'new')
+    response.headers.set('X-New-Registration-Data', JSON.stringify({
+      id: registration.id,
+      fullName: registration.fullName,
+      emailAddress: registration.parentGuardianEmail,
+      phoneNumber: registration.parentGuardianPhone,
+      gender: registration.gender,
+      isVerified: false,
+      createdAt: registration.createdAt
+    }))
+
+    return response
 
   } catch (error: any) {
     console.error('Children registration error:', error)

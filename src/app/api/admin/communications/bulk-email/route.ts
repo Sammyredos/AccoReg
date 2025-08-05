@@ -2,6 +2,105 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { NotificationService } from '@/lib/notifications'
+import QRCode from 'qrcode'
+
+// Generate visual QR code as inline PNG for bulk emails (production-safe)
+async function generateInlineQRCodeForBulk(data: string): Promise<string> {
+  try {
+    // Generate QR code as PNG buffer with production-safe settings
+    const qrBuffer = await QRCode.toBuffer(data, {
+      errorCorrectionLevel: 'H', // High error correction for better reliability
+      margin: 4, // More margin for better scanning
+      color: {
+        dark: '#1f2937', // Darker color for better contrast
+        light: '#ffffff'
+      },
+      width: 200, // Smaller size for better email compatibility
+      type: 'png'
+    })
+
+    // Convert PNG buffer to base64 data URL for email embedding
+    const base64Png = qrBuffer.toString('base64')
+    return `data:image/png;base64,${base64Png}`
+  } catch (error) {
+    console.error('Error generating inline QR code for bulk email:', error)
+    return ''
+  }
+}
+
+// Helper function to generate QR code attachment for email
+async function generateQRCodeAttachment(registration: any): Promise<any> {
+  try {
+    if (!registration.qrCode) {
+      console.log('⚠️ No QR code data for registration:', registration.id)
+      return null
+    }
+
+    console.log('🔄 Generating QR code attachment for bulk email...')
+
+    // Generate QR code as PNG buffer with production-safe settings
+    const qrBuffer = await QRCode.toBuffer(registration.qrCode, {
+      errorCorrectionLevel: 'H', // High error correction for better reliability
+      margin: 4, // More margin for better scanning
+      color: {
+        dark: '#1f2937', // Darker color for better contrast
+        light: '#ffffff'
+      },
+      width: 400, // Good size for attachments
+      type: 'png'
+    })
+
+    console.log('✅ QR code attachment generated for bulk email')
+
+    return {
+      filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`,
+      content: qrBuffer,
+      contentType: 'image/png'
+    }
+  } catch (error) {
+    console.error('❌ Error generating QR code attachment for bulk email:', error)
+    return null
+  }
+}
+
+// Helper function to generate QR section HTML for email with visual QR code
+async function generateQRSectionHTML(registration: any): Promise<string> {
+  if (!registration.qrCode) {
+    return ''
+  }
+
+  // Generate visual QR code
+  const visualQRCode = await generateInlineQRCodeForBulk(registration.qrCode)
+
+  return `
+  <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 32px; margin: 32px 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+    ${visualQRCode ? `
+    <div style="text-align: center; margin: 24px 0; padding: 24px; background: #f8fafc; border-radius: 12px;">
+      <img src="${visualQRCode}" alt="QR Code" style="width: 200px; height: 200px; border: 2px solid #e5e7eb; border-radius: 8px; display: block; margin: 0 auto;" />
+    </div>
+    ` : ''}
+
+    <div style="background: #f9fafb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <p style="color: #4b5563; font-weight: 600; font-size: 13px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">📋 QR Code Data</p>
+      <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 11px; color: #374151; word-break: break-all; line-height: 1.4; background: #ffffff; padding: 8px; border-radius: 4px; display: block;">${registration.qrCode}</code>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <span style="font-size: 18px;">💡</span>
+        <div>
+          <p style="color: #0369a1; margin: 0 0 8px 0; font-size: 13px; font-weight: 600;">How to use your QR code:</p>
+          <ul style="color: #0369a1; margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.5;">
+            <li>Show the QR code above during check-in</li>
+            <li>Or download the attached QR image file</li>
+            <li>Backup: Use the QR data above for manual entry</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  `
+}
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -79,8 +178,14 @@ export async function POST(request: NextRequest) {
           }
         },
         select: {
+          id: true,
           emailAddress: true,
-          fullName: true
+          fullName: true,
+          dateOfBirth: true,
+          gender: true,
+          phoneNumber: true,
+          createdAt: true,
+          qrCode: true
         }
       })
     }
@@ -93,12 +198,27 @@ export async function POST(request: NextRequest) {
       try {
         let personalizedMessage = message
         let personalizedSubject = subject
+        let currentRegistration = null
 
         if (includeNames) {
-          const registration = registrationData.find(r => r.emailAddress === email)
-          if (registration) {
-            personalizedMessage = `Dear ${registration.fullName},\n\n${message}`
-            personalizedSubject = subject
+          currentRegistration = registrationData.find(r => r.emailAddress === email)
+          if (currentRegistration) {
+            // Handle registration information template
+            if (message.includes('[Registration ID]') || message.includes('[Date of Birth]') || message.includes('[Gender]') || message.includes('[Phone Number]') || message.includes('[Email Address]') || message.includes('[Registration Date]')) {
+              personalizedMessage = message
+                .replace(/\[Name\]/g, currentRegistration.fullName)
+                .replace(/\[Your Name\]/g, currentRegistration.fullName)
+                .replace(/\[Registration ID\]/g, currentRegistration.id)
+                .replace(/\[Date of Birth\]/g, currentRegistration.dateOfBirth ? new Date(currentRegistration.dateOfBirth).toLocaleDateString() : 'Not provided')
+                .replace(/\[Gender\]/g, currentRegistration.gender || 'Not specified')
+                .replace(/\[Phone Number\]/g, currentRegistration.phoneNumber || 'Not provided')
+                .replace(/\[Email Address\]/g, currentRegistration.emailAddress)
+                .replace(/\[Registration Date\]/g, currentRegistration.createdAt ? new Date(currentRegistration.createdAt).toLocaleDateString() : 'Unknown')
+            } else {
+              // Standard personalization
+              personalizedMessage = `Dear ${currentRegistration.fullName},\n\n${message}`
+            }
+            personalizedSubject = subject.replace(/\[Name\]/g, currentRegistration.fullName)
           }
         }
 
@@ -110,12 +230,15 @@ export async function POST(request: NextRequest) {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${personalizedSubject}</title>
             <style>
-              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-              .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; margin: -20px -20px 20px -20px; }
-              .content { padding: 20px 0; }
-              .message { white-space: pre-wrap; margin: 20px 0; }
-              .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center; }
+              @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+              body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f8fafc; }
+              .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+              .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px; border-radius: 12px; text-align: center; margin: -32px -32px 32px -32px; }
+              .content { padding: 24px 0; }
+              .message { white-space: pre-wrap; margin: 24px 0; font-size: 16px; line-height: 1.7; }
+              .qr-section { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 32px; margin: 32px 0; text-align: center; }
+              .qr-code { max-width: 200px; height: auto; margin: 16px 0; border-radius: 8px; }
+              .footer { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center; }
             </style>
           </head>
           <body>
@@ -125,6 +248,7 @@ export async function POST(request: NextRequest) {
               </div>
               <div class="content">
                 <div class="message">${personalizedMessage}</div>
+                ${currentRegistration && currentRegistration.qrCode ? await generateQRSectionHTML(currentRegistration) : ''}
               </div>
               <div class="footer">
                 <p>This email was sent from the Youth Registration System.</p>
@@ -135,16 +259,30 @@ export async function POST(request: NextRequest) {
           </html>
         `
 
-        const result = await sendEmail({
+        // Generate QR code attachment if registration has QR code
+        let qrAttachment = null
+        if (currentRegistration && currentRegistration.qrCode) {
+          qrAttachment = await generateQRCodeAttachment(currentRegistration)
+        }
+
+        // Prepare email options
+        const emailOptions: any = {
           to: email,
           subject: personalizedSubject,
           html: emailHtml
-        })
+        }
+
+        // Add QR attachment if available
+        if (qrAttachment) {
+          emailOptions.attachments = [qrAttachment]
+        }
+
+        const result = await sendEmail(emailOptions)
 
         results.push({
           email,
-          success: result.success,
-          messageId: result.messageId
+          success: result,
+          messageId: result ? `sent-${Date.now()}` : null
         })
 
       } catch (error) {

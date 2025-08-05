@@ -12,9 +12,9 @@ import { ErrorModal } from '@/components/ui/error-modal'
 import { parseApiError } from '@/lib/error-messages'
 import { useUser } from '@/contexts/UserContext'
 import { formatNumber } from '@/lib/statistics'
-// import { useTranslation } from '@/contexts/LanguageContext'
+import { useTranslation } from '@/contexts/LanguageContext'
 import { Skeleton } from '@/components/ui/skeleton'
-// import { capitalizeName } from '@/lib/utils'
+import { capitalizeName } from '@/lib/utils'
 
 import { PlatoonAllocationCard } from '@/components/admin/PlatoonAllocationCard'
 import { PlatoonAllocationSetupModal } from '@/components/admin/PlatoonAllocationSetupModal'
@@ -33,10 +33,10 @@ import {
   Loader2,
   Search,
   X,
-  // UserCheck,
+  UserCheck,
   Download,
-  FileText
-  // Filter
+  FileText,
+  Filter
 } from 'lucide-react'
 
 interface PlatoonAllocation {
@@ -82,7 +82,7 @@ interface AllocationStats {
 }
 
 function AllocatePlatoonPageContent() {
-  // const { t } = useTranslation()
+  const { t } = useTranslation()
   const [stats, setStats] = useState<AllocationStats | null>(null)
   const [platoons, setPlatoons] = useState<PlatoonAllocation[]>([])
   const [unallocatedParticipants, setUnallocatedParticipants] = useState<UnallocatedParticipant[]>([])
@@ -1279,7 +1279,7 @@ function AllocatePlatoonPageContent() {
           </div>
 
           {/* Platoons Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {isLoading && !initialLoadComplete ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <Card key={i} className="p-4 sm:p-6 bg-white">

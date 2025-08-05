@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, sendRoomAllocationEmail } from '@/lib/email'
 import { generateRoomAllocationEmail, generateRoomAllocationTextEmail } from '@/lib/email-templates/room-allocation'
 import { Logger } from '@/lib/logger'
 
@@ -113,17 +113,12 @@ export class RoomAllocationEmailService {
         eventDetails
       }
 
-      // Generate email content
-      const htmlContent = generateRoomAllocationEmail(emailData)
-      const textContent = generateRoomAllocationTextEmail(emailData)
+      // Send email using new visual QR code template
+      const emailResult = await sendRoomAllocationEmail(registration, registration.roomAllocation.room)
 
-      // Send email
-      await sendEmail({
-        to: [registration.emailAddress],
-        subject: `🏠 Room Allocation Confirmed - ${registration.roomAllocation.room.name}`,
-        html: htmlContent,
-        text: textContent
-      })
+      if (!emailResult.success) {
+        throw new Error(emailResult.error || 'Failed to send room allocation email')
+      }
 
       logger.info('Room allocation email sent successfully', {
         registrationId,

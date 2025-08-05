@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Check, Users, Shield, Baby, Calendar } from 'lucide-react'
+import { checkAndTriggerRegistrationUpdate } from '@/lib/registration-events'
 
 interface FormData {
   fullName: string
@@ -542,6 +543,9 @@ function ChildrenRegistrationContent() {
       })
 
       if (response.ok) {
+        // Trigger real-time updates for admin communications
+        checkAndTriggerRegistrationUpdate(response)
+
         setSuccess(true)
       } else {
         let errorData: any

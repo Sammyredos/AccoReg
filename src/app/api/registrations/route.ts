@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const forceRefresh = searchParams.get('refresh') === 'true'
+    const since = searchParams.get('since') // For real-time updates
 
     // Create cache key based on query parameters
     const cacheKey = `registrations_${page}_${limit || 'all'}_${search}_${status}_${currentUser.email}`
@@ -73,6 +74,18 @@ export async function GET(request: NextRequest) {
         where.parentalPermissionGranted = true
       } else if (status === 'pending') {
         where.parentalPermissionGranted = false
+      }
+    }
+
+    // Add since filter for real-time updates
+    if (since) {
+      try {
+        const sinceDate = new Date(since)
+        where.createdAt = {
+          gt: sinceDate
+        }
+      } catch (error) {
+        console.error('Invalid since date format:', since)
       }
     }
 

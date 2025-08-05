@@ -433,12 +433,138 @@ async function testEmailConfiguration(settings: any) {
   transporter.close()
 }
 
-// Handle unsupported methods
-export async function POST() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405 }
-  )
+// Handle POST requests for testing email configuration
+export async function POST(request: NextRequest) {
+  try {
+    const { action, testEmail } = await request.json()
+
+    if (action !== 'test') {
+      return NextResponse.json(
+        { error: 'Invalid action' },
+        { status: 400 }
+      )
+    }
+
+    // Verify authentication
+    const authResult = await verifyToken(request)
+    if (!authResult.success || !authResult.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get current email settings
+    const emailSettings = await prisma.setting.findMany({
+      where: {
+        key: {
+          in: ['smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'smtpSecure', 'emailFromName']
+        }
+      }
+    })
+
+    const settings = emailSettings.reduce((acc, setting) => {
+      let value = setting.value
+      if (setting.key === 'smtpPort') {
+        value = parseInt(value) || 587
+      } else if (setting.key === 'smtpSecure') {
+        value = value === 'true' || value === '1'
+      }
+      acc[setting.key] = value
+      return acc
+    }, {} as any)
+
+    // Use development defaults if settings are missing
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    const finalSettings = {
+      smtpHost: settings.smtpHost || (isDevelopment ? 'localhost' : ''),
+      smtpPort: settings.smtpPort || 587,
+      smtpUser: settings.smtpUser || (isDevelopment ? 'test@localhost' : ''),
+      smtpPass: settings.smtpPass || '',
+      smtpSecure: settings.smtpSecure || false,
+      emailFromName: settings.emailFromName || 'AccoReg System'
+    }
+
+    // Test email configuration
+    await testEmailConfiguration(finalSettings)
+
+    // Send test email
+    const transporter = nodemailer.createTransporter({
+      host: finalSettings.smtpHost,
+      port: finalSettings.smtpPort,
+      secure: finalSettings.smtpSecure,
+      auth: finalSettings.smtpUser && finalSettings.smtpPass ? {
+        user: finalSettings.smtpUser,
+        pass: finalSettings.smtpPass
+      } : undefined,
+      // Development settings
+      ...(isDevelopment && {
+        ignoreTLS: true,
+        requireTLS: false,
+        tls: {
+          rejectUnauthorized: false
+        }
+      })
+    })
+
+    const testEmailAddress = testEmail || authResult.user.email
+
+    await transporter.sendMail({
+      from: `"${finalSettings.emailFromName}" <${finalSettings.smtpUser}>`,
+      to: testEmailAddress,
+      subject: 'AccoReg Email Test - Configuration Working!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4F46E5;">Email Configuration Test Successful!</h2>
+          <p>This is a test email from your AccoReg system to confirm that email sending is working correctly.</p>
+
+          <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #374151;">Configuration Details:</h3>
+            <ul style="color: #6B7280;">
+              <li><strong>SMTP Host:</strong> ${finalSettings.smtpHost}</li>
+              <li><strong>SMTP Port:</strong> ${finalSettings.smtpPort}</li>
+              <li><strong>Secure Connection:</strong> ${finalSettings.smtpSecure ? 'Yes' : 'No'}</li>
+              <li><strong>Environment:</strong> ${isDevelopment ? 'Development' : 'Production'}</li>
+              <li><strong>Sent At:</strong> ${new Date().toLocaleString()}</li>
+            </ul>
+          </div>
+
+          <p style="color: #6B7280; font-size: 14px;">
+            If you received this email, your email configuration is working correctly and you can now send notifications to users.
+          </p>
+        </div>
+      `
+    })
+
+    transporter.close()
+
+    logger.info('Test email sent successfully', {
+      to: testEmailAddress,
+      smtpHost: finalSettings.smtpHost,
+      environment: isDevelopment ? 'development' : 'production'
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: `Test email sent successfully to ${testEmailAddress}`,
+      settings: {
+        smtpHost: finalSettings.smtpHost,
+        smtpPort: finalSettings.smtpPort,
+        smtpSecure: finalSettings.smtpSecure,
+        environment: isDevelopment ? 'development' : 'production'
+      }
+    })
+
+  } catch (error) {
+    logger.error('Test email failed', error)
+    return NextResponse.json(
+      {
+        error: 'Test email failed',
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      },
+      { status: 500 }
+    )
+  }
 }
 
 export async function DELETE() {

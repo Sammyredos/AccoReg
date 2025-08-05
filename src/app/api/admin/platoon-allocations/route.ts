@@ -163,12 +163,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })
     }
 
-    // Check for duplicate platoon names
+    // Check for duplicate platoon names (case-insensitive for PostgreSQL, case-sensitive for SQLite)
     const existingPlatoon = await prisma.platoonAllocation.findFirst({
       where: {
         name: {
           equals: name.trim(),
-          mode: 'insensitive'
+          // Only use mode: 'insensitive' for PostgreSQL
+          ...(process.env.DATABASE_URL?.includes('postgresql') && { mode: 'insensitive' })
         }
       }
     })

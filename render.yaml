@@ -21,6 +21,8 @@ services:
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
       (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
+      echo "🔐 Seeding notification and security settings..." &&
+      (npx tsx scripts/seed-notification-security-settings.ts && echo "✅ Notification and security settings seeded" || echo "⚠️ Notification/security seeding skipped") &&
       echo "🎨 Updating branding and settings..." &&
       (npx tsx scripts/update-branding.ts && echo "✅ Branding updated successfully" || echo "⚠️ Branding update skipped") &&
       echo "👥 Setting up roles and permissions..." &&
@@ -191,6 +193,21 @@ services:
         value: info
       - key: ENABLE_DEBUG_MODE
         value: false
+      # Email Configuration for Gmail
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 465
+      - key: SMTP_SECURE
+        value: true
+      - key: SMTP_USER
+        value: samuel.obadina93@gmail.com
+      - key: SMTP_PASS
+        value: zcugqmuisrldyegf
+      - key: EMAIL_FROM
+        value: samuel.obadina93@gmail.com
+      - key: EMAIL_FROM_NAME
+        value: LINGER NO LONGER 6.0 Registration
 
 databases:
   - name: mopgomyouth-db
