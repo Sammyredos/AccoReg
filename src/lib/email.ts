@@ -1034,9 +1034,13 @@ async function generatePlatoonAllocationEmail(registration: any, platoon: any): 
 // Send verification confirmation email
 export async function sendVerificationConfirmationEmail(registration: any) {
   try {
-    console.log('📧 Sending verification confirmation email to:', registration.emailAddress)
+    console.log('📧 Starting verification confirmation email process...')
+    console.log('📧 Recipient:', registration.emailAddress)
+    console.log('📧 Participant:', registration.fullName)
+    console.log('📧 Registration ID:', registration.id)
 
     const emailHtml = await generateVerificationConfirmationEmail(registration)
+    console.log('📧 Email HTML generated successfully')
 
     // Generate QR code attachment
     let attachments: Array<{ filename: string; content: Buffer; contentType: string }> = []
@@ -1068,14 +1072,18 @@ export async function sendVerificationConfirmationEmail(registration: any) {
       attachments
     }
 
+    console.log('📧 Calling sendEmail function...')
     const result = await sendEmail(emailOptions)
+    console.log('📧 sendEmail result:', result)
 
-    if (result) {
-      console.log('✅ Verification confirmation email sent to:', registration.emailAddress)
-      return { success: true }
+    if (result && result.success) {
+      console.log('✅ Verification confirmation email sent successfully to:', registration.emailAddress)
+      console.log('📧 Message ID:', result.messageId)
+      return { success: true, messageId: result.messageId }
     } else {
       console.error('❌ Failed to send verification confirmation email')
-      return { success: false, error: 'Email sending failed' }
+      console.error('❌ Error details:', result?.error || 'Unknown error')
+      return { success: false, error: result?.error || 'Email sending failed' }
     }
   } catch (error) {
     console.error('❌ Failed to send verification confirmation email:', error)

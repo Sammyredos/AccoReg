@@ -124,13 +124,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`🚀 Preparing to send ${recipients.length} emails in batches...`)
 
-    // Process emails in batches to prevent server overload
-    const BATCH_SIZE = 10 // Process 10 emails at a time
+    // Process emails in smaller batches to prevent Gmail rate limiting
+    const BATCH_SIZE = 5 // Smaller batches for better reliability
+    const BATCH_DELAY = 2000 // 2 seconds between batches
     const results: any[] = []
+
+    console.log(`📧 Processing ${recipients.length} emails in ${Math.ceil(recipients.length / BATCH_SIZE)} batches`)
+    console.log(`⏱️ Estimated time: ${Math.ceil(recipients.length / BATCH_SIZE) * (BATCH_DELAY / 1000)} seconds`)
 
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE)
-      console.log(`📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(recipients.length / BATCH_SIZE)} (${batch.length} emails)`)
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(recipients.length / BATCH_SIZE)
+
+      console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} emails)`)
 
       const batchPromises = batch.map(async (email) => {
       try {
@@ -259,9 +266,10 @@ export async function POST(request: NextRequest) {
       const batchResults = await Promise.allSettled(batchPromises)
       results.push(...batchResults)
 
-      // Add a small delay between batches to prevent overwhelming the server
+      // Add delay between batches to respect Gmail rate limits
       if (i + BATCH_SIZE < recipients.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second delay
+        console.log(`⏳ Waiting ${BATCH_DELAY / 1000} seconds before next batch...`)
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
       }
     }
 
@@ -290,6 +298,31 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`✅ Bulk email completed: ${successfulResults.length}/${recipients.length} sent successfully`)
+
+    // Detailed error reporting for failed emails
+    if (errors.length > 0) {
+      console.log(`❌ Failed emails (${errors.length}):`)
+
+      // Group errors by type for better analysis
+      const errorTypes = {}
+      errors.forEach(error => {
+        const errorType = error.error.includes('timeout') ? 'Timeout' :
+                         error.error.includes('connection') ? 'Connection' :
+                         error.error.includes('authentication') ? 'Authentication' :
+                         error.error.includes('rate') ? 'Rate Limit' :
+                         error.error.includes('invalid') ? 'Invalid Email' :
+                         'Other'
+
+        if (!errorTypes[errorType]) errorTypes[errorType] = []
+        errorTypes[errorType].push(error.email)
+      })
+
+      Object.entries(errorTypes).forEach(([type, emails]) => {
+        console.log(`  ${type}: ${emails.length} emails`)
+        emails.slice(0, 3).forEach(email => console.log(`    - ${email}`))
+        if (emails.length > 3) console.log(`    ... and ${emails.length - 3} more`)
+      })
+    }
 
     // Create notification for bulk email sent
     try {

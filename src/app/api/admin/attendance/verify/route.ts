@@ -127,24 +127,41 @@ export async function POST(request: NextRequest) {
     })
 
     // Send verification confirmation email to participant
+    console.log(`📧 Attempting to send verification email to: ${registration.emailAddress}`)
+    console.log(`🔧 Verification method: ${method}`)
+
     try {
       const emailResult = await sendVerificationConfirmationEmail(updatedRegistration)
+
+      console.log(`📧 Email send result:`, emailResult)
+
       if (emailResult.success) {
-        logger.info('Verification confirmation email sent', {
+        logger.info('Verification confirmation email sent successfully', {
           registrationId: registration.id,
-          participantEmail: registration.emailAddress
+          participantEmail: registration.emailAddress,
+          verificationMethod: method,
+          verifiedBy: currentUser.email
         })
+        console.log(`✅ Verification email sent successfully to: ${registration.emailAddress}`)
       } else {
         logger.warn('Failed to send verification confirmation email', {
           registrationId: registration.id,
-          error: emailResult.error
+          participantEmail: registration.emailAddress,
+          verificationMethod: method,
+          error: emailResult.error,
+          verifiedBy: currentUser.email
         })
+        console.error(`❌ Verification email failed for: ${registration.emailAddress}`, emailResult.error)
       }
     } catch (emailError) {
       logger.error('Error sending verification confirmation email', {
         registrationId: registration.id,
-        error: emailError
+        participantEmail: registration.emailAddress,
+        verificationMethod: method,
+        error: emailError,
+        verifiedBy: currentUser.email
       })
+      console.error(`❌ Verification email exception for: ${registration.emailAddress}`, emailError)
       // Don't fail the verification if email sending fails
     }
 
