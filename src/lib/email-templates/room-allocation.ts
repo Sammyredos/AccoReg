@@ -93,7 +93,7 @@ export function generateRoomAllocationEmail(data: RoomAllocationData): string {
           <div style="margin-bottom: 30px;">
             <h2 style="color: #1f2937; margin: 0 0 10px 0; font-size: 24px;">Hello ${registrant.fullName}! 👋</h2>
             <p style="color: #4b5563; margin: 0; font-size: 16px; line-height: 1.6;">
-              Great news! We've successfully allocated you to a room for the upcoming youth program. 
+            Great news! We've successfully allocated you to a room for the upcoming youth program. 
               Here are your accommodation details:
             </p>
           </div>

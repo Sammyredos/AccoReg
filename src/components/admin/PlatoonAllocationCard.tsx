@@ -3,13 +3,15 @@
 import React, { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Edit, Phone, User, Trash2, UserMinus, Loader2 } from 'lucide-react'
+import { Users, Edit, Phone, User, Trash2, UserMinus, Loader2, Mail } from 'lucide-react'
 import { PlatoonParticipantsModal } from './PlatoonParticipantsModal'
+import { PlatoonEmailModal } from './PlatoonEmailModal'
 
 interface PlatoonAllocation {
   id: string
   name: string
   leaderName: string
+  leaderEmail: string
   label: string
   leaderPhone: string
   capacity: number
@@ -55,6 +57,7 @@ export function PlatoonAllocationCard({
   loadingAction
 }: PlatoonAllocationCardProps) {
   const [showParticipantsModal, setShowParticipantsModal] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
   const participantCount = platoon.participants?.length || 0
   const capacityPercentage = platoon.capacity > 0 ? (participantCount / platoon.capacity) * 100 : 0
 
@@ -87,6 +90,14 @@ export function PlatoonAllocationCard({
                           <Phone className="h-2.5 w-2.5 text-emerald-600" />
                         </div>
                         <span className="font-apercu-regular">{platoon.leaderPhone}</span>
+                      </div>
+                    )}
+                    {platoon.leaderEmail && (
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <div className="h-4 w-4 bg-gradient-to-r from-purple-100 to-violet-100 rounded-full flex items-center justify-center">
+                          <Mail className="h-2.5 w-2.5 text-violet-600" />
+                        </div>
+                        <span className="font-apercu-regular truncate">{platoon.leaderEmail}</span>
                       </div>
                     )}
                   </div>
@@ -198,38 +209,48 @@ export function PlatoonAllocationCard({
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2">
+              {/* Action Buttons - Responsive Layout */}
+              <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:gap-2">
                 {participantCount > 0 && (
                   <Button
                     onClick={() => setShowParticipantsModal(true)}
                     variant="outline"
                     size="sm"
-                    className="font-apercu-medium h-8 px-3 sm:px-4 text-xs text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 shadow-sm w-full sm:w-auto"
+                    className="font-apercu-medium h-9 px-4 text-xs text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 shadow-sm flex items-center justify-center w-full sm:w-auto sm:flex-1 lg:min-w-[100px]"
                   >
-                    <Users className="h-3 w-3 mr-1 sm:mr-1.5" />
-                    <span className="hidden sm:inline">View All</span>
-                    <span className="sm:hidden">View</span>
+                    <Users className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
+                    <span>View All</span>
                   </Button>
                 )}
+
+                {/* Send Email Button - Always visible */}
+                <Button
+                  onClick={() => setShowEmailModal(true)}
+                  variant="outline"
+                  size="sm"
+                  className="font-apercu-medium h-9 px-4 text-xs text-violet-600 hover:text-violet-700 border-violet-200 hover:bg-violet-50 hover:border-violet-300 transition-all duration-200 shadow-sm flex items-center justify-center w-full sm:w-auto sm:flex-1 lg:min-w-[110px]"
+                >
+                  <Mail className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
+                  <span>Send Email</span>
+                </Button>
+
                 {participantCount > 0 && canEditPlatoons && (
                   <Button
                     onClick={() => onEmpty(platoon)}
                     variant="outline"
                     size="sm"
                     disabled={isLoading}
-                    className="font-apercu-medium h-8 px-3 sm:px-4 text-xs text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300 disabled:text-gray-400 transition-all duration-200 shadow-sm w-full sm:w-auto"
+                    className="font-apercu-medium h-9 px-4 text-xs text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300 disabled:text-gray-400 disabled:border-gray-200 disabled:hover:bg-transparent transition-all duration-200 shadow-sm flex items-center justify-center w-full sm:w-auto sm:flex-1 lg:min-w-[90px]"
                   >
                     {isLoading && loadingAction === 'empty' ? (
                       <>
-                        <Loader2 className="h-3 w-3 mr-1 sm:mr-1.5 animate-spin" />
-                        <span className="hidden sm:inline">Emptying...</span>
-                        <span className="sm:hidden">...</span>
+                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin flex-shrink-0" />
+                        <span>Emptying...</span>
                       </>
                     ) : (
                       <>
-                        <UserMinus className="h-3 w-3 mr-1 sm:mr-1.5" />
-                        <span className="hidden sm:inline">Empty</span>
-                        <span className="sm:hidden">Clear</span>
+                        <UserMinus className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
+                        <span>Empty</span>
                       </>
                     )}
                   </Button>
@@ -247,6 +268,17 @@ export function PlatoonAllocationCard({
         platoon={platoon}
         onParticipantRemoved={onRefresh}
         canRemoveParticipants={canRemoveAllocations}
+      />
+
+      {/* Email Modal */}
+      <PlatoonEmailModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        platoonId={platoon.id}
+        platoonName={platoon.name}
+        leaderName={platoon.leaderName}
+        leaderEmail={platoon.leaderEmail}
+        participants={platoon.participants || []}
       />
     </>
   )

@@ -12,6 +12,7 @@ interface PlatoonAllocation {
   id: string
   name: string
   leaderName: string
+  leaderEmail: string
   label: string
   leaderPhone: string
   capacity: number
@@ -55,6 +56,7 @@ export function PlatoonAllocationSetupModal({
   const [formData, setFormData] = useState({
     name: '',
     leaderName: '',
+    leaderEmail: '',
     leaderPhone: '',
     capacity: 30
   })
@@ -64,6 +66,7 @@ export function PlatoonAllocationSetupModal({
       setFormData({
         name: platoon.name,
         leaderName: platoon.leaderName,
+        leaderEmail: platoon.leaderEmail || '',
         leaderPhone: platoon.leaderPhone,
         capacity: platoon.capacity
       })
@@ -71,6 +74,7 @@ export function PlatoonAllocationSetupModal({
       setFormData({
         name: '',
         leaderName: '',
+        leaderEmail: '',
         leaderPhone: '',
         capacity: 30
       })
@@ -87,6 +91,17 @@ export function PlatoonAllocationSetupModal({
     }
     if (!formData.leaderName.trim()) {
       safeShowToast('Please enter the leader name', 'error')
+      return
+    }
+    if (!formData.leaderEmail.trim()) {
+      safeShowToast('Please enter the leader email address', 'error')
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.leaderEmail.trim())) {
+      safeShowToast('Please enter a valid email address', 'error')
       return
     }
 
@@ -234,6 +249,23 @@ export function PlatoonAllocationSetupModal({
               placeholder="e.g., John Smith"
               required
               className="mt-1"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="leaderEmail" className="font-apercu-medium text-sm text-gray-700">
+              Leader Email *
+            </Label>
+            <Input
+              id="leaderEmail"
+              type="email"
+              value={formData.leaderEmail}
+              onChange={(e) => setFormData(prev => ({ ...prev, leaderEmail: e.target.value }))}
+              placeholder="e.g., john.smith@example.com"
+              required
+              className="mt-1"
+              disabled={isLoading}
             />
           </div>
 
@@ -249,6 +281,7 @@ export function PlatoonAllocationSetupModal({
               placeholder="e.g., +1234567890"
               required
               className="mt-1"
+              disabled={isLoading}
             />
           </div>
 

@@ -4,42 +4,11 @@ import { sendEmail } from '@/lib/email'
 import { NotificationService } from '@/lib/notifications'
 import QRCode from 'qrcode'
 
-// Generate visual QR code as inline PNG for bulk emails (production-safe)
-async function generateInlineQRCodeForBulk(data: string): Promise<string> {
+// Generate QR code attachment for bulk emails (production-safe)
+async function generateQRCodeAttachment(data: string, filename: string): Promise<any> {
   try {
     // Generate QR code as PNG buffer with production-safe settings
     const qrBuffer = await QRCode.toBuffer(data, {
-      errorCorrectionLevel: 'H', // High error correction for better reliability
-      margin: 4, // More margin for better scanning
-      color: {
-        dark: '#1f2937', // Darker color for better contrast
-        light: '#ffffff'
-      },
-      width: 200, // Smaller size for better email compatibility
-      type: 'png'
-    })
-
-    // Convert PNG buffer to base64 data URL for email embedding
-    const base64Png = qrBuffer.toString('base64')
-    return `data:image/png;base64,${base64Png}`
-  } catch (error) {
-    console.error('Error generating inline QR code for bulk email:', error)
-    return ''
-  }
-}
-
-// Helper function to generate QR code attachment for email
-async function generateQRCodeAttachment(registration: any): Promise<any> {
-  try {
-    if (!registration.qrCode) {
-      console.log('⚠️ No QR code data for registration:', registration.id)
-      return null
-    }
-
-    console.log('🔄 Generating QR code attachment for bulk email...')
-
-    // Generate QR code as PNG buffer with production-safe settings
-    const qrBuffer = await QRCode.toBuffer(registration.qrCode, {
       errorCorrectionLevel: 'H', // High error correction for better reliability
       margin: 4, // More margin for better scanning
       color: {
@@ -50,57 +19,20 @@ async function generateQRCodeAttachment(registration: any): Promise<any> {
       type: 'png'
     })
 
-    console.log('✅ QR code attachment generated for bulk email')
-
     return {
-      filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`,
+      filename: filename,
       content: qrBuffer,
       contentType: 'image/png'
     }
   } catch (error) {
-    console.error('❌ Error generating QR code attachment for bulk email:', error)
+    console.error('Error generating QR code attachment for bulk email:', error)
     return null
   }
 }
 
-// Helper function to generate QR section HTML for email with visual QR code
-async function generateQRSectionHTML(registration: any): Promise<string> {
-  if (!registration.qrCode) {
-    return ''
-  }
 
-  // Generate visual QR code
-  const visualQRCode = await generateInlineQRCodeForBulk(registration.qrCode)
 
-  return `
-  <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 32px; margin: 32px 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-    ${visualQRCode ? `
-    <div style="text-align: center; margin: 24px 0; padding: 24px; background: #f8fafc; border-radius: 12px;">
-      <img src="${visualQRCode}" alt="QR Code" style="width: 200px; height: 200px; border: 2px solid #e5e7eb; border-radius: 8px; display: block; margin: 0 auto;" />
-    </div>
-    ` : ''}
 
-    <div style="background: #f9fafb; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <p style="color: #4b5563; font-weight: 600; font-size: 13px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">📋 QR Code Data</p>
-      <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 11px; color: #374151; word-break: break-all; line-height: 1.4; background: #ffffff; padding: 8px; border-radius: 4px; display: block;">${registration.qrCode}</code>
-    </div>
-
-    <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <div style="display: flex; align-items: flex-start; gap: 12px;">
-        <span style="font-size: 18px;">💡</span>
-        <div>
-          <p style="color: #0369a1; margin: 0 0 8px 0; font-size: 13px; font-weight: 600;">How to use your QR code:</p>
-          <ul style="color: #0369a1; margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.5;">
-            <li>Show the QR code above during check-in</li>
-            <li>Or download the attached QR image file</li>
-            <li>Backup: Use the QR data above for manual entry</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-  `
-}
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -190,11 +122,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const results = []
-    const errors = []
+    console.log(`🚀 Preparing to send ${recipients.length} emails in parallel...`)
 
-    // Send emails individually to allow for personalization
-    for (const email of recipients) {
+    // Prepare all email data first (much faster)
+    const emailPromises = recipients.map(async (email) => {
       try {
         let personalizedMessage = message
         let personalizedSubject = subject
@@ -248,57 +179,104 @@ export async function POST(request: NextRequest) {
               </div>
               <div class="content">
                 <div class="message">${personalizedMessage}</div>
-                ${currentRegistration && currentRegistration.qrCode ? await generateQRSectionHTML(currentRegistration) : ''}
               </div>
               <div class="footer">
-                <p>This email was sent from the Youth Registration System.</p>
-                <p>If you have any questions, please contact our support team.</p>
+                <p style="margin: 0; font-size: 12px;">
+                  LINGER NO LONGER 6.0 • Questions? Reply to this email
+                </p>
               </div>
             </div>
           </body>
           </html>
         `
 
-        // Generate QR code attachment if registration has QR code
+        // FORCE QR code attachment generation for every registration
         let qrAttachment = null
-        if (currentRegistration && currentRegistration.qrCode) {
-          qrAttachment = await generateQRCodeAttachment(currentRegistration)
+        if (currentRegistration) {
+          const filename = `QR-Code-${currentRegistration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`
+
+          // Use stored QR code or generate from registration data
+          const qrData = currentRegistration.qrCode || JSON.stringify({
+            id: currentRegistration.id,
+            name: currentRegistration.fullName,
+            email: currentRegistration.emailAddress,
+            phone: currentRegistration.phoneNumber,
+            event: 'LINGER NO LONGER 6.0',
+            registrationDate: currentRegistration.createdAt,
+            branch: currentRegistration.branch,
+            type: 'participant_qr'
+          })
+
+          qrAttachment = await generateQRCodeAttachment(qrData, filename)
+          console.log('📎 FORCED QR attachment for bulk email:', filename)
         }
 
-        // Prepare email options
+        // Prepare email options with FORCED QR attachment
         const emailOptions: any = {
           to: email,
           subject: personalizedSubject,
-          html: emailHtml
+          html: emailHtml,
+          attachments: qrAttachment ? [qrAttachment] : [] // FORCE attachments array
         }
 
-        // Add QR attachment if available
+        // Log attachment status
         if (qrAttachment) {
-          emailOptions.attachments = [qrAttachment]
+          console.log('📎 QR attachment FORCED into bulk email for:', email)
+        } else {
+          console.log('⚠️ No QR attachment generated for:', email)
         }
 
         const result = await sendEmail(emailOptions)
 
-        results.push({
+        return {
           email,
           success: result,
           messageId: result ? `sent-${Date.now()}` : null
-        })
+        }
 
       } catch (error) {
-        errors.push({
+        return {
           email,
+          success: false,
           error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    })
+
+    // Send all emails in parallel (much faster!)
+    console.log(`📧 Sending ${recipients.length} emails in parallel...`)
+    const results = await Promise.allSettled(emailPromises)
+
+    // Process results
+    const successfulResults = []
+    const errors = []
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        if (result.value.success) {
+          successfulResults.push(result.value)
+        } else {
+          errors.push({
+            email: recipients[index],
+            error: result.value.error || 'Email sending failed'
+          })
+        }
+      } else {
+        errors.push({
+          email: recipients[index],
+          error: result.reason?.message || 'Promise rejected'
         })
       }
-    }
+    })
+
+    console.log(`✅ Bulk email completed: ${successfulResults.length}/${recipients.length} sent successfully`)
 
     // Create notification for bulk email sent
     try {
       await NotificationService.create({
         type: 'bulk_email_sent',
         title: 'Bulk Email Sent',
-        message: `Bulk email "${subject}" sent to ${results.filter(r => r.success).length} recipients`,
+        message: `Bulk email "${subject}" sent to ${successfulResults.length} recipients`,
         priority: 'medium',
         authorizedBy: currentUser.name || currentUser.email,
         authorizedByEmail: currentUser.email,
@@ -306,7 +284,7 @@ export async function POST(request: NextRequest) {
           sender: currentUser.email,
           subject,
           recipientCount: recipients.length,
-          successCount: results.filter(r => r.success).length,
+          successCount: successfulResults.length,
           errorCount: errors.length
         }
       })
@@ -319,9 +297,9 @@ export async function POST(request: NextRequest) {
       message: `Bulk email sent successfully`,
       results: {
         total: recipients.length,
-        successful: results.filter(r => r.success).length,
+        successful: successfulResults.length,
         failed: errors.length,
-        details: results,
+        details: successfulResults,
         errors: errors.length > 0 ? errors : undefined
       }
     })

@@ -206,24 +206,26 @@ export async function POST(request: NextRequest) {
         data: allocations
       })
 
-      // Broadcast real-time allocation events for each allocation
-      for (const allocation of allocations) {
-        const registration = [...maleRegistrations, ...femaleRegistrations].find(reg => reg.id === allocation.registrationId)
-        const room = [...maleRooms, ...femaleRooms].find(r => r.id === allocation.roomId)
+      // Broadcast real-time allocation events in background (don't block response)
+      setImmediate(() => {
+        for (const allocation of allocations) {
+          const registration = [...maleRegistrations, ...femaleRegistrations].find(reg => reg.id === allocation.registrationId)
+          const room = [...maleRooms, ...femaleRooms].find(r => r.id === allocation.roomId)
 
-        if (registration && room) {
-          broadcastAttendanceEvent({
-            type: 'status_change',
-            data: {
-              registrationId: allocation.registrationId,
-              fullName: registration.fullName,
-              status: 'present',
-              timestamp: new Date().toISOString(),
-              roomName: room.name
-            }
-          })
+          if (registration && room) {
+            broadcastAttendanceEvent({
+              type: 'status_change',
+              data: {
+                registrationId: allocation.registrationId,
+                fullName: registration.fullName,
+                status: 'present',
+                timestamp: new Date().toISOString(),
+                roomName: room.name
+              }
+            })
+          }
         }
-      }
+      })
 
       console.log('🏠 Real-time random allocation events broadcasted:', {
         totalAllocations: allocations.length,

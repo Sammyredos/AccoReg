@@ -17,8 +17,7 @@ import { UserCard } from '@/components/ui/user-card'
 import { QRCodeDisplay } from '@/components/ui/qr-code-display'
 import { useTranslation } from '@/contexts/LanguageContext'
 import { clearStatisticsCache } from '@/lib/statistics'
-// import { ModernDatePicker } from '@/components/ui/modern-date-picker' // Commented out as unused
-// import { TableSkeleton } from '@/components/ui/skeleton' // Commented out as unused
+
 import {
   Users,
   Search,

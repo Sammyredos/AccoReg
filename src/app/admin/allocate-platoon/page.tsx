@@ -43,6 +43,7 @@ interface PlatoonAllocation {
   id: string
   name: string
   leaderName: string
+  leaderEmail: string
   label: string
   leaderPhone: string
   capacity: number

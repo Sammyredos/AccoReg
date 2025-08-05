@@ -53,6 +53,11 @@ export interface EmailOptions {
   subject: string
   html: string
   text?: string
+  attachments?: Array<{
+    filename: string
+    content: Buffer | string
+    contentType?: string
+  }>
 }
 
 // Utility function to delay execution
@@ -113,7 +118,7 @@ export async function sendEmail(options: EmailOptions, retryCount = 0): Promise<
     }
 
     // Prepare mail options
-    const mailOptions = {
+    const mailOptions: any = {
       from: `"${EMAIL_CONFIG.FROM_NAME}" <${EMAIL_CONFIG.FROM_EMAIL}>`,
       replyTo: EMAIL_CONFIG.REPLY_TO,
       to: recipients.join(', '),
@@ -126,6 +131,21 @@ export async function sendEmail(options: EmailOptions, retryCount = 0): Promise<
         'X-Priority': '3',
         'X-MSMail-Priority': 'Normal'
       }
+    }
+
+    // Add attachments if provided
+    if (options.attachments && options.attachments.length > 0) {
+      mailOptions.attachments = options.attachments
+      console.log('📎 ATTACHMENTS ADDED to mail options:', options.attachments.length, 'attachments')
+      options.attachments.forEach((attachment, index) => {
+        console.log(`📎 Attachment ${index + 1}:`, {
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          contentSize: attachment.content.length
+        })
+      })
+    } else {
+      console.log('📎 NO ATTACHMENTS in email options')
     }
 
     // Send email
@@ -369,12 +389,6 @@ async function generateInlineQRCode(data: string): Promise<string> {
 }
 
 export async function generateRegistrationConfirmationEmail(registration: any, includeVisualQR = true) {
-  // Generate visual QR code for email display
-  let visualQRCode = ''
-  if (includeVisualQR && registration.qrCode) {
-    visualQRCode = await generateInlineQRCode(registration.qrCode)
-  }
-
   const hasQRCode = !!registration.qrCode
 
   return `
@@ -448,10 +462,13 @@ export async function generateRegistrationConfirmationEmail(registration: any, i
                 Your registration is confirmed! We're excited to have you join us.
             </p>
 
-            ${hasQRCode && visualQRCode ? `
-                <div class="qr-section">
-                    <img src="${visualQRCode}" alt="QR Code" style="width: 120px; height: 120px; border-radius: 6px; display: block; margin: 0 auto;" />
-                    <p style="color: #6b7280; font-size: 11px; margin: 8px 0 0 0;">Your event QR code</p>
+            ${hasQRCode ? `
+                <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin: 16px 0; text-align: center; border: 1px solid #bbf7d0;">
+                    <div style="font-size: 48px; margin-bottom: 12px;">📱</div>
+                    <h3 style="color: #059669; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Your QR Code is Attached</h3>
+                    <p style="color: #065f46; font-size: 13px; margin: 0; line-height: 1.4;">
+                        Download the attached PNG file to access your QR code for event check-in
+                    </p>
                 </div>
             ` : ''}
 
@@ -463,6 +480,24 @@ export async function generateRegistrationConfirmationEmail(registration: any, i
             <div class="info-item">
                 <div style="font-weight: 600; color: #6b7280; font-size: 11px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Phone</div>
                 <div style="color: #1f2937; font-size: 13px;">${registration.phoneNumber}</div>
+            </div>
+
+            ${hasQRCode ? `
+                <div style="background: #eff6ff; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid #3b82f6;">
+                    <h4 style="color: #1e40af; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">📋 How to Use Your QR Code</h4>
+                    <div style="color: #1e40af; font-size: 13px; line-height: 1.5;">
+                        <div style="margin-bottom: 8px;"><strong>1. Save QR Code:</strong> Download the attached PNG file to your phone</div>
+                        <div style="margin-bottom: 8px;"><strong>2. Keep Accessible:</strong> Save to Photos or Screenshots folder</div>
+                        <div style="margin-bottom: 8px;"><strong>3. Event Check-in:</strong> Show the QR code to staff for scanning</div>
+                        <div><strong>4. Backup:</strong> Keep this email saved as a backup</div>
+                    </div>
+                </div>
+            ` : ''}
+
+            <div style="background: #f0f9ff; border-radius: 6px; padding: 12px; margin: 16px 0;">
+                <p style="color: #1e40af; font-size: 13px; margin: 0;">
+                    <strong>Important:</strong> Bring your QR code to the event for quick check-in
+                </p>
             </div>
         </div>
 
@@ -479,92 +514,188 @@ export async function generateRegistrationConfirmationEmail(registration: any, i
 
 export async function sendRegistrationConfirmationEmail(registration: any) {
   try {
-    // Generate QR code attachment if QR code data exists
-    let qrAttachment = null
+    console.log('📧 Sending registration confirmation email to:', registration.emailAddress)
 
-    if (registration.qrCode) {
+    // ALWAYS generate QR code attachment - no exceptions
+    let qrAttachment: { filename: string; content: Buffer; contentType: string } | null = null
+    const QRCode = await import('qrcode')
+
+    // Use stored QR code or generate from registration data
+    const qrData = registration.qrCode || JSON.stringify({
+      id: registration.id,
+      name: registration.fullName,
+      email: registration.emailAddress,
+      phone: registration.phoneNumber,
+      event: 'LINGER NO LONGER 6.0',
+      registrationDate: registration.createdAt,
+      branch: registration.branch,
+      type: 'participant_qr'
+    })
+
+    console.log('🔄 Generating QR code attachment...')
+
+    try {
+      // Generate QR code as PNG buffer
+      const qrBuffer = await QRCode.default.toBuffer(qrData, {
+        errorCorrectionLevel: 'H',
+        margin: 4,
+        color: {
+          dark: '#1f2937',
+          light: '#ffffff'
+        },
+        width: 400,
+        type: 'png'
+      })
+
+      // Create attachment
+      qrAttachment = {
+        filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`,
+        content: qrBuffer,
+        contentType: 'image/png'
+      }
+
+      console.log('✅ QR code attachment generated successfully')
+    } catch (qrError) {
+      console.error('❌ QR code generation failed:', qrError)
+      console.log('🔄 Attempting emergency QR generation with minimal data...')
+
+      // Emergency fallback - generate QR with just essential data
       try {
-        // Import QR code library
-        const QRCode = await import('qrcode')
-
-        console.log('🔄 Generating QR code attachment for email...')
-
-        // Generate QR code as PNG buffer
-        const qrBuffer = await QRCode.default.toBuffer(registration.qrCode, {
-          errorCorrectionLevel: 'M',
+        const emergencyData = `${registration.id}|${registration.fullName}|${registration.emailAddress}|LINGER NO LONGER 6.0`
+        const emergencyBuffer = await QRCode.default.toBuffer(emergencyData, {
+          errorCorrectionLevel: 'L', // Lower error correction for emergency
           margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          },
-          width: 512 // Higher resolution for attachment
+          width: 200, // Smaller size for emergency
+          type: 'png'
         })
 
-        // Create attachment
         qrAttachment = {
-          filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`,
-          content: qrBuffer,
+          filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}-Emergency.png`,
+          content: emergencyBuffer,
           contentType: 'image/png'
         }
-
-        console.log('✅ QR code attachment generated successfully')
-      } catch (qrError) {
-        console.error('❌ Failed to generate QR code attachment:', qrError)
-        // Generate a fallback QR code with just the registration ID
-        try {
-          const QRCode = await import('qrcode')
-          const fallbackData = JSON.stringify({
-            id: registration.id,
-            fullName: registration.fullName,
-            email: registration.emailAddress
-          })
-          const fallbackBuffer = await QRCode.default.toBuffer(fallbackData, {
-            errorCorrectionLevel: 'M',
-            margin: 2,
-            width: 512
-          })
-
-          qrAttachment = {
-            filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}-Fallback.png`,
-            content: fallbackBuffer,
-            contentType: 'image/png'
-          }
-          console.log('✅ Fallback QR code attachment generated')
-        } catch (fallbackError) {
-          console.error('❌ Fallback QR generation also failed:', fallbackError)
-        }
+        console.log('✅ Emergency QR code generated (size:', emergencyBuffer.length, 'bytes)')
+      } catch (emergencyError) {
+        console.error('❌ Emergency QR generation also failed:', emergencyError)
+        console.log('⚠️ Email will be sent WITHOUT QR attachment - manual QR generation required')
+        qrAttachment = null
       }
-    } else {
-      console.log('⚠️ No QR code data found for registration:', registration.id)
     }
 
-    // Generate email HTML with visual QR code
-    const emailHtml = await generateRegistrationConfirmationEmail(registration, true)
+    // Generate dynamic email HTML based on QR attachment availability
+    const qrSection = qrAttachment ? `
+        <div style="background: #3b82f6; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <h3 style="margin: 0 0 10px 0;">📱 Your QR Code</h3>
+            <p style="margin: 0;">Your unique QR code is attached to this email as a PNG file.</p>
+        </div>
 
-    // Prepare email options with attachment
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <h4>📱 How to Use Your QR Code:</h4>
+            <ol>
+                <li>Download the attached QR code PNG file</li>
+                <li>Save it to your phone's Photos</li>
+                <li>Present it during event check-in</li>
+                <li>Keep it accessible throughout the event</li>
+            </ol>
+        </div>` : `
+        <div style="background: #f59e0b; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <h3 style="margin: 0 0 10px 0;">⚠️ QR Code Notice</h3>
+            <p style="margin: 0;">Your QR code will be sent in a separate email shortly.</p>
+        </div>
+
+        <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <h4>📧 What to Expect:</h4>
+            <ul>
+                <li>You will receive your QR code within 24 hours</li>
+                <li>Check your email (including spam folder)</li>
+                <li>Contact support if you don't receive it</li>
+                <li>Your registration is still confirmed!</li>
+            </ul>
+        </div>`
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Confirmed</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: white; padding: 30px; border-radius: 12px;">
+        <h1 style="color: #1f2937; text-align: center;">LINGER NO LONGER 6.0</h1>
+        <h2 style="color: #059669; text-align: center;">✅ Registration Confirmed!</h2>
+
+        <p>Dear <strong>${registration.fullName}</strong>,</p>
+
+        <p>Thank you for registering for LINGER NO LONGER 6.0! Your registration has been confirmed.</p>
+
+        ${qrSection}
+
+        <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <h4>✅ What's Next:</h4>
+            <ul>
+                <li>Wait for room allocation notification</li>
+                <li>Wait for platoon assignment notification</li>
+                <li>Prepare for an amazing event experience!</li>
+            </ul>
+        </div>
+
+        <p>If you have any questions, please reply to this email.</p>
+        <p>See you at LINGER NO LONGER 6.0!</p>
+
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
+        <p style="font-size: 12px; color: #6b7280; text-align: center;">
+            This email contains your personal QR code. Please keep it secure.
+        </p>
+    </div>
+</body>
+</html>`
+
+    // Prepare email with conditional QR attachment
     const emailOptions: any = {
       to: [registration.emailAddress],
-      subject: `Registration Confirmed - Your QR Code for Mopgomglobal`,
+      subject: qrAttachment
+        ? `📱 Registration Confirmed - Your QR Code for LINGER NO LONGER 6.0`
+        : `✅ Registration Confirmed - QR Code Coming Soon`,
       html: emailHtml
     }
 
-    // Add QR code attachment if available
+    // Add QR attachment if available
     if (qrAttachment) {
       emailOptions.attachments = [qrAttachment]
+      console.log('📎 QR code attachment added to email')
+    } else {
+      console.log('⚠️ NO QR ATTACHMENT - email will be sent without QR code')
     }
 
+    console.log('📧 Final email options:', {
+      to: emailOptions.to,
+      subject: emailOptions.subject,
+      hasAttachments: !!emailOptions.attachments,
+      attachmentCount: emailOptions.attachments ? emailOptions.attachments.length : 0
+    })
+
+    // Send email
+    console.log('📤 SENDING email with sendEmail function...')
     const result = await sendEmail(emailOptions)
+    console.log('📬 Email send result:', result)
 
     if (result) {
-      console.log('✅ Registration confirmation email sent to:', registration.emailAddress)
-      return { success: true }
+      if (qrAttachment) {
+        console.log('✅ SUCCESS: Registration email sent WITH QR attachment to:', registration.emailAddress)
+      } else {
+        console.log('⚠️ WARNING: Registration email sent WITHOUT QR attachment to:', registration.emailAddress)
+        console.log('🔄 Manual QR generation and follow-up email required')
+      }
+      return { success: true, hasAttachment: !!qrAttachment }
     } else {
-      console.error('❌ Failed to send registration confirmation email')
+      console.error('❌ FAILED: Email sending failed')
       return { success: false, error: 'Email sending failed' }
     }
   } catch (error) {
-    console.error('❌ Failed to send registration confirmation email:', error)
-    return { success: false, error: error.message }
+    console.error('❌ Registration confirmation email error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -908,7 +1039,7 @@ export async function sendVerificationConfirmationEmail(registration: any) {
     const emailHtml = await generateVerificationConfirmationEmail(registration)
 
     // Generate QR code attachment
-    let attachments = []
+    let attachments: Array<{ filename: string; content: Buffer; contentType: string }> = []
     if (registration.qrCode) {
       try {
         const QRCode = await import('qrcode')
@@ -948,7 +1079,7 @@ export async function sendVerificationConfirmationEmail(registration: any) {
     }
   } catch (error) {
     console.error('❌ Failed to send verification confirmation email:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -960,7 +1091,7 @@ export async function sendRoomAllocationEmail(registration: any, room: any) {
     const emailHtml = await generateRoomAllocationEmail(registration, room)
 
     // Generate QR code attachment
-    let attachments = []
+    let attachments: Array<{ filename: string; content: Buffer; contentType: string }> = []
     if (registration.qrCode) {
       try {
         const QRCode = await import('qrcode')
@@ -999,7 +1130,7 @@ export async function sendRoomAllocationEmail(registration: any, room: any) {
     }
   } catch (error) {
     console.error('❌ Failed to send room allocation email:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -1027,7 +1158,7 @@ export async function sendPlatoonAllocationEmail(registration: any, platoon: any
     }
   } catch (error) {
     console.error('❌ Failed to send platoon allocation email:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -1056,6 +1187,6 @@ export async function sendRegistrationNotification(registration: any) {
     }
   } catch (error) {
     console.error('❌ Failed to send registration notification:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }

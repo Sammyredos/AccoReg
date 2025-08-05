@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 import { sendPlatoonAllocationEmail } from '@/lib/email'
+import { PlatoonLeaderEmailService } from '@/lib/services/platoon-leader-email'
 
 // POST - Auto allocate participants to platoons
 export async function POST(request: NextRequest) {
@@ -106,64 +107,101 @@ export async function POST(request: NextRequest) {
       currentPlatoonIndex = (currentPlatoonIndex + 1) % platoons.length
     }
 
-    // Create all allocations in a transaction
-    await prisma.$transaction(
-      allocations.map(allocation =>
-        prisma.platoonParticipant.create({
-          data: allocation
-        })
-      )
-    )
+    // Create all allocations in a single batch operation (much faster)
+    console.log(`🚀 Creating ${allocations.length} platoon allocations in batch...`)
+    await prisma.platoonParticipant.createMany({
+      data: allocations
+    })
 
-    // Send platoon allocation emails to participants
-    console.log('📧 Sending platoon allocation emails to participants...')
-    const emailResults = []
-
-    for (const allocation of allocations) {
-      try {
-        // Get full registration and platoon data for email
-        const registration = await prisma.registration.findUnique({
-          where: { id: allocation.registrationId }
-        })
-
-        const platoon = await prisma.platoonAllocation.findUnique({
-          where: { id: allocation.platoonId }
-        })
-
-        if (registration && platoon) {
-          const emailResult = await sendPlatoonAllocationEmail(registration, platoon)
-          emailResults.push({
-            participantId: allocation.registrationId,
-            participantName: registration.fullName,
-            platoonName: platoon.name,
-            emailSent: emailResult.success,
-            error: emailResult.error
-          })
-
-          if (emailResult.success) {
-            console.log(`✅ Platoon allocation email sent to ${registration.fullName}`)
-          } else {
-            console.error(`❌ Failed to send platoon allocation email to ${registration.fullName}:`, emailResult.error)
-          }
-        }
-      } catch (emailError) {
-        console.error('Error sending platoon allocation email:', emailError)
-        emailResults.push({
-          participantId: allocation.registrationId,
-          emailSent: false,
-          error: emailError.message
-        })
+    // Send platoon allocation emails asynchronously (don't wait for completion)
+    console.log('📧 Starting platoon allocation emails in background...')
+    let emailResults = {
+      summary: {
+        total: allocations.length,
+        successful: 0,
+        failed: 0,
+        status: 'sending'
       }
     }
 
-    const successfulEmails = emailResults.filter(r => r.emailSent).length
-    console.log(`📧 Platoon allocation emails: ${successfulEmails}/${allocations.length} sent successfully`)
+    if (allocations.length > 0) {
+      // Get all registration and platoon data in batch queries (much faster)
+      const registrationIds = allocations.map(a => a.registrationId)
+      const platoonIds = [...new Set(allocations.map(a => a.platoonId))]
+
+      // Fire and forget - don't await this (immediate response to user)
+      Promise.all([
+        prisma.registration.findMany({
+          where: { id: { in: registrationIds } }
+        }),
+        prisma.platoonAllocation.findMany({
+          where: { id: { in: platoonIds } }
+        })
+      ]).then(async ([registrations, platoonsData]) => {
+        console.log('📧 Sending platoon allocation emails in background...')
+        const emailPromises = []
+
+        for (const allocation of allocations) {
+          const registration = registrations.find(r => r.id === allocation.registrationId)
+          const platoon = platoonsData.find(p => p.id === allocation.platoonId)
+
+          if (registration && platoon) {
+            emailPromises.push(
+              sendPlatoonAllocationEmail(registration, platoon).catch(error => ({
+                success: false,
+                error: error.message
+              }))
+            )
+          }
+        }
+
+        // Send all emails in parallel (much faster)
+        const results = await Promise.allSettled(emailPromises)
+        const successful = results.filter(r => r.status === 'fulfilled' && r.value?.success).length
+        console.log(`📧 Platoon allocation emails completed: ${successful}/${allocations.length} sent successfully`)
+      }).catch((emailError) => {
+        console.error('Error sending bulk platoon allocation emails:', emailError)
+      })
+
+      console.log(`Started sending platoon allocation emails to ${allocations.length} participants in background...`)
+    }
+
+    const successfulEmails = 0 // Will be updated in background
+
+    // Check for full platoons and send notifications to leaders
+    if (allocations.length > 0) {
+      // Get updated platoon data to check which ones are now full
+      const updatedPlatoons = await prisma.platoonAllocation.findMany({
+        where: {
+          id: { in: [...new Set(allocations.map(a => a.platoonId))] }
+        },
+        include: {
+          participants: true
+        }
+      })
+
+      // Send notifications to leaders of full platoons in background
+      setImmediate(async () => {
+        for (const platoon of updatedPlatoons) {
+          if (platoon.participants.length >= platoon.capacity) {
+            try {
+              await PlatoonLeaderEmailService.sendPlatoonFullNotification({
+                platoonId: platoon.id,
+                allocatedBy: currentUser.email
+              })
+              console.log(`📧 Sent full platoon notification to leader of ${platoon.name}`)
+            } catch (error) {
+              console.error(`❌ Failed to send full platoon notification for ${platoon.name}:`, error)
+            }
+          }
+        }
+      })
+    }
 
     return NextResponse.json({
       success: true,
       totalAllocated: allocations.length,
-      message: `Successfully allocated ${allocations.length} participants to platoons.`,
-      emailsSent: successfulEmails,
+      message: `Successfully allocated ${allocations.length} participants to platoons. Notification emails are being sent in background.`,
       emailResults,
       allocations: allocations.map(a => ({
         participantId: a.registrationId,

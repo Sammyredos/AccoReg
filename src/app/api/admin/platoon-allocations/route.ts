@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
+import { PlatoonLeaderEmailService } from '@/lib/services/platoon-leader-email'
 
 // GET - Fetch all platoon allocation data
 export async function GET(request: NextRequest) {
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     console.log('📥 Received platoon data:', body)
-    const { name, leaderName, leaderPhone, capacity } = body
+    const { name, leaderName, leaderEmail, leaderPhone, capacity } = body
 
     // Validate required fields with specific messages
     if (!name?.trim()) {
@@ -134,9 +135,17 @@ export async function POST(request: NextRequest) {
     if (!leaderName?.trim()) {
       return NextResponse.json({ error: 'Leader name is required' }, { status: 400 })
     }
-
+    if (!leaderEmail?.trim()) {
+      return NextResponse.json({ error: 'Leader email is required' }, { status: 400 })
+    }
     if (!leaderPhone?.trim()) {
       return NextResponse.json({ error: 'Leader phone number is required' }, { status: 400 })
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(leaderEmail.trim())) {
+      return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
     }
     if (!capacity || isNaN(capacity)) {
       return NextResponse.json({ error: 'Valid capacity is required' }, { status: 400 })
@@ -180,6 +189,19 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Check for duplicate leader email
+    const existingEmail = await prisma.platoonAllocation.findFirst({
+      where: {
+        leaderEmail: leaderEmail.trim().toLowerCase()
+      }
+    })
+
+    if (existingEmail) {
+      return NextResponse.json({
+        error: 'This email address is already assigned to another platoon leader. Please use a different email address.'
+      }, { status: 400 })
+    }
+
     // Generate a unique label (A, B, C, etc.)
     const existingPlatoons = await prisma.platoonAllocation.findMany({
       select: { label: true },
@@ -201,6 +223,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: name.trim(),
         leaderName: leaderName.trim(),
+        leaderEmail: leaderEmail.trim().toLowerCase(),
         leaderPhone: leaderPhone.trim(),
         capacity: parseInt(capacity.toString()),
         label,
@@ -225,9 +248,25 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    console.log(`✅ Platoon "${newPlatoon.name}" created successfully by ${currentUser.email}`)
+
+    // Send confirmation email to platoon leader in background
+    setImmediate(async () => {
+      try {
+        const emailResult = await PlatoonLeaderEmailService.sendPlatoonCreationConfirmation(newPlatoon.id)
+        if (emailResult.success) {
+          console.log(`📧 Platoon creation confirmation sent to ${newPlatoon.leaderEmail}`)
+        } else {
+          console.error(`❌ Failed to send confirmation email to ${newPlatoon.leaderEmail}:`, emailResult.error)
+        }
+      } catch (error) {
+        console.error('Error sending platoon creation confirmation:', error)
+      }
+    })
+
     return NextResponse.json({
       success: true,
-      message: `Platoon "${newPlatoon.name}" created successfully`,
+      message: `Platoon "${newPlatoon.name}" created successfully. Confirmation email sent to platoon leader.`,
       platoon: newPlatoon
     }, { status: 201 })
 
