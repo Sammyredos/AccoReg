@@ -14,11 +14,9 @@ services:
       npm ci &&
       echo "🔧 Generating Prisma client for PostgreSQL..." &&
       npx prisma generate &&
-      echo "🗄️ Running database migrations..." &&
-      npx tsx scripts/deploy-database.ts &&
-      echo "📧 Setting up email history system..." &&
-      npx prisma db push &&
-      echo "✅ Database schema deployed with email history" &&
+      echo "🗄️ Setting up production database..." &&
+      npx tsx scripts/setup-production-db.ts &&
+      echo "✅ Production database ready with email history" &&
       echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&

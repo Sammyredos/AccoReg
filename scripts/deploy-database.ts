@@ -11,40 +11,55 @@ async function deployDatabase() {
   console.log('🗄️ Starting database deployment...')
 
   try {
-    // First, try to run migrations
-    console.log('📋 Attempting to deploy migrations...')
-    execSync('prisma migrate deploy', { stdio: 'inherit' })
-    console.log('✅ Migrations deployed successfully!')
+    // Generate Prisma client first
+    console.log('🔧 Generating Prisma client...')
+    execSync('prisma generate', { stdio: 'inherit' })
+    console.log('✅ Prisma client generated!')
+
+    // Check database connection
+    console.log('🔗 Testing database connection...')
+    execSync('prisma db execute --stdin <<< "SELECT 1;"', { stdio: 'pipe' })
+    console.log('✅ Database connection successful!')
+
+    // Use db push for production deployment (more reliable than migrations)
+    console.log('📋 Deploying database schema with db push...')
+    execSync('prisma db push --force-reset', { stdio: 'inherit' })
+    console.log('✅ Database schema deployed successfully!')
+
+    // Verify the deployment
+    console.log('🔍 Verifying database schema...')
+    execSync('prisma db execute --stdin <<< "SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\';"', { stdio: 'pipe' })
+    console.log('✅ Database schema verified!')
+
   } catch (error) {
-    console.log('⚠️ Migration deploy failed, trying alternative approach...')
-    
+    console.log('⚠️ Primary deployment failed, trying alternative approach...')
+
     try {
-      // If migrations fail, try to baseline the database
-      console.log('🔄 Attempting to baseline existing database...')
-      execSync('prisma migrate resolve --applied "20250117000002_postgresql_final_setup"', { stdio: 'inherit' })
-      execSync('prisma migrate resolve --applied "20250530204940_initial_with_user_info"', { stdio: 'inherit' })
-      execSync('prisma migrate resolve --applied "20250531202131_add_room_accommodation_tables"', { stdio: 'inherit' })
-      execSync('prisma migrate resolve --applied "20250605071911_add_system_config_table"', { stdio: 'inherit' })
-      execSync('prisma migrate resolve --applied "20250704000000_add_unverification_tracking"', { stdio: 'inherit' })
-      console.log('✅ Database baselined successfully!')
-      
-      // Now try migrations again
-      console.log('📋 Retrying migration deployment...')
-      execSync('prisma migrate deploy', { stdio: 'inherit' })
-      console.log('✅ Migrations deployed after baseline!')
-    } catch (baselineError) {
-      console.log('⚠️ Baseline failed, using db push as fallback...')
-      
+      // Alternative: Try without force reset
+      console.log('🔄 Attempting deployment without force reset...')
+      execSync('prisma db push', { stdio: 'inherit' })
+      console.log('✅ Database schema updated successfully!')
+
+    } catch (alternativeError) {
+      console.log('⚠️ Alternative failed, trying migration approach...')
+
       try {
-        // Final fallback: use db push
-        console.log('🔄 Using db push as final fallback...')
-        execSync('prisma db push --accept-data-loss', { stdio: 'inherit' })
-        console.log('✅ Database schema updated with db push!')
-      } catch (pushError) {
+        // Try migration approach as last resort
+        console.log('🔄 Attempting migration deployment...')
+        execSync('prisma migrate deploy', { stdio: 'inherit' })
+        console.log('✅ Migrations deployed successfully!')
+
+      } catch (migrationError) {
         console.error('❌ All database deployment methods failed!')
-        console.error('Migration error:', error)
-        console.error('Baseline error:', baselineError)
-        console.error('Push error:', pushError)
+        console.error('Primary error:', error)
+        console.error('Alternative error:', alternativeError)
+        console.error('Migration error:', migrationError)
+
+        // Log environment info for debugging
+        console.log('🔍 Environment debugging info:')
+        console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set')
+        console.log('NODE_ENV:', process.env.NODE_ENV)
+
         process.exit(1)
       }
     }
