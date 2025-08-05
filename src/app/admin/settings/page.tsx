@@ -16,7 +16,7 @@ import { EmailConfigDisplay } from '@/components/admin/EmailConfigDisplay'
 import { useTranslation } from '@/contexts/LanguageContext'
 import { LogoManager } from '@/lib/logo-manager'
 import { RolesPermissionsManager } from '@/components/admin/RolesPermissionsManager'
-import { SettingsTestComponent } from '@/components/admin/SettingsTestComponent'
+
 
 import {
   SettingsPageSkeleton,
@@ -2549,8 +2549,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* Settings Integration Test */}
-        <SettingsTestComponent />
+
       </div>
     )
   }
