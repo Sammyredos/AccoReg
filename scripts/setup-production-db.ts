@@ -6,6 +6,8 @@
  */
 
 import { execSync } from 'child_process'
+import { writeFileSync, unlinkSync } from 'fs'
+import { join } from 'path'
 
 async function setupProductionDatabase() {
   console.log('🗄️ Setting up production database...')
@@ -24,35 +26,42 @@ async function setupProductionDatabase() {
     // Step 3: Verify email history table exists
     console.log('📧 Verifying email history table...')
     try {
-      execSync(`npx prisma db execute --stdin <<< "SELECT COUNT(*) FROM platoon_email_history LIMIT 1;"`, { stdio: 'pipe' })
+      // Create a temporary SQL file for verification
+      const verifySqlFile = join(process.cwd(), 'verify-email-history.sql')
+      writeFileSync(verifySqlFile, 'SELECT COUNT(*) FROM platoon_email_history LIMIT 1;')
+
+      execSync(`npx prisma db execute --file ${verifySqlFile}`, { stdio: 'pipe' })
+      unlinkSync(verifySqlFile) // Clean up
       console.log('✅ Email history table verified!')
     } catch (error) {
       console.log('📧 Creating email history table manually...')
-      
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS "platoon_email_history" (
-          "id" TEXT NOT NULL,
-          "platoonId" TEXT NOT NULL,
-          "subject" TEXT NOT NULL,
-          "message" TEXT NOT NULL,
-          "emailTarget" TEXT NOT NULL,
-          "recipientCount" INTEGER NOT NULL,
-          "successCount" INTEGER NOT NULL,
-          "failedCount" INTEGER NOT NULL,
-          "sentBy" TEXT NOT NULL,
-          "senderName" TEXT NOT NULL,
-          "senderEmail" TEXT NOT NULL,
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "platoon_email_history_pkey" PRIMARY KEY ("id")
-        );
-        
-        CREATE INDEX IF NOT EXISTS "platoon_email_history_platoonId_idx" ON "platoon_email_history"("platoonId");
-        CREATE INDEX IF NOT EXISTS "platoon_email_history_createdAt_idx" ON "platoon_email_history"("createdAt");
-        CREATE INDEX IF NOT EXISTS "platoon_email_history_sentBy_idx" ON "platoon_email_history"("sentBy");
-      `
-      
-      execSync(`npx prisma db execute --stdin <<< "${createTableSQL}"`, { stdio: 'inherit' })
+
+      const createTableSQL = `CREATE TABLE IF NOT EXISTS "platoon_email_history" (
+  "id" TEXT NOT NULL,
+  "platoonId" TEXT NOT NULL,
+  "subject" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "emailTarget" TEXT NOT NULL,
+  "recipientCount" INTEGER NOT NULL,
+  "successCount" INTEGER NOT NULL,
+  "failedCount" INTEGER NOT NULL,
+  "sentBy" TEXT NOT NULL,
+  "senderName" TEXT NOT NULL,
+  "senderEmail" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "platoon_email_history_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "platoon_email_history_platoonId_idx" ON "platoon_email_history"("platoonId");
+CREATE INDEX IF NOT EXISTS "platoon_email_history_createdAt_idx" ON "platoon_email_history"("createdAt");
+CREATE INDEX IF NOT EXISTS "platoon_email_history_sentBy_idx" ON "platoon_email_history"("sentBy");`
+
+      const createSqlFile = join(process.cwd(), 'create-email-history.sql')
+      writeFileSync(createSqlFile, createTableSQL)
+
+      execSync(`npx prisma db execute --file ${createSqlFile}`, { stdio: 'inherit' })
+      unlinkSync(createSqlFile) // Clean up
       console.log('✅ Email history table created manually!')
     }
 
