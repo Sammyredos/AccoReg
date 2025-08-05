@@ -122,10 +122,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log(`🚀 Preparing to send ${recipients.length} emails in parallel...`)
+    console.log(`🚀 Preparing to send ${recipients.length} emails in batches...`)
 
-    // Prepare all email data first (much faster)
-    const emailPromises = recipients.map(async (email) => {
+    // Process emails in batches to prevent server overload
+    const BATCH_SIZE = 10 // Process 10 emails at a time
+    const results: any[] = []
+
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+      const batch = recipients.slice(i, i + BATCH_SIZE)
+      console.log(`📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(recipients.length / BATCH_SIZE)} (${batch.length} emails)`)
+
+      const batchPromises = batch.map(async (email) => {
       try {
         let personalizedMessage = message
         let personalizedSubject = subject
@@ -190,25 +197,32 @@ export async function POST(request: NextRequest) {
           </html>
         `
 
-        // FORCE QR code attachment generation for every registration
+        // Generate QR code attachment only for registration info emails (performance optimization)
         let qrAttachment = null
-        if (currentRegistration) {
-          const filename = `QR-Code-${currentRegistration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`
+        if (currentRegistration && (message.includes('{{REGISTRATION_INFO}}') || subject.toLowerCase().includes('registration'))) {
+          try {
+            const filename = `QR-Code-${currentRegistration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`
 
-          // Use stored QR code or generate from registration data
-          const qrData = currentRegistration.qrCode || JSON.stringify({
-            id: currentRegistration.id,
-            name: currentRegistration.fullName,
-            email: currentRegistration.emailAddress,
-            phone: currentRegistration.phoneNumber,
-            event: 'LINGER NO LONGER 6.0',
-            registrationDate: currentRegistration.createdAt,
-            branch: currentRegistration.branch,
-            type: 'participant_qr'
-          })
+            // Use cached QR code if available, otherwise generate
+            let qrData = currentRegistration.qrCode
+            if (!qrData) {
+              qrData = JSON.stringify({
+                id: currentRegistration.id,
+                name: currentRegistration.fullName,
+                email: currentRegistration.emailAddress,
+                phone: currentRegistration.phoneNumber,
+                event: 'LINGER NO LONGER 6.0',
+                registrationDate: currentRegistration.createdAt,
+                type: 'participant_qr'
+              })
+            }
 
-          qrAttachment = await generateQRCodeAttachment(qrData, filename)
-          console.log('📎 FORCED QR attachment for bulk email:', filename)
+            qrAttachment = await generateQRCodeAttachment(qrData, filename)
+            console.log('📎 QR attachment generated for registration email:', filename)
+          } catch (qrError) {
+            console.error('QR generation error:', qrError)
+            // Continue without QR code if generation fails
+          }
         }
 
         // Prepare email options with FORCED QR attachment
@@ -219,11 +233,9 @@ export async function POST(request: NextRequest) {
           attachments: qrAttachment ? [qrAttachment] : [] // FORCE attachments array
         }
 
-        // Log attachment status
+        // Minimal logging for performance
         if (qrAttachment) {
-          console.log('📎 QR attachment FORCED into bulk email for:', email)
-        } else {
-          console.log('⚠️ No QR attachment generated for:', email)
+          console.log('📎 QR attachment included for:', email)
         }
 
         const result = await sendEmail(emailOptions)
@@ -241,11 +253,19 @@ export async function POST(request: NextRequest) {
           error: error instanceof Error ? error.message : 'Unknown error'
         }
       }
-    })
+      })
 
-    // Send all emails in parallel (much faster!)
-    console.log(`📧 Sending ${recipients.length} emails in parallel...`)
-    const results = await Promise.allSettled(emailPromises)
+      // Process this batch
+      const batchResults = await Promise.allSettled(batchPromises)
+      results.push(...batchResults)
+
+      // Add a small delay between batches to prevent overwhelming the server
+      if (i + BATCH_SIZE < recipients.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second delay
+      }
+    }
+
+    console.log(`📧 All batches completed: ${results.length} emails processed`)
 
     // Process results
     const successfulResults = []

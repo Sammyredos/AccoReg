@@ -408,10 +408,13 @@ export default function CommunicationsPage() {
 
   const handleEmailToggle = (email: string) => {
     if (isAllEmailsSelected) {
-      // If all are selected, deselect all and select only this one
+      // If all are selected, switch to individual selection mode
+      // and deselect only this email (keep all others selected)
       setIsAllEmailsSelected(false)
-      setSelectedEmails([email])
+      const allEmailsExceptThis = allEmails.filter(e => e !== email)
+      setSelectedEmails(allEmailsExceptThis)
     } else {
+      // Normal toggle behavior for individual selections
       setSelectedEmails(prev =>
         prev.includes(email)
           ? prev.filter(e => e !== email)
@@ -422,10 +425,13 @@ export default function CommunicationsPage() {
 
   const handlePhoneToggle = (phone: string) => {
     if (isAllPhonesSelected) {
-      // If all are selected, deselect all and select only this one
+      // If all are selected, switch to individual selection mode
+      // and deselect only this phone (keep all others selected)
       setIsAllPhonesSelected(false)
-      setSelectedPhones([phone])
+      const allPhonesExceptThis = allPhones.filter(p => p !== phone)
+      setSelectedPhones(allPhonesExceptThis)
     } else {
+      // Normal toggle behavior for individual selections
       setSelectedPhones(prev =>
         prev.includes(phone)
           ? prev.filter(p => p !== phone)
@@ -491,6 +497,12 @@ export default function CommunicationsPage() {
     setIsSendingBulkEmail(true)
 
     try {
+      // Show progress message for large batches
+      const recipientCount = getEffectiveSelectedEmailsCount()
+      if (recipientCount > 50) {
+        success('Processing Started', `Processing ${recipientCount} emails in batches. This may take a few minutes...`)
+      }
+
       const response = await fetch('/api/admin/communications/bulk-email', {
         method: 'POST',
         headers: {
@@ -501,7 +513,9 @@ export default function CommunicationsPage() {
           subject: bulkEmailData.subject,
           message: bulkEmailData.message,
           includeNames: bulkEmailData.includeNames
-        })
+        }),
+        // Increase timeout for large batches
+        signal: AbortSignal.timeout(recipientCount > 100 ? 300000 : 120000) // 5 min for large batches, 2 min for smaller
       })
 
       const data = await response.json()
