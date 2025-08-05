@@ -17,6 +17,9 @@ services:
       echo "🗄️ Setting up production database..." &&
       npx tsx scripts/setup-production-db.ts &&
       echo "✅ Production database ready with email history" &&
+      echo "🧹 Cleaning up placeholder platoon data..." &&
+      npx tsx scripts/cleanup-placeholder-platoons.ts &&
+      echo "✅ Placeholder data cleanup completed" &&
       echo "👑 Setting up Super Admin account..." &&
       (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
       echo "⚙️ Seeding system settings..." &&
