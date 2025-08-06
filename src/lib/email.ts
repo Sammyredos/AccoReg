@@ -736,7 +736,13 @@ async function generateVerificationConfirmationEmail(registration: any): Promise
             text-align: center;
         }
         .content { padding: 24px; }
-        
+        .qr-section {
+            background: #f0fdf4;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+        }
         .footer {
             background: #f9fafb;
             padding: 16px;
@@ -833,7 +839,13 @@ async function generateRoomAllocationEmail(registration: any, room: any): Promis
             margin: 16px 0;
             text-align: center;
         }
-        
+        .qr-section {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+        }
         .info-item {
             background: #f9fafb;
             padding: 12px;
@@ -1030,34 +1042,11 @@ export async function sendVerificationConfirmationEmail(registration: any) {
     const emailHtml = await generateVerificationConfirmationEmail(registration)
     console.log('📧 Email HTML generated successfully')
 
-    // Generate QR code attachment
-    let attachments: Array<{ filename: string; content: Buffer; contentType: string }> = []
-    if (registration.qrCode) {
-      try {
-        const QRCode = await import('qrcode')
-        const qrBuffer = await QRCode.default.toBuffer(registration.qrCode, {
-          errorCorrectionLevel: 'H', // High error correction for better reliability
-          margin: 4, // More margin for better scanning
-          color: { dark: '#1f2937', light: '#ffffff' },
-          width: 400, // Good size for attachments
-          type: 'png'
-        })
-
-        attachments.push({
-          filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`,
-          content: qrBuffer,
-          contentType: 'image/png'
-        })
-      } catch (qrError) {
-        console.error('Error generating QR attachment for verification email:', qrError)
-      }
-    }
-
+    // No QR code attachment for verification emails
     const emailOptions = {
       to: [registration.emailAddress],
       subject: `✅ Verification Confirmed - LINGER NO LONGER 6.0`,
-      html: emailHtml,
-      attachments
+      html: emailHtml
     }
 
     console.log('📧 Calling sendEmail function...')
@@ -1086,33 +1075,11 @@ export async function sendRoomAllocationEmail(registration: any, room: any) {
 
     const emailHtml = await generateRoomAllocationEmail(registration, room)
 
-    // Generate QR code attachment
-    let attachments: Array<{ filename: string; content: Buffer; contentType: string }> = []
-    if (registration.qrCode) {
-      try {
-        const QRCode = await import('qrcode')
-        const qrBuffer = await QRCode.default.toBuffer(registration.qrCode, {
-          errorCorrectionLevel: 'M',
-          margin: 2,
-          color: { dark: '#000000', light: '#FFFFFF' },
-          width: 512
-        })
-
-        attachments.push({
-          filename: `QR-Code-${registration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`,
-          content: qrBuffer,
-          contentType: 'image/png'
-        })
-      } catch (qrError) {
-        console.error('Error generating QR attachment for room allocation email:', qrError)
-      }
-    }
-
+    // No QR code attachment for room allocation emails
     const emailOptions = {
       to: [registration.emailAddress],
       subject: `🏠 Room Allocated - ${room.name} - LINGER NO LONGER 6.0`,
-      html: emailHtml,
-      attachments
+      html: emailHtml
     }
 
     const result = await sendEmail(emailOptions)
