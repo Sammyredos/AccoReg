@@ -768,7 +768,7 @@ export default function CommunicationsPage() {
           <StatsGrid columns={4}>
             <StatsCard
               title="Unverified Participants"
-              value={registrations.filter(r => !r.isVerified).length}
+              value={filteredRegistrations.filter(r => !r.isVerified).length}
               subtitle="Awaiting verification"
               icon={UserX}
               gradient="bg-gradient-to-r from-amber-500 to-orange-600"
@@ -777,7 +777,7 @@ export default function CommunicationsPage() {
 
             <StatsCard
               title="Email Addresses"
-              value={allEmails.length}
+              value={emailPagination.totalItems}
               subtitle="Unique email contacts"
               icon={Mail}
               gradient="bg-gradient-to-r from-green-500 to-emerald-600"
@@ -786,7 +786,7 @@ export default function CommunicationsPage() {
 
             <StatsCard
               title="Phone Numbers"
-              value={allPhones.length}
+              value={phonePagination.totalItems}
               subtitle="Unique phone contacts"
               icon={Phone}
               gradient="bg-gradient-to-r from-purple-500 to-pink-600"
