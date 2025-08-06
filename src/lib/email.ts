@@ -736,13 +736,7 @@ async function generateVerificationConfirmationEmail(registration: any): Promise
             text-align: center;
         }
         .content { padding: 24px; }
-        .qr-section {
-            background: #f0fdf4;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
-            text-align: center;
-        }
+        
         .footer {
             background: #f9fafb;
             padding: 16px;
@@ -839,13 +833,7 @@ async function generateRoomAllocationEmail(registration: any, room: any): Promis
             margin: 16px 0;
             text-align: center;
         }
-        .qr-section {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
-            text-align: center;
-        }
+        
         .info-item {
             background: #f9fafb;
             padding: 12px;
