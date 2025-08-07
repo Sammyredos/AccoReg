@@ -56,8 +56,8 @@ export default function CommunicationsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
   const [selectedPhones, setSelectedPhones] = useState<string[]>([])
-  const [isAllEmailsSelected, setIsAllEmailsSelected] = useState(false)
-  const [isAllPhonesSelected, setIsAllPhonesSelected] = useState(false)
+  const [isAllFilteredEmailsSelected, setIsAllFilteredEmailsSelected] = useState(false)
+  const [isAllFilteredPhonesSelected, setIsAllFilteredPhonesSelected] = useState(false)
   // Separate search states for Email and SMS tabs
   const [emailSearchTerm, setEmailSearchTerm] = useState('')
   const [emailGenderFilter, setEmailGenderFilter] = useState('')
@@ -360,57 +360,55 @@ export default function CommunicationsPage() {
   }, [emailFilteredRegistrations, smsFilteredRegistrations, emailCurrentPage, phoneCurrentPage, ITEMS_PER_PAGE])
 
   const handleSelectAllEmails = useCallback(() => {
-    if (isAllEmailsSelected) {
+    if (isAllFilteredEmailsSelected) {
       setSelectedEmails([])
-      setIsAllEmailsSelected(false)
+      setIsAllFilteredEmailsSelected(false)
     } else {
-      // For performance, we'll use a flag instead of copying all emails
-      setIsAllEmailsSelected(true)
-      setSelectedEmails([]) // Clear individual selections when selecting all
+      setSelectedEmails(emailFilteredRegistrations.map(r => r.emailAddress).filter(Boolean))
+      setIsAllFilteredEmailsSelected(true)
     }
-  }, [isAllEmailsSelected])
+  }, [isAllFilteredEmailsSelected, emailFilteredRegistrations])
 
   const handleSelectAllPhones = useCallback(() => {
-    if (isAllPhonesSelected) {
+    if (isAllFilteredPhonesSelected) {
       setSelectedPhones([])
-      setIsAllPhonesSelected(false)
+      setIsAllFilteredPhonesSelected(false)
     } else {
-      // For performance, we'll use a flag instead of copying all phones
-      setIsAllPhonesSelected(true)
-      setSelectedPhones([]) // Clear individual selections when selecting all
+      setSelectedPhones(smsFilteredRegistrations.map(r => r.phoneNumber).filter(Boolean))
+      setIsAllFilteredPhonesSelected(true)
     }
-  }, [isAllPhonesSelected])
+  }, [isAllFilteredPhonesSelected, smsFilteredRegistrations])
 
   // Helper functions to get effective selections
   const getEffectiveSelectedEmails = useCallback(() => {
-    return isAllEmailsSelected ? allEmails : selectedEmails
-  }, [isAllEmailsSelected, allEmails, selectedEmails])
+    return selectedEmails
+  }, [selectedEmails])
 
   const getEffectiveSelectedPhones = useCallback(() => {
-    return isAllPhonesSelected ? allPhones : selectedPhones
-  }, [isAllPhonesSelected, allPhones, selectedPhones])
+    return selectedPhones
+  }, [selectedPhones])
 
   const getEffectiveSelectedEmailsCount = useCallback(() => {
-    return isAllEmailsSelected ? allEmails.length : selectedEmails.length
-  }, [isAllEmailsSelected, allEmails.length, selectedEmails.length])
+    return selectedEmails.length
+  }, [selectedEmails.length])
 
   const getEffectiveSelectedPhonesCount = useCallback(() => {
-    return isAllPhonesSelected ? allPhones.length : selectedPhones.length
-  }, [isAllPhonesSelected, allPhones.length, selectedPhones.length])
+    return selectedPhones.length
+  }, [selectedPhones.length])
 
   const isEmailSelected = useCallback((email: string) => {
-    return isAllEmailsSelected || selectedEmails.includes(email)
-  }, [isAllEmailsSelected, selectedEmails])
+    return selectedEmails.includes(email)
+  }, [selectedEmails])
 
   const isPhoneSelected = useCallback((phone: string) => {
-    return isAllPhonesSelected || selectedPhones.includes(phone)
-  }, [isAllPhonesSelected, selectedPhones])
+    return selectedPhones.includes(phone)
+  }, [selectedPhones])
 
   const handleEmailToggle = (email: string) => {
-    if (isAllEmailsSelected) {
+    if (isAllFilteredEmailsSelected) {
       // If all are selected, switch to individual selection mode
       // and deselect only this email (keep all others selected)
-      setIsAllEmailsSelected(false)
+      setIsAllFilteredEmailsSelected(false)
       const allEmailsExceptThis = allEmails.filter(e => e !== email)
       setSelectedEmails(allEmailsExceptThis)
     } else {
@@ -424,10 +422,10 @@ export default function CommunicationsPage() {
   }
 
   const handlePhoneToggle = (phone: string) => {
-    if (isAllPhonesSelected) {
+    if (isAllFilteredPhonesSelected) {
       // If all are selected, switch to individual selection mode
       // and deselect only this phone (keep all others selected)
-      setIsAllPhonesSelected(false)
+      setIsAllFilteredPhonesSelected(false)
       const allPhonesExceptThis = allPhones.filter(p => p !== phone)
       setSelectedPhones(allPhonesExceptThis)
     } else {
@@ -531,7 +529,7 @@ export default function CommunicationsPage() {
         })
         setShowBulkEmailModal(false)
         setSelectedEmails([])
-        setIsAllEmailsSelected(false)
+        setIsAllFilteredEmailsSelected(false)
       } else {
         setErrorModal({
           isOpen: true,
@@ -594,7 +592,7 @@ export default function CommunicationsPage() {
         })
         setShowBulkSmsModal(false)
         setSelectedPhones([])
-        setIsAllPhonesSelected(false)
+        setIsAllFilteredPhonesSelected(false)
       } else {
         setErrorModal({
           isOpen: true,
@@ -923,7 +921,7 @@ export default function CommunicationsPage() {
                     onClick={handleSelectAllEmails}
                     className="font-apercu-medium text-xs sm:text-sm flex-1 sm:flex-none"
                   >
-                    {isAllEmailsSelected ? 'Deselect All' : 'Select All'}
+                    {isAllFilteredEmailsSelected ? 'Deselect All' : 'Select All'}
                   </Button>
                   <Button
                     variant="outline"
@@ -1110,7 +1108,7 @@ export default function CommunicationsPage() {
                     onClick={handleSelectAllPhones}
                     className="font-apercu-medium text-xs sm:text-sm flex-1 sm:flex-none"
                   >
-                    {isAllPhonesSelected ? 'Deselect All' : 'Select All'}
+                    {isAllFilteredPhonesSelected ? 'Deselect All' : 'Select All'}
                   </Button>
                   <Button
                     variant="outline"
