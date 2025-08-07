@@ -3,10 +3,8 @@
  * Implements async message processing for improved performance
  */
 
-import { PrismaClient } from '@prisma/client'
+import { prisma } from './db'
 import { sendEmail } from './email'
-
-const prisma = new PrismaClient()
 
 interface QueuedMessage {
   id: string
