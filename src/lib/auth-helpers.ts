@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
-import { prisma } from './db'
+import { PrismaClient } from '@prisma/client'
 import { verifyToken } from '@/lib/auth'
+
+const prisma = new PrismaClient()
 
 export interface AuthenticatedUser {
   id: string

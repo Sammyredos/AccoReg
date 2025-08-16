@@ -1,4 +1,6 @@
-import { prisma } from './db'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 // Cache for settings to avoid database calls
 let settingsCache: Record<string, any> = {}

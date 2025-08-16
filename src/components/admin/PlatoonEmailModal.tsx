@@ -22,8 +22,7 @@ import {
   ArrowLeft,
   Trash2,
   ChevronLeft,
-  ChevronRight,
-  Clock
+  ChevronRight
 } from 'lucide-react'
 
 interface PlatoonEmailModalProps {
@@ -549,7 +548,7 @@ export function PlatoonEmailModal({
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Send Email</span>
+                        <span className=" hidden text-white sm:inline">Send Email</span>
                         <span className="sm:hidden">Send</span>
                       </>
                     )}

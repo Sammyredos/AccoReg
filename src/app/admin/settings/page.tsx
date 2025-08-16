@@ -61,7 +61,6 @@ import {
   XCircle
 } from 'lucide-react'
 import '@/styles/settings-responsive.css'
-import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 interface SettingItem {
   key: string
@@ -1647,19 +1646,7 @@ export default function SettingsPage() {
       case 'data':
         return renderDataManagementTab()
       case 'roles':
-        return (
-          <div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="mb-4">Edit System Roles</Button>
-              </DialogTrigger>
-              <DialogContent fullScreen>
-                <DialogTitle>Edit System Roles & Permissions</DialogTitle>
-                <RolesPermissionsManager />
-              </DialogContent>
-            </Dialog>
-          </div>
-        )
+        return <RolesPermissionsManager />
       default:
         return null
     }
