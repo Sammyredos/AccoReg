@@ -323,7 +323,7 @@ export async function generateRegistrationConfirmationEmail(registration: any, i
     <div class="container">
         <div class="header">
             <h1 style="margin: 0; font-size: 20px; font-weight: 600;">✅ Registration Confirmed</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Linger no Longer 7.0</p>
         </div>
 
         <div class="content">
@@ -376,7 +376,7 @@ export async function generateRegistrationConfirmationEmail(registration: any, i
 
         <div class="footer">
             <p style="margin: 0; font-size: 12px;">
-                LINGER NO LONGER 6.0 • Questions? Reply to this email
+                Linger no Longer 7.0 • Questions? Reply to this email
             </p>
         </div>
     </div>
@@ -399,7 +399,7 @@ export async function sendRegistrationConfirmationEmail(registration: any) {
       name: registration.fullName,
       email: registration.emailAddress,
       phone: registration.phoneNumber,
-      event: 'LINGER NO LONGER 6.0',
+      event: 'Linger no Longer 7.0',
       registrationDate: registration.createdAt,
       branch: registration.branch,
       type: 'participant_qr'
@@ -434,7 +434,7 @@ export async function sendRegistrationConfirmationEmail(registration: any) {
 
       // Emergency fallback - generate QR with just essential data
       try {
-        const emergencyData = `${registration.id}|${registration.fullName}|${registration.emailAddress}|LINGER NO LONGER 6.0`
+        const emergencyData = `${registration.id}|${registration.fullName}|${registration.emailAddress}|Linger no Longer 7.0`
         const emergencyBuffer = await QRCode.default.toBuffer(emergencyData, {
           errorCorrectionLevel: 'L', // Lower error correction for emergency
           margin: 2,
@@ -496,12 +496,12 @@ export async function sendRegistrationConfirmationEmail(registration: any) {
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background: white; padding: 30px; border-radius: 12px;">
-        <h1 style="color: #1f2937; text-align: center;">LINGER NO LONGER 6.0</h1>
+        <h1 style="color: #1f2937; text-align: center;">Linger no Longer 7.0</h1>
         <h2 style="color: #059669; text-align: center;">✅ Registration Confirmed!</h2>
 
         <p>Dear <strong>${registration.fullName}</strong>,</p>
 
-        <p>Thank you for registering for LINGER NO LONGER 6.0! Your registration has been confirmed.</p>
+        <p>Thank you for registering for Linger no Longer 7.0! Your registration has been confirmed.</p>
 
         ${qrSection}
 
@@ -515,7 +515,7 @@ export async function sendRegistrationConfirmationEmail(registration: any) {
         </div>
 
         <p>If you have any questions, please reply to this email.</p>
-        <p>See you at LINGER NO LONGER 6.0!</p>
+        <p>See you at Linger no Longer 7.0!</p>
 
         <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
         <p style="font-size: 12px; color: #6b7280; text-align: center;">
@@ -529,7 +529,7 @@ export async function sendRegistrationConfirmationEmail(registration: any) {
     const emailOptions: any = {
       to: [registration.emailAddress],
       subject: qrAttachment
-        ? `📱 Registration Confirmed - Your QR Code for LINGER NO LONGER 6.0`
+        ? `📱 Registration Confirmed - Your QR Code for Linger no Longer 7.0`
         : `✅ Registration Confirmed - QR Code Coming Soon`,
       html: emailHtml
     }
@@ -630,7 +630,7 @@ async function generateVerificationConfirmationEmail(registration: any): Promise
     <div class="container">
         <div class="header">
             <h1 style="margin: 0; font-size: 20px; font-weight: 600;">✅ Verification Confirmed</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Linger no Longer 7.0</p>
         </div>
 
         <div class="content">
@@ -661,7 +661,7 @@ async function generateVerificationConfirmationEmail(registration: any): Promise
 
         <div class="footer">
             <p style="margin: 0; font-size: 12px;">
-                LINGER NO LONGER 6.0 • Questions? Reply to this email
+                Linger no Longer 7.0 • Questions? Reply to this email
             </p>
         </div>
     </div>
@@ -740,7 +740,7 @@ async function generateRoomAllocationEmail(registration: any, room: any): Promis
     <div class="container">
         <div class="header">
             <h1 style="margin: 0; font-size: 20px; font-weight: 600;">🏠 Room Allocated</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Linger no Longer 7.0</p>
         </div>
 
         <div class="content">
@@ -776,7 +776,7 @@ async function generateRoomAllocationEmail(registration: any, room: any): Promis
 
         <div class="footer">
             <p style="margin: 0; font-size: 12px;">
-                LINGER NO LONGER 6.0 • Questions? Reply to this email
+                Linger no Longer 7.0 • Questions? Reply to this email
             </p>
         </div>
     </div>
@@ -854,7 +854,7 @@ async function generatePlatoonAllocationEmail(registration: any, platoon: any): 
     <div class="container">
         <div class="header">
             <h1 style="margin: 0; font-size: 20px; font-weight: 600;">⚔️ Platoon Assigned</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Linger no Longer 7.0</p>
         </div>
 
         <div class="content">
@@ -895,7 +895,7 @@ async function generatePlatoonAllocationEmail(registration: any, platoon: any): 
 
         <div class="footer">
             <p style="margin: 0; font-size: 12px;">
-                LINGER NO LONGER 6.0 • Questions? Reply to this email
+                Linger no Longer 7.0 • Questions? Reply to this email
             </p>
         </div>
     </div>
@@ -918,7 +918,7 @@ export async function sendVerificationConfirmationEmail(registration: any) {
     // No QR code attachment for verification emails
     const emailOptions = {
       to: [registration.emailAddress],
-      subject: `✅ Verification Confirmed - LINGER NO LONGER 6.0`,
+      subject: `✅ Verification Confirmed - Linger no Longer 7.0`,
       html: emailHtml
     }
 
@@ -951,7 +951,7 @@ export async function sendRoomAllocationEmail(registration: any, room: any) {
     // No QR code attachment for room allocation emails
     const emailOptions = {
       to: [registration.emailAddress],
-      subject: `🏠 Room Allocated - ${room.name} - LINGER NO LONGER 6.0`,
+      subject: `🏠 Room Allocated - ${room.name} - Linger no Longer 7.0`,
       html: emailHtml
     }
 
@@ -979,7 +979,7 @@ export async function sendPlatoonAllocationEmail(registration: any, platoon: any
 
     const emailOptions = {
       to: [registration.emailAddress],
-      subject: `⚔️ Platoon Assigned - ${platoon.name} - LINGER NO LONGER 6.0`,
+      subject: `⚔️ Platoon Assigned - ${platoon.name} - Linger no Longer 7.0`,
       html: emailHtml
     }
 

@@ -154,7 +154,7 @@ export class PlatoonLeaderEmailService {
           <div class="container">
             <div class="header">
               <h1 style="margin: 0; font-size: 24px;">⚔️ Platoon Leader Assignment</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">Linger no Longer 7.0</p>
             </div>
 
             <div style="text-align: center;">
@@ -168,7 +168,7 @@ export class PlatoonLeaderEmailService {
             </p>
 
             <p style="font-size: 16px; line-height: 1.6;">
-              Congratulations! You have been assigned as the leader of <strong>${platoon.name}</strong> for the upcoming LINGER NO LONGER 6.0 event. This is an important leadership role, and we're excited to have you guide your platoon through this amazing experience.
+              Congratulations! You have been assigned as the leader of <strong>${platoon.name}</strong> for the upcoming Linger no Longer 7.0 event. This is an important leadership role, and we're excited to have you guide your platoon through this amazing experience.
             </p>
 
             <div class="platoon-info">
@@ -221,7 +221,7 @@ export class PlatoonLeaderEmailService {
 
             <div class="footer">
               <p>
-                Welcome to the LINGER NO LONGER 6.0 Leadership Team!<br>
+                Welcome to the Linger no Longer 7.0 Leadership Team!<br>
                 <strong>Platoon:</strong> ${platoon.name} (${platoon.label})<br>
                 <strong>Generated on:</strong> ${new Date().toLocaleString()}
               </p>
@@ -236,7 +236,7 @@ export class PlatoonLeaderEmailService {
 
       const emailOptions = {
         to: [platoon.leaderEmail],
-        subject: `🎖️ Platoon Leader Assignment - ${platoon.name} | LINGER NO LONGER 6.0`,
+        subject: `🎖️ Platoon Leader Assignment - ${platoon.name} | Linger no Longer 7.0`,
         html: emailHtml
       }
 
@@ -261,16 +261,16 @@ export class PlatoonLeaderEmailService {
       }
     }
   }
-  
+
   /**
    * Send email to platoon leader
    */
   static async sendEmailToPlatoonLeader(options: PlatoonLeaderEmailOptions): Promise<{ success: boolean; error?: string }> {
     try {
       const { platoonId, subject, message, senderName, senderEmail } = options
-      
+
       logger.info('Sending email to platoon leader', { platoonId, subject, senderEmail })
-      
+
       // Get platoon with leader details
       const platoon = await prisma.platoonAllocation.findUnique({
         where: { id: platoonId },
@@ -353,7 +353,7 @@ export class PlatoonLeaderEmailService {
           <div class="container">
             <div class="header">
               <h1 style="margin: 0; font-size: 24px;">⚔️ Platoon Leader Communication</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">Linger no Longer 7.0</p>
             </div>
 
             <p style="font-size: 18px; color: #1f2937;">
@@ -379,16 +379,16 @@ export class PlatoonLeaderEmailService {
               <h4 style="margin: 0 0 10px 0; color: #92400e;">👥 Your Platoon Members</h4>
               ${platoon.participants.length > 0 ? `
                 <div style="font-size: 14px; color: #78350f;">
-                  ${platoon.participants.map(p => 
-                    `• ${p.registration.fullName} (${p.registration.gender}, ${p.registration.branch})`
-                  ).join('<br>')}
+                  ${platoon.participants.map(p =>
+        `• ${p.registration.fullName} (${p.registration.gender}, ${p.registration.branch})`
+      ).join('<br>')}
                 </div>
               ` : '<p style="margin: 0; color: #78350f; font-style: italic;">No participants assigned yet</p>'}
             </div>
 
             <div class="footer">
               <p>
-                This email was sent from the LINGER NO LONGER 6.0 Admin System<br>
+                This email was sent from the Linger no Longer 7.0 Admin System<br>
                 <strong>Sender:</strong> ${senderName} (${senderEmail})
               </p>
             </div>
@@ -418,9 +418,9 @@ export class PlatoonLeaderEmailService {
 
     } catch (error) {
       logger.error('Failed to send email to platoon leader', error, { platoonId: options.platoonId })
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   }
@@ -431,9 +431,9 @@ export class PlatoonLeaderEmailService {
   static async sendPlatoonFullNotification(options: PlatoonFullNotificationOptions): Promise<{ success: boolean; error?: string }> {
     try {
       const { platoonId, allocatedBy } = options
-      
+
       logger.info('Sending platoon full notification', { platoonId, allocatedBy })
-      
+
       // Get platoon with participants
       const platoon = await prisma.platoonAllocation.findUnique({
         where: { id: platoonId },
@@ -472,15 +472,15 @@ If you have any questions or need to make any adjustments, please contact the ad
         platoonId,
         subject,
         message,
-        senderName: 'LINGER NO LONGER 6.0 Admin System',
+        senderName: 'Linger no Longer 7.0 Admin System',
         senderEmail: allocatedBy
       })
 
     } catch (error) {
       logger.error('Failed to send platoon full notification', error, { platoonId: options.platoonId })
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   }
@@ -489,19 +489,19 @@ If you have any questions or need to make any adjustments, please contact the ad
    * Send bulk emails to multiple platoon leaders
    */
   static async sendBulkEmailsToPlatoonLeaders(
-    platoonIds: string[], 
-    subject: string, 
-    message: string, 
-    senderName: string, 
+    platoonIds: string[],
+    subject: string,
+    message: string,
+    senderName: string,
     senderEmail: string
-  ): Promise<{ 
-    summary: { total: number; successful: number; failed: number }; 
-    results: Array<{ platoonId: string; success: boolean; error?: string }> 
+  ): Promise<{
+    summary: { total: number; successful: number; failed: number };
+    results: Array<{ platoonId: string; success: boolean; error?: string }>
   }> {
-    logger.info('Sending bulk emails to platoon leaders', { 
-      platoonCount: platoonIds.length, 
-      subject, 
-      senderEmail 
+    logger.info('Sending bulk emails to platoon leaders', {
+      platoonCount: platoonIds.length,
+      subject,
+      senderEmail
     })
 
     const results = []

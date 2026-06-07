@@ -251,8 +251,8 @@ export default function CommunicationsPage() {
       if (emailSearchTerm) {
         const searchLower = emailSearchTerm.toLowerCase()
         return registration.fullName.toLowerCase().includes(searchLower) ||
-               registration.emailAddress.toLowerCase().includes(searchLower) ||
-               registration.phoneNumber.includes(emailSearchTerm)
+          registration.emailAddress.toLowerCase().includes(searchLower) ||
+          registration.phoneNumber.includes(emailSearchTerm)
       }
 
       return true
@@ -274,8 +274,8 @@ export default function CommunicationsPage() {
       if (smsSearchTerm) {
         const searchLower = smsSearchTerm.toLowerCase()
         return registration.fullName.toLowerCase().includes(searchLower) ||
-               registration.emailAddress.toLowerCase().includes(searchLower) ||
-               registration.phoneNumber.includes(smsSearchTerm)
+          registration.emailAddress.toLowerCase().includes(searchLower) ||
+          registration.phoneNumber.includes(smsSearchTerm)
       }
 
       return true
@@ -943,64 +943,62 @@ export default function CommunicationsPage() {
                 </div>
               </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-            {isLoading ? (
-              // Skeleton loaders for email contacts
-              Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="p-3 sm:p-4 border rounded-lg bg-white">
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <Skeleton className="w-4 h-4 sm:w-5 sm:h-5 rounded" />
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              paginatedEmails.map((email, index) => {
-                const registration = filteredRegistrations.find(r => r.emailAddress === email)
-                return (
-                  <div
-                    key={index}
-                    className={`p-3 sm:p-4 border rounded-lg cursor-pointer transition-colors ${
-                      isEmailSelected(email)
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300 active:bg-gray-50'
-                    }`}
-                    onClick={() => handleEmailToggle(email)}
-                  >
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                        isEmailSelected(email)
-                          ? 'border-green-500 bg-green-500'
-                          : 'border-gray-300'
-                      }`}>
-                        {isEmailSelected(email) && (
-                          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-apercu-medium text-xs sm:text-sm text-gray-900 truncate">{email}</p>
-                        {registration && (
-                          <p className="font-apercu-regular text-xs text-gray-500 truncate mt-0.5">
-                            {registration.fullName}
-                          </p>
-                        )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                {isLoading ? (
+                  // Skeleton loaders for email contacts
+                  Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} className="p-3 sm:p-4 border rounded-lg bg-white">
+                      <div className="flex items-center space-x-2 sm:space-x-3">
+                        <Skeleton className="w-4 h-4 sm:w-5 sm:h-5 rounded" />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-3 w-24" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
+                  ))
+                ) : (
+                  paginatedEmails.map((email, index) => {
+                    const registration = filteredRegistrations.find(r => r.emailAddress === email)
+                    return (
+                      <div
+                        key={index}
+                        className={`p-3 sm:p-4 border rounded-lg cursor-pointer transition-colors ${isEmailSelected(email)
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-gray-200 hover:border-gray-300 active:bg-gray-50'
+                          }`}
+                        onClick={() => handleEmailToggle(email)}
+                      >
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${isEmailSelected(email)
+                              ? 'border-green-500 bg-green-500'
+                              : 'border-gray-300'
+                            }`}>
+                            {isEmailSelected(email) && (
+                              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-apercu-medium text-xs sm:text-sm text-gray-900 truncate">{email}</p>
+                            {registration && (
+                              <p className="font-apercu-regular text-xs text-gray-500 truncate mt-0.5">
+                                {registration.fullName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
 
-          {/* Email Pagination Controls */}
-          <PaginationControls
-            pagination={emailPagination}
-            onPageChange={handleEmailPageChange}
-            type="emails"
-          />
+              {/* Email Pagination Controls */}
+              <PaginationControls
+                pagination={emailPagination}
+                onPageChange={handleEmailPageChange}
+                type="emails"
+              />
 
               {allEmails.length === 0 && (
                 <div className="text-center py-6 sm:py-8">
@@ -1150,19 +1148,17 @@ export default function CommunicationsPage() {
                     return (
                       <div
                         key={index}
-                        className={`p-3 sm:p-4 border rounded-lg cursor-pointer transition-colors ${
-                          isPhoneSelected(phone)
+                        className={`p-3 sm:p-4 border rounded-lg cursor-pointer transition-colors ${isPhoneSelected(phone)
                             ? 'border-purple-500 bg-purple-50'
                             : 'border-gray-200 hover:border-gray-300 active:bg-gray-50'
-                        }`}
+                          }`}
                         onClick={() => handlePhoneToggle(phone)}
                       >
                         <div className="flex items-center space-x-2 sm:space-x-3">
-                          <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                            isPhoneSelected(phone)
+                          <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${isPhoneSelected(phone)
                               ? 'border-purple-500 bg-purple-500'
                               : 'border-gray-300'
-                          }`}>
+                            }`}>
                             {isPhoneSelected(phone) && (
                               <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                             )}
@@ -1264,11 +1260,10 @@ export default function CommunicationsPage() {
               <Button
                 onClick={() => setShowBulkEmailModal(true)}
                 disabled={getEffectiveSelectedEmailsCount() === 0}
-                className={`font-apercu-medium h-10 sm:h-12 text-xs sm:text-sm ${
-                  getEffectiveSelectedEmailsCount() === 0
+                className={`font-apercu-medium h-10 sm:h-12 text-xs sm:text-sm ${getEffectiveSelectedEmailsCount() === 0
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:shadow-lg transform hover:scale-105 transition-all duration-200'
-                }`}
+                  }`}
               >
                 <Mail className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 <span className="text-white">
@@ -1285,11 +1280,10 @@ export default function CommunicationsPage() {
               <Button
                 onClick={() => setShowBulkSmsModal(true)}
                 disabled={getEffectiveSelectedPhonesCount() === 0}
-                className={`font-apercu-medium h-10 sm:h-12 text-xs sm:text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border-0 ${
-                  getEffectiveSelectedPhonesCount() === 0
+                className={`font-apercu-medium h-10 sm:h-12 text-xs sm:text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border-0 ${getEffectiveSelectedPhonesCount() === 0
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:shadow-lg transform hover:scale-105 transition-all duration-200'
-                }`}
+                  }`}
               >
                 <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 <span className="text-white">
@@ -1485,8 +1479,8 @@ export default function CommunicationsPage() {
                         type="button"
                         onClick={() => setBulkEmailData(prev => ({
                           ...prev,
-                          subject: '📱 Your LINGER NO LONGER 6.0 Registration & QR Code',
-                          message: 'Thank you for registering for LINGER NO LONGER 6.0!\n\n YOUR QR CODE:\nYour unique QR code is attached to this email as a PNG file. Please:\n\n1. Download the attached QR code file to your phone\n2. Save it to your Photos or Screenshots folder\n3. Present it during event check-in\n4. Keep it accessible throughout the event\n5. Keep this email as a backup\n\n✅ WHAT\'S NEXT:\n• Wait for room allocation notification\n• Wait for platoon assignment notification\n• Prepare for an amazing event experience!\n\nIf you have any questions, please reply to this email.\n\nSee you at LINGER NO LONGER 6.0!\n\n---\nThis email contains your personal QR code. Please keep it secure.'
+                          subject: '📱 Your Linger no Longer 7.0 Registration & QR Code',
+                          message: 'Thank you for registering for Linger no Longer 7.0!\n\n YOUR QR CODE:\nYour unique QR code is attached to this email as a PNG file. Please:\n\n1. Download the attached QR code file to your phone\n2. Save it to your Photos or Screenshots folder\n3. Present it during event check-in\n4. Keep it accessible throughout the event\n5. Keep this email as a backup\n\n✅ WHAT\'S NEXT:\n• Wait for room allocation notification\n• Wait for platoon assignment notification\n• Prepare for an amazing event experience!\n\nIf you have any questions, please reply to this email.\n\nSee you at Linger no Longer 7.0!\n\n---\nThis email contains your personal QR code. Please keep it secure.'
                         }))}
                         className="text-xs text-indigo-600 hover:text-indigo-800 font-apercu-regular px-2 py-1 rounded bg-indigo-50 sm:bg-transparent sm:px-0 sm:py-0"
                         disabled={isSendingBulkEmail}
@@ -1740,6 +1734,6 @@ export default function CommunicationsPage() {
           showContactSupport={errorModal.type === 'error'}
         />
       </div>
-      </AdminLayoutNew>
+    </AdminLayoutNew>
   )
 }

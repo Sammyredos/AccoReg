@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
         <div class="container">
           <div class="header">
             <h2 style="margin: 0;">👥 ${platoon.name} - Participant Roster</h2>
-            <p style="margin: 5px 0 0 0; opacity: 0.9;">LINGER NO LONGER 6.0</p>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">Linger no Longer 7.0</p>
           </div>
 
           <p><strong>Dear ${platoon.leaderName}</strong>,</p>
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
           </div>
 
           <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            This email was sent from the LINGER NO LONGER 6.0 Admin System<br>
+            This email was sent from the Linger no Longer 7.0 Admin System<br>
             <strong>Platoon:</strong> ${platoon.name} (${platoon.label}) | <strong>Generated:</strong> ${new Date().toLocaleString()}
           </p>
         </div>
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
 
     const emailOptions = {
       to: [platoon.leaderEmail],
-      subject: `👥 ${subject} - ${platoon.name} Roster | LINGER NO LONGER 6.0`,
+      subject: `👥 ${subject} - ${platoon.name} Roster | Linger no Longer 7.0`,
       html: emailHtml
     }
 

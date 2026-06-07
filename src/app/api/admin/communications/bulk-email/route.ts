@@ -140,34 +140,34 @@ export async function POST(request: NextRequest) {
       console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} emails)`)
 
       const batchPromises = batch.map(async (email) => {
-      try {
-        let personalizedMessage = message
-        let personalizedSubject = subject
-        let currentRegistration = null
+        try {
+          let personalizedMessage = message
+          let personalizedSubject = subject
+          let currentRegistration = null
 
-        if (includeNames) {
-          currentRegistration = registrationData.find(r => r.emailAddress === email)
-          if (currentRegistration) {
-            // Handle registration information template
-            if (message.includes('[Registration ID]') || message.includes('[Date of Birth]') || message.includes('[Gender]') || message.includes('[Phone Number]') || message.includes('[Email Address]') || message.includes('[Registration Date]')) {
-              personalizedMessage = message
-                .replace(/\[Name\]/g, currentRegistration.fullName)
-                .replace(/\[Your Name\]/g, currentRegistration.fullName)
-                .replace(/\[Registration ID\]/g, currentRegistration.id)
-                .replace(/\[Date of Birth\]/g, currentRegistration.dateOfBirth ? new Date(currentRegistration.dateOfBirth).toLocaleDateString() : 'Not provided')
-                .replace(/\[Gender\]/g, currentRegistration.gender || 'Not specified')
-                .replace(/\[Phone Number\]/g, currentRegistration.phoneNumber || 'Not provided')
-                .replace(/\[Email Address\]/g, currentRegistration.emailAddress)
-                .replace(/\[Registration Date\]/g, currentRegistration.createdAt ? new Date(currentRegistration.createdAt).toLocaleDateString() : 'Unknown')
-            } else {
-              // Standard personalization
-              personalizedMessage = `Dear ${currentRegistration.fullName},\n\n${message}`
+          if (includeNames) {
+            currentRegistration = registrationData.find(r => r.emailAddress === email)
+            if (currentRegistration) {
+              // Handle registration information template
+              if (message.includes('[Registration ID]') || message.includes('[Date of Birth]') || message.includes('[Gender]') || message.includes('[Phone Number]') || message.includes('[Email Address]') || message.includes('[Registration Date]')) {
+                personalizedMessage = message
+                  .replace(/\[Name\]/g, currentRegistration.fullName)
+                  .replace(/\[Your Name\]/g, currentRegistration.fullName)
+                  .replace(/\[Registration ID\]/g, currentRegistration.id)
+                  .replace(/\[Date of Birth\]/g, currentRegistration.dateOfBirth ? new Date(currentRegistration.dateOfBirth).toLocaleDateString() : 'Not provided')
+                  .replace(/\[Gender\]/g, currentRegistration.gender || 'Not specified')
+                  .replace(/\[Phone Number\]/g, currentRegistration.phoneNumber || 'Not provided')
+                  .replace(/\[Email Address\]/g, currentRegistration.emailAddress)
+                  .replace(/\[Registration Date\]/g, currentRegistration.createdAt ? new Date(currentRegistration.createdAt).toLocaleDateString() : 'Unknown')
+              } else {
+                // Standard personalization
+                personalizedMessage = `Dear ${currentRegistration.fullName},\n\n${message}`
+              }
+              personalizedSubject = subject.replace(/\[Name\]/g, currentRegistration.fullName)
             }
-            personalizedSubject = subject.replace(/\[Name\]/g, currentRegistration.fullName)
           }
-        }
 
-        const emailHtml = `
+          const emailHtml = `
           <!DOCTYPE html>
           <html>
           <head>
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
               </div>
               <div class="footer">
                 <p style="margin: 0; font-size: 12px;">
-                  LINGER NO LONGER 6.0 • Questions? Reply to this email
+                  Linger no Longer 7.0 • Questions? Reply to this email
                 </p>
               </div>
             </div>
@@ -204,62 +204,62 @@ export async function POST(request: NextRequest) {
           </html>
         `
 
-        // Generate QR code attachment only for registration info emails (performance optimization)
-        let qrAttachment = null
-        if (currentRegistration && (message.includes('{{REGISTRATION_INFO}}') || subject.toLowerCase().includes('registration'))) {
-          try {
-            const filename = `QR-Code-${currentRegistration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`
+          // Generate QR code attachment only for registration info emails (performance optimization)
+          let qrAttachment = null
+          if (currentRegistration && (message.includes('{{REGISTRATION_INFO}}') || subject.toLowerCase().includes('registration'))) {
+            try {
+              const filename = `QR-Code-${currentRegistration.fullName.replace(/[^a-zA-Z0-9]/g, '-')}.png`
 
-            // Use cached QR code if available, otherwise generate
-            let qrData = currentRegistration.qrCode
-            if (!qrData) {
-              qrData = JSON.stringify({
-                id: currentRegistration.id,
-                name: currentRegistration.fullName,
-                email: currentRegistration.emailAddress,
-                phone: currentRegistration.phoneNumber,
-                event: 'LINGER NO LONGER 6.0',
-                registrationDate: currentRegistration.createdAt,
-                type: 'participant_qr'
-              })
+              // Use cached QR code if available, otherwise generate
+              let qrData = currentRegistration.qrCode
+              if (!qrData) {
+                qrData = JSON.stringify({
+                  id: currentRegistration.id,
+                  name: currentRegistration.fullName,
+                  email: currentRegistration.emailAddress,
+                  phone: currentRegistration.phoneNumber,
+                  event: 'Linger no Longer 7.0',
+                  registrationDate: currentRegistration.createdAt,
+                  type: 'participant_qr'
+                })
+              }
+
+              qrAttachment = await generateQRCodeAttachment(qrData, filename)
+              console.log('📎 QR attachment generated for registration email:', filename)
+            } catch (qrError) {
+              console.error('QR generation error:', qrError)
+              // Continue without QR code if generation fails
             }
+          }
 
-            qrAttachment = await generateQRCodeAttachment(qrData, filename)
-            console.log('📎 QR attachment generated for registration email:', filename)
-          } catch (qrError) {
-            console.error('QR generation error:', qrError)
-            // Continue without QR code if generation fails
+          // Prepare email options with FORCED QR attachment
+          const emailOptions: any = {
+            to: email,
+            subject: personalizedSubject,
+            html: emailHtml,
+            attachments: qrAttachment ? [qrAttachment] : [] // FORCE attachments array
+          }
+
+          // Minimal logging for performance
+          if (qrAttachment) {
+            console.log('📎 QR attachment included for:', email)
+          }
+
+          const result = await sendEmail(emailOptions)
+
+          return {
+            email,
+            success: result,
+            messageId: result ? `sent-${Date.now()}` : null
+          }
+
+        } catch (error) {
+          return {
+            email,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
           }
         }
-
-        // Prepare email options with FORCED QR attachment
-        const emailOptions: any = {
-          to: email,
-          subject: personalizedSubject,
-          html: emailHtml,
-          attachments: qrAttachment ? [qrAttachment] : [] // FORCE attachments array
-        }
-
-        // Minimal logging for performance
-        if (qrAttachment) {
-          console.log('📎 QR attachment included for:', email)
-        }
-
-        const result = await sendEmail(emailOptions)
-
-        return {
-          email,
-          success: result,
-          messageId: result ? `sent-${Date.now()}` : null
-        }
-
-      } catch (error) {
-        return {
-          email,
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      }
       })
 
       // Process this batch
@@ -307,11 +307,11 @@ export async function POST(request: NextRequest) {
       const errorTypes = {}
       errors.forEach(error => {
         const errorType = error.error.includes('timeout') ? 'Timeout' :
-                         error.error.includes('connection') ? 'Connection' :
-                         error.error.includes('authentication') ? 'Authentication' :
-                         error.error.includes('rate') ? 'Rate Limit' :
-                         error.error.includes('invalid') ? 'Invalid Email' :
-                         'Other'
+          error.error.includes('connection') ? 'Connection' :
+            error.error.includes('authentication') ? 'Authentication' :
+              error.error.includes('rate') ? 'Rate Limit' :
+                error.error.includes('invalid') ? 'Invalid Email' :
+                  'Other'
 
         if (!errorTypes[errorType]) errorTypes[errorType] = []
         errorTypes[errorType].push(error.email)

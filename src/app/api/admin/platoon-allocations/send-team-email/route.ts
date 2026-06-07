@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       <body>
         <div class="container">
           <div class="header">
-            <h2 style="margin: 0;">⚔️ ${platoon.name} - LINGER NO LONGER 6.0</h2>
+            <h2 style="margin: 0;">⚔️ ${platoon.name} - Linger no Longer 7.0</h2>
           </div>
 
           <p><strong>Dear ${recipientName}</strong> (${recipientType}),</p>
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           </div>
 
           <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            This email was sent from the LINGER NO LONGER 6.0 Admin System
+            This email was sent from the Linger no Longer 7.0 Admin System
           </p>
         </div>
       </body>
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await sendEmail(emailOptions)
-        
+
         return {
           recipient: recipient.name,
           email: recipient.email,
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
     })
 
     const results = await Promise.allSettled(emailPromises)
-    
+
     // Process results
     const emailResults = []
     let successful = 0
