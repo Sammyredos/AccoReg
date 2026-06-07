@@ -28,21 +28,22 @@ export async function GET(request: NextRequest) {
     const searchConditions: any[] = []
 
     if (search.trim()) {
-      const searchTerm = search.trim()
-      searchConditions.push({
+      const tokens = search.trim().split(/\s+/);
+      const tokenConditions = tokens.map(token => ({
         OR: [
-          { fullName: { contains: searchTerm } },
-          { emailAddress: { contains: searchTerm } },
-          { phoneNumber: { contains: searchTerm } },
+          { fullName: { contains: token } },
+          { emailAddress: { contains: token } },
+          { phoneNumber: { contains: token } },
           {
             roomAllocation: {
               room: {
-                name: { contains: searchTerm }
+                name: { contains: token }
               }
             }
           }
         ]
-      })
+      }));
+      searchConditions.push(...tokenConditions)
     }
 
     if (filter === 'allocated') {
@@ -282,9 +283,9 @@ function generatePDF(registrations: any[]) {
         <p>Generated on: ${new Date().toLocaleDateString()}</p>
         <p>Total Registrations: ${registrations.length}</p>
     </div>
-`
+`;
 
-  Object.entries(roomGroups).forEach(([roomName, roomRegistrations]) => {
+  (Object.entries(roomGroups) as [string, any[]][]).forEach(([roomName, roomRegistrations]) => {
     const room = roomRegistrations[0]?.roomAllocation?.room
 
     htmlContent += `

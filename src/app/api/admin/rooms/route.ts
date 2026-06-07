@@ -21,15 +21,23 @@ export async function GET(request: NextRequest) {
 
     // Get all rooms with allocation counts
     const rooms = await prisma.room.findMany({
+      take: 50,
       include: {
+        _count: {
+          select: { allocations: true }
+        },
         allocations: {
+          take: 5,
           include: {
             registration: {
               select: {
                 id: true,
                 fullName: true,
                 gender: true,
-                dateOfBirth: true
+                dateOfBirth: true,
+                phoneNumber: true,
+                emailAddress: true,
+                branch: true
               }
             }
           }
@@ -43,9 +51,9 @@ export async function GET(request: NextRequest) {
     // Calculate room statistics
     const roomStats = rooms.map(room => ({
       ...room,
-      occupancy: room.allocations.length,
-      availableSpaces: room.capacity - room.allocations.length,
-      occupancyRate: room.capacity > 0 ? Math.round((room.allocations.length / room.capacity) * 100) : 0
+      occupancy: room._count.allocations,
+      availableSpaces: room.capacity - room._count.allocations,
+      occupancyRate: room.capacity > 0 ? Math.round((room._count.allocations / room.capacity) * 100) : 0
     }))
 
     return NextResponse.json({

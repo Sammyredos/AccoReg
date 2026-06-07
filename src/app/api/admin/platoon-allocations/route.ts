@@ -21,48 +21,53 @@ export async function GET(request: NextRequest) {
 
 
 
-    // Fetch verified participants
-    const allVerifiedParticipants = await prisma.registration.findMany({
-      where: {
-        isVerified: true
-      },
-      select: {
-        id: true,
-        fullName: true,
-        dateOfBirth: true,
-        gender: true,
-        emailAddress: true,
-        phoneNumber: true,
-        branch: true
-      },
-      orderBy: {
-        fullName: 'asc'
-      }
-    })
-
-    // Fetch all platoons with their participants
-    const platoons = await prisma.platoonAllocation.findMany({
-      include: {
-        participants: {
-          include: {
-            registration: {
-              select: {
-                id: true,
-                fullName: true,
-                gender: true,
-                dateOfBirth: true,
-                phoneNumber: true,
-                emailAddress: true,
-                branch: true
+    // ✅ PARALLEL — All queries run simultaneously
+    const [
+      allVerifiedParticipants,
+      platoons,
+      totalVerified,
+      totalAllocated
+    ] = await Promise.all([
+      prisma.registration.findMany({
+        take: 50,
+        where: { isVerified: true },
+        select: {
+          id: true,
+          fullName: true,
+          dateOfBirth: true,
+          gender: true,
+          emailAddress: true,
+          phoneNumber: true,
+          branch: true
+        },
+        orderBy: { fullName: 'asc' }
+      }),
+      prisma.platoonAllocation.findMany({
+        take: 50,
+        include: {
+          _count: { select: { participants: true } },
+          participants: {
+            take: 5,
+            include: {
+              registration: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  gender: true,
+                  dateOfBirth: true,
+                  phoneNumber: true,
+                  emailAddress: true,
+                  branch: true
+                }
               }
             }
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.registration.count({ where: { isVerified: true } }),
+      prisma.platoonParticipant.count()
+    ])
 
     // Get allocated participant IDs
     const allocatedParticipantIds = new Set(
@@ -75,12 +80,6 @@ export async function GET(request: NextRequest) {
     const unallocatedParticipants = allVerifiedParticipants.filter(
       participant => !allocatedParticipantIds.has(participant.id)
     )
-
-    // Calculate overall statistics
-    const totalVerified = await prisma.registration.count({
-      where: { isVerified: true }
-    })
-    const totalAllocated = totalVerified - unallocatedParticipants.length
 
     const stats = {
       totalVerified,

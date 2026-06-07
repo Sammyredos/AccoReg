@@ -38,6 +38,7 @@ interface Room {
       dateOfBirth: string
       phoneNumber: string
       emailAddress: string
+      branch: string
     }
   }>
 }

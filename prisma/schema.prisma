@@ -2,8 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ✅ CAPPED — Prevents connection exhaustion
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

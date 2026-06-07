@@ -10,7 +10,7 @@ import { prisma } from '@/lib/db'
 import { authenticateRequest } from '@/lib/auth-helpers'
 import { Logger } from '@/lib/logger'
 
-const logger = new Logger('UnverifiedRegistrations')
+const logger = Logger('UnverifiedRegistrations')
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,21 +56,24 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        {
-          fullName: {
-            contains: search,
-            ...(process.env.DATABASE_URL?.includes('postgresql') && { mode: 'insensitive' })
-          }
-        },
-        {
-          emailAddress: {
-            contains: search,
-            ...(process.env.DATABASE_URL?.includes('postgresql') && { mode: 'insensitive' })
-          }
-        },
-        { phoneNumber: { contains: search } }
-      ]
+      const tokens = search.trim().split(/\s+/);
+      where.AND = tokens.map(token => ({
+        OR: [
+          {
+            fullName: {
+              contains: token,
+              ...(process.env.DATABASE_URL?.includes('postgresql') && { mode: 'insensitive' })
+            }
+          },
+          {
+            emailAddress: {
+              contains: token,
+              ...(process.env.DATABASE_URL?.includes('postgresql') && { mode: 'insensitive' })
+            }
+          },
+          { phoneNumber: { contains: token } }
+        ]
+      }));
     }
 
     // Get unverified registrations

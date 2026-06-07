@@ -23,8 +23,9 @@ export async function GET(request: NextRequest) {
 
     // If ID is provided, return single registration
     if (id) {
+      let registration: any;
       try {
-        const registration = await prisma.childrenRegistration.findUnique({
+        registration = await prisma.childrenRegistration.findUnique({
           where: { id }
         })
 
@@ -71,11 +72,14 @@ export async function GET(request: NextRequest) {
     const where: any = {}
 
     if (search) {
-      where.OR = [
-        { fullName: { contains: search } },
-        { parentGuardianName: { contains: search } },
-        { parentGuardianEmail: { contains: search } }
-      ]
+      const tokens = search.trim().split(/\s+/);
+      where.AND = tokens.map(token => ({
+        OR: [
+          { fullName: { contains: token } },
+          { parentGuardianName: { contains: token } },
+          { parentGuardianEmail: { contains: token } }
+        ]
+      }));
     }
 
     if (gender && gender !== 'all') {

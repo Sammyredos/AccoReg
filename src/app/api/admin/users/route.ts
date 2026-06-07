@@ -36,11 +36,13 @@ export async function GET(request: NextRequest) {
     // Build where clause for search and filtering (PostgreSQL compatible)
     const whereClause: any = {}
     if (search) {
-      const searchLower = search.toLowerCase()
-      whereClause.OR = [
-        { name: { contains: searchLower } },
-        { email: { contains: searchLower } }
-      ]
+      const tokens = search.toLowerCase().trim().split(/\s+/);
+      whereClause.AND = tokens.map(token => ({
+        OR: [
+          { name: { contains: token } },
+          { email: { contains: token } }
+        ]
+      }));
     }
     if (roleId) {
       whereClause.roleId = roleId
@@ -50,11 +52,12 @@ export async function GET(request: NextRequest) {
 
     // First, get all users and admins that match the search criteria (without pagination)
     // We need to do this to properly apply role-based filtering before pagination
-    let allUsersFromDB = []
-    let allAdminsFromDB = []
+    let allUsersFromDB: any[] = []
+    let allAdminsFromDB: any[] = []
 
     try {
       allUsersFromDB = await prisma.user.findMany({
+        take: 50,
         where: whereClause,
         include: {
           role: {
@@ -73,6 +76,7 @@ export async function GET(request: NextRequest) {
 
     try {
       allAdminsFromDB = await prisma.admin.findMany({
+        take: 50,
         where: whereClause,
         include: {
           role: {
@@ -196,7 +200,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email, name, password, roleId } = body
+    let { email, name, password, roleId } = body
     // type removed as it's not used
 
     // Validate required fields

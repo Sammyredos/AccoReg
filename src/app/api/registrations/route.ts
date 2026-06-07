@@ -60,12 +60,14 @@ export async function GET(request: NextRequest) {
 
     // Add search conditions (PostgreSQL compatible)
     if (search) {
-      const searchLower = search.toLowerCase()
-      where.OR = [
-        { fullName: { contains: searchLower } },
-        { emailAddress: { contains: searchLower } },
-        { phoneNumber: { contains: search } }
-      ]
+      const tokens = search.toLowerCase().trim().split(/\s+/);
+      where.AND = tokens.map(token => ({
+        OR: [
+          { fullName: { contains: token } },
+          { emailAddress: { contains: token } },
+          { phoneNumber: { contains: token } }
+        ]
+      }));
     }
 
     // Add status filter

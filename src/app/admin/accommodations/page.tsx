@@ -1,6 +1,12 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then(r => {
+  if (!r.ok) throw new Error('Failed to fetch')
+  return r.json()
+})
 import { flushSync } from 'react-dom'
 import { AdminLayoutNew } from '@/components/admin/AdminLayoutNew'
 import { Card } from '@/components/ui/card'
@@ -76,6 +82,7 @@ interface Room {
       dateOfBirth: string
       phoneNumber: string
       emailAddress: string
+      branch: string
     }
   }>
 }
@@ -91,6 +98,8 @@ function AccommodationsPageContent() {
     dateOfBirth: string
     gender: string
     emailAddress: string
+    phoneNumber: string
+    branch: string
   }>>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [unallocatedLoading, setUnallocatedLoading] = useState(false)
@@ -169,96 +178,49 @@ function AccommodationsPageContent() {
     }
   }, [showSuccess, showError])
 
-  const fetchAccommodationData = useCallback(async () => {
-    try {
-      console.time('fetch-accommodation-data')
-      setIsLoading(true)
+  // Add state to track initial load
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
-      const response = await fetch(`/api/admin/accommodations?t=${Date.now()}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch accommodation data')
-      }
-
-      const data = await response.json()
-      console.log('🏠 Accommodation data fetched successfully at', new Date().toISOString())
-      console.log('📊 Accommodation Stats Received:', {
-        totalRegistrations: data.stats?.totalRegistrations,
-        verifiedRegistrations: data.stats?.verifiedRegistrations,
-        allocatedRegistrations: data.stats?.allocatedRegistrations,
-        unallocatedRegistrations: data.stats?.unallocatedRegistrations,
-        occupiedSpaces: data.stats?.occupiedSpaces,
-        totalCapacity: data.stats?.totalCapacity,
-        roomOccupancyRate: data.stats?.roomOccupancyRate,
-        timestamp: new Date().toISOString()
-      })
-
-      // Batch state updates for better performance
-      const previousUnallocated = stats?.unallocatedRegistrations || 0
-      const newUnallocated = data.stats?.unallocatedRegistrations || 0
-
-      if (previousUnallocated !== newUnallocated) {
-        console.log('🔄 Unallocated count changed:', {
-          from: previousUnallocated,
-          to: newUnallocated,
-          difference: newUnallocated - previousUnallocated,
-          timestamp: new Date().toISOString()
-        })
-      }
-
+  const { data: swrData, error: swrError, mutate } = useSWR('/api/admin/accommodations', fetcher, {
+    refreshInterval: 30000,  // Auto-refresh every 30s
+    dedupingInterval: 2000,  // Dedupe requests within 2s
+    onSuccess: (data) => {
       setStats(data.stats)
-
       const newRoomsByGender = data.roomsByGender || {}
       setRoomsByGender(newRoomsByGender)
       setUnallocatedByGender(data.unallocatedByGender || {})
 
-      // Adjust pagination if current page is now empty
       const maleRooms = newRoomsByGender.Male || []
       const femaleRooms = newRoomsByGender.Female || []
-
-      const maxMalePage = Math.max(1, Math.ceil(maleRooms.length / 8)) // Use fixed value instead of state
-      const maxFemalePage = Math.max(1, Math.ceil(femaleRooms.length / 8)) // Use fixed value instead of state
+      const maxMalePage = Math.max(1, Math.ceil(maleRooms.length / 8))
+      const maxFemalePage = Math.max(1, Math.ceil(femaleRooms.length / 8))
 
       setMalePagination(prev => ({
         ...prev,
         currentPage: prev.currentPage > maxMalePage ? maxMalePage : prev.currentPage
       }))
-
       setFemalePagination(prev => ({
         ...prev,
         currentPage: prev.currentPage > maxFemalePage ? maxFemalePage : prev.currentPage
       }))
-    } catch (error) {
-      console.error('Error fetching accommodation data:', error)
-      // Don't show error modal during normal operation - just log the error
-      // Only show error for critical failures that prevent the app from working
-      if (error instanceof Error && error.message.includes('Network')) {
-        const errorMessage = parseApiError(error)
+
+      setInitialLoadComplete(true)
+      setIsLoading(false)
+    },
+    onError: (err) => {
+      console.error('SWR Error fetching accommodation data:', err)
+      if (err instanceof Error && err.message.includes('Network')) {
+        const errorMessage = parseApiError(err)
         setError(errorMessage.description)
       }
-    } finally {
       setIsLoading(false)
-      console.timeEnd('fetch-accommodation-data')
     }
-  }, []) // Remove dependencies to prevent re-renders
+  })
 
-  // Add state to track initial load
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
-
-  useEffect(() => {
-    const loadData = async () => {
-      await fetchAccommodationData()
-      setInitialLoadComplete(true)
-    }
-    loadData()
-  }, []) // No dependencies to prevent re-renders
+  const fetchAccommodationData = useCallback(async () => {
+    setIsLoading(true)
+    await mutate()
+  }, [mutate])
 
   // Removed auto-refresh for better performance
 
@@ -765,7 +727,7 @@ function AccommodationsPageContent() {
       ...(roomsByGender.Male || []),
       ...(roomsByGender.Female || [])
     ].flatMap(room =>
-      room.participants
+      room.allocations
         .filter(p =>
           p.registration?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           p.registration?.emailAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -841,7 +803,7 @@ function AccommodationsPageContent() {
       ...(roomsByGender.Female || [])
     ]
     for (const room of allRooms) {
-      const allocatedMatch = room.participants.find(p => p.registration?.fullName === name)
+      const allocatedMatch = room.allocations.find(p => p.registration?.fullName === name)
       if (allocatedMatch) {
         console.log('✅ Found in room:', room.name, allocatedMatch)
         return {
@@ -856,12 +818,10 @@ function AccommodationsPageContent() {
           roomName: room.name,
           roomId: room.id,
           roomDetails: {
-            roomNumber: room.roomNumber,
+            name: room.name,
             capacity: room.capacity,
             occupancy: room.occupancy,
-            occupancyRate: room.occupancyRate,
-            floor: room.floor,
-            building: room.building
+            occupancyRate: room.occupancyRate
           }
         }
       }

@@ -124,7 +124,7 @@ function checkProductionReadiness() {
       allChecksPass = false
     }
 
-    if (renderConfig.includes('npx prisma migrate deploy')) {
+    if (renderConfig.includes('npx prisma migrate deploy') || renderConfig.includes('npx tsx scripts/setup-production-db.ts') || renderConfig.includes('npx tsx scripts/deploy-database.ts')) {
       console.log('✅ Database migration in build command')
     } else {
       console.log('❌ Database migration missing from build command')

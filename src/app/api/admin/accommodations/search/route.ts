@@ -36,21 +36,22 @@ export async function GET(request: NextRequest) {
     ]
 
     if (search.trim()) {
-      const searchTerm = search.trim()
-      searchConditions.push({
+      const tokens = search.trim().split(/\s+/);
+      const tokenConditions = tokens.map(token => ({
         OR: [
-          { fullName: { contains: searchTerm } },
-          { emailAddress: { contains: searchTerm } },
-          { phoneNumber: { contains: searchTerm } },
+          { fullName: { contains: token } },
+          { emailAddress: { contains: token } },
+          { phoneNumber: { contains: token } },
           {
             roomAllocation: {
               room: {
-                name: { contains: searchTerm }
+                name: { contains: token }
               }
             }
           }
         ]
-      })
+      }));
+      searchConditions.push(...tokenConditions)
     }
 
     // Add allocation filter conditions (within verified participants)
