@@ -263,9 +263,9 @@ export default function Home() {
                 </div>
                 <h3 className="font-bold text-2xl text-white mb-4">Where</h3>
                 <div className="space-y-3">
-                  <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400">MOPGOM Campground Gudugba</p>
+                  <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400">Great City of God</p>
                   <p className="text-neutral-300 text-base max-w-sm mx-auto leading-relaxed">
-                    After WAPCO Housing Estate, Ifo/Abeokuta Expressway, Gudugba Bus Stop, Ogun State
+                    Awowo, Ogun State
                   </p>
                   <div className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-neutral-400 mt-2">
                     Retreat Center with full accommodation

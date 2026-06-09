@@ -210,7 +210,7 @@ services:
       - key: EMAIL_FROM
         value: samuel.obadina93@gmail.com
       - key: EMAIL_FROM_NAME
-        value: LINGER NO LONGER 6.0 Registration
+        value: LINGER NO LONGER 7.0 Registration
 
 databases:
   - name: mopgomyouth-db
